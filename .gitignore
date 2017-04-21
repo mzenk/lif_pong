@@ -1,0 +1,18 @@
+# Exclude pictures
+*.png
+*.jpg
+figures/
+
+# slurm outputs
+*.out
+
+# datasets and saved rbms
+datasets/
+saved_rbms/
+*.pkl
+*.npz
+*.npy
+*.gz
+
+# Python bytecode
+*.pyc
