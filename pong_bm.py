@@ -12,25 +12,24 @@ import matplotlib.pyplot as plt
 
 
 # Load Pong data
-img_shape = (36, 1)
-fname = 'pong_fixed_start{}x{}'.format(*img_shape)
-fname = 'last_columns'
+img_shape = (36, 48)
+fname = 'gauss_fixed_start{}x{}'.format(*img_shape)
 with np.load('datasets/' + fname + '.npz') as d:
     train_set, valid_set, test_set = d[d.keys()[0]]
 
 assert np.prod(img_shape) == train_set[0].shape[1]
 
-# # inspect data
-# samples = tile_raster_images(train_set[0][:16],
-#                              img_shape=img_shape,
-#                              tile_shape=(4, 4),
-#                              tile_spacing=(1, 1),
-#                              scale_rows_to_unit_interval=True,
-#                              output_pixel_vals=False)
+# inspect data
+samples = tile_raster_images(train_set[0][:16],
+                             img_shape=img_shape,
+                             tile_shape=(4, 4),
+                             tile_spacing=(1, 1),
+                             scale_rows_to_unit_interval=True,
+                             output_pixel_vals=False)
 
-# plt.figure()
-# plt.imshow(samples, interpolation='Nearest', cmap='gray', origin='lower')
-# plt.savefig(fname + 'samples.png')
+plt.figure()
+plt.imshow(samples, interpolation='Nearest', cmap='gray', origin='lower')
+plt.savefig(fname + 'samples.png')
 
 if sys.argv[1] == 'gen':
     print('Training generative RBM on Pong...')
