@@ -384,7 +384,7 @@ class Rbm(object):
         return [grad_w, grad_bv, grad_bh], [vis_recon, hid_recon]
 
     def train(self, train_data, cd_steps=1, persistent=False, cast=False,
-              valid_set=None):
+              valid_set=None, momentum=0.):
         # initializations
         n_instances = train_data.shape[0]
         n_batches = int(np.ceil(n_instances/self.batch_size))
@@ -397,9 +397,8 @@ class Rbm(object):
         delta_f = []
         steps = []
 
-        # regularization was not necessary for my application
+        # regularization was not necessary for my applications
         regularizer = 0
-        momentum = .2
         # ++++++++++++
         # new for cast
         cast_variables = None
@@ -518,14 +517,14 @@ class ClassRbm(Rbm):
                  n_inputs,
                  n_hidden,
                  n_labels,
-                 rate=.01,
-                 n_epochs=5,
-                 batch_size=10,
                  wv=None,
                  wl=None,
                  bias_vis=None,
                  bias_hid=None,
-                 bias_lab=None):
+                 bias_lab=None,
+                 rate=.01,
+                 n_epochs=5,
+                 batch_size=10,):
         self.n_hidden = n_hidden
         self.n_visible = n_inputs + n_labels
         self.n_inputs = n_inputs

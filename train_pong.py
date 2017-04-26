@@ -19,18 +19,6 @@ with np.load('datasets/' + fname + '.npz') as d:
 
 assert np.prod(img_shape) == train_set[0].shape[1]
 
-# inspect data
-samples = tile_raster_images(train_set[0][:16],
-                             img_shape=img_shape,
-                             tile_shape=(4, 4),
-                             tile_spacing=(1, 1),
-                             scale_rows_to_unit_interval=True,
-                             output_pixel_vals=False)
-
-plt.figure()
-plt.imshow(samples, interpolation='Nearest', cmap='gray', origin='lower')
-plt.savefig(fname + 'samples.png')
-
 if sys.argv[1] == 'gen':
     print('Training generative RBM on Pong...')
     # discard labels
@@ -83,16 +71,24 @@ if sys.argv[1] == 'dis':
     valid_set = np.concatenate((valid_set[0],
                                 to_1_of_c(valid_set[1], n_labels)), axis=1)
 
+    # initialize biases like in Hinton's guide
+    pj = np.average(train_wlabel, axis=0)
+    pj[pj == 0] = 1e-5
+    pj[pj == 1] = 1 - 1e-5
+    bias_init = np.log(pj / (1 - pj))
+
     my_rbm = ClassRbm(n_inputs=train_set[0].shape[1],
-                      n_hidden=100,
+                      n_hidden=200,
                       n_labels=n_labels,
+                      bias_vis=pj[:-n_labels],
+                      bias_lab=pj[-n_labels:],
                       n_epochs=30,
                       batch_size=10,
-                      rate=.8)
+                      rate=.3)
 
     start = time.time()
     t, df, pl = my_rbm.train(train_wlabel, cd_steps=5, persistent=True,
-                             cast=False, valid_set=valid_set)
+                             cast=False, valid_set=valid_set, momentum=0.1)
 
     print('Total training time: {:.1f} min'.format((time.time() - start)/60))
 

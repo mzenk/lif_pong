@@ -43,6 +43,19 @@ def to_1_of_c(labels, c):
     res[range(labels.size), labels] = 1
     return res
 
+
+def get_windowed_image_index(img_shape, end_index,
+                             window_size=-1, fractional=False):
+    mask = np.zeros(img_shape)
+    if fractional:
+        end_index = int(end_index * img_shape[1])
+    if window_size < 0:
+        window_size = end_index
+    start_index = max(0, end_index - window_size)
+    mask[:, start_index:end_index] = 1
+    uncovered_ind = np.nonzero(mask.flatten())[0]
+    return uncovered_ind
+
 # -----------------------------------------------------------------------------
 # Taken from http://deeplearning.net/tutorial/utilities.html#how-to-plot
 
