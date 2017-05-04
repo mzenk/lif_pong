@@ -3,7 +3,7 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 from util import tile_raster_images, to_1_of_c, get_windowed_image_index
-from bm import Rbm, ClassRbm
+from rbm import Rbm, ClassRbm
 import sys
 import matplotlib
 matplotlib.use('agg')
@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 # pong pattern completion
 # Load Pong data
 img_shape = (36, 48)
-data_name = 'gauss_fixed_start{}x{}'.format(*img_shape)
+data_name = 'pong_var_start{}x{}'.format(*img_shape)
+# data_name = 'label1_fixed'
 discriminative = True
 with np.load('datasets/' + data_name + '.npz') as d:
     train_set, _, test_set = d[d.keys()[0]]
@@ -36,7 +37,7 @@ else:
     index_range = testrbm.n_visible
 
 # # Produce visual example for a pattern completion
-# my_test = test_set[0][123]
+# my_test = test_set[0][141]
 # for fraction in np.linspace(.1, .9, 9):
 #     # first get the prediction
 #     clamped_ind = get_windowed_image_index(img_shape, fraction,
@@ -67,7 +68,8 @@ else:
 #     ax2.set_ylim([-.5, inferred_img.shape[0] - .5])
 #     ax2.xaxis.set_ticks([0., 0.5, 1.])
 #     ax2.tick_params(left='off', right='off', labelleft='off', labelright='off')
-#     fig.savefig('windowed_traj{:.1f}.png'.format(fraction))
+#     fig.savefig('windowed_traj{:.1f}.png'.format(fraction),
+#                 bbox_inches='tight')
 
 # # Test the "classification performance", i.e. how much of the picture does
 # # the RBM need to predict the correct outcome
@@ -112,7 +114,8 @@ else:
 #     plt.gca().spines['right'].set_color('blue')
 #     plt.gca().spines['left'].set_color('red')
 #     plt.title('#samples: {}, window size: {}'.format(n_sampl, win_size))
-#     plt.savefig('uncovering{}window{}samples.png'.format(win_size, n_sampl))
+    # plt.savefig('uncovering{}window{}samples.png'.format(win_size, n_sampl),
+    #             bbox_inches = 'tight')
 
 # # Dreaming
 # samples = testrbm.draw_samples(int(1e4), ast=False)
@@ -126,26 +129,52 @@ else:
 
 # plt.figure()
 # plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-# plt.savefig('samples.png')
+# plt.savefig('samples.png', bbox_inches = 'tight')
 
-# train set performance
-prediction = testrbm.classify(test_set[0])
+# # whole set performance
+my_set = train_set
+
+# For the wrong cases, how do the class probabilities look?
+class_prob = testrbm.classify(my_set[0], class_prob=True)
+prediction = np.argmax(class_prob, axis=1)
 print('Correct predictions: '
-      '{}'.format(np.average(prediction == test_set[1])))
+      '{}'.format(np.average(prediction == my_set[1])))
+wrong_ind = np.where(np.argmax(class_prob, axis=1) != my_set[1])[0]
+# plt.figure()
+# for i in range(9):
+#     plt.subplot(3, 3, i + 1)
+#     plt.bar(np.arange(testrbm.n_labels), class_prob[wrong_ind][i], width=1)
+# plt.tight_layout()
+# plt.savefig('class_prob.png')
 
-# # How much off are the labels?
-# dist = prediction - train_set[1]
-# plt.hist(dist[dist != 0], bins=np.arange(-testrbm.n_labels + 1,
-#                                          testrbm.n_labels - 1), align='left')
-# plt.xlim([-5, 5])
-# plt.xlabel('Correct label - predicted label')
-# plt.savefig('wrong_difference.png')
+# How much off are the labels?
+# also check the distance to second best label guess
+sorted_ind = np.argsort(class_prob[wrong_ind], axis=1)
+difference1 = my_set[1][wrong_ind] - sorted_ind[:, -1]
+difference2 = my_set[1][wrong_ind] - sorted_ind[:, -2]
+plt.figure()
+plt.hist(difference1, align='left', color='g', label='1st guess',
+         bins=np.arange(-testrbm.n_labels + 1, testrbm.n_labels - 1))
+plt.hist(difference2, align='left', color='b', label='2nd guess', alpha=.7,
+         bins=np.arange(-testrbm.n_labels + 1, testrbm.n_labels - 1))
+plt.xlim([-5, 5])
+plt.legend()
+plt.xlabel('Correct label - predicted label')
+plt.savefig('wrong_difference.png')
+
+# ...and the difference in probability between first and second guess
+sorted_probs = np.sort(class_prob[wrong_ind], axis=1)
+prob_diffs = sorted_probs[:, -1] - sorted_probs[:, -2]
+plt.figure()
+plt.hist(prob_diffs, align='left', bins=10)
+plt.xlabel('Probability difference between 1st and 2nd guess')
+plt.savefig('prob_differences.png')
 
 # # inspect some wrong predictions
-# wrong_ind = np.where(prediction != train_set[1])[0]
-# wrong_imgs = train_set[0][wrong_ind]
-# wrong_labels = train_set[1][wrong_ind]
-# rep_labels = np.repeat(2*(to_1_of_c(train_set[1][wrong_ind], testrbm.n_labels) -
+# wrong_ind = np.where(prediction != my_set[1])[0]
+# wrong_imgs = my_set[0][wrong_ind]
+# wrong_labels = my_set[1][wrong_ind]
+# rep_labels = np.repeat(2*(to_1_of_c(my_set[1][wrong_ind], testrbm.n_labels) -
 #                           to_1_of_c(prediction[wrong_ind], testrbm.n_labels)),
 #                        3, axis=1)
 
@@ -162,7 +191,7 @@ print('Correct predictions: '
 #                                     output_pixel_vals=False)
 
 # plt.figure()
-# plt.imshow(wrong_examples, interpolation='Nearest', cmap='gray', origin='lower')
+# plt.imshow(wrong_examples, interpolation='Nearest', cmap='gray')
 # plt.colorbar()
 # plt.title('Black: predicted; white: correct')
 # plt.savefig('wrong_examples.png')
@@ -171,7 +200,7 @@ print('Correct predictions: '
 # # -> if more detail needed: confusion matrix
 # plt.figure()
 # histo = np.histogram(wrong_labels, bins=testrbm.n_labels)[0] /\
-#     np.histogram(train_set[1], bins=testrbm.n_labels)[0]
+#     np.histogram(my_set[1], bins=testrbm.n_labels)[0]
 # plt.bar(np.arange(testrbm.n_labels), height=histo)
 # plt.xlabel('Class label')
 # plt.ylabel('Wrong predictions %')

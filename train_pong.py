@@ -1,7 +1,7 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
-from bm import Rbm, ClassRbm
+from rbm import Rbm, ClassRbm
 import time
 import cPickle
 from util import to_1_of_c, tile_raster_images
@@ -13,11 +13,23 @@ import matplotlib.pyplot as plt
 
 # Load Pong data
 img_shape = (36, 48)
-fname = 'gauss_fixed_start{}x{}'.format(*img_shape)
+save = False
+fname = 'gauss_var_start{}x{}'.format(*img_shape)
+# fname = 'label1_fixed'
 with np.load('datasets/' + fname + '.npz') as d:
     train_set, valid_set, test_set = d[d.keys()[0]]
 
 assert np.prod(img_shape) == train_set[0].shape[1]
+
+training_params = {
+    'n_epochs': 5,
+    'batch_size': 10,
+    'lrate': .01,
+    'cd_steps': 5,
+    'persistent': True,
+    'cast': False,
+    'momentum': 0.5
+}
 
 if sys.argv[1] == 'gen':
     print('Training generative RBM on Pong...')
@@ -30,36 +42,18 @@ if sys.argv[1] == 'gen':
     pj[pj == 0] = 1e-5
     pj[pj == 1] = 1 - 1e-5
     bias_init = np.log(pj / (1 - pj))
-    my_rbm = Rbm(train_set.shape[1],
-                 n_hidden=200,
-                 n_epochs=2,
-                 batch_size=10,
-                 rate=.06,
-                 bv=bias_init)
+    my_rbm = Rbm(train_set.shape[1], n_hidden=200, vbias=bias_init)
 
     start = time.time()
-
-    t, df, pl = my_rbm.train(train_set, cd_steps=5, persistent=True,
-                             valid_set=valid_set)
+    my_rbm.train(train_set, valid_set=valid_set,
+                 filename='pong_gen_log.txt', **training_params)
 
     print('Total training time: {:.1f} min'.format((time.time() - start)/60))
 
-    # Save monitoring quantities as diagram
-    plt.figure()
-    plt.plot(t, pl, '.')
-    plt.xlabel('update steps')
-    plt.ylabel('log PL')
-    plt.savefig('logpl.png')
-
-    plt.figure()
-    plt.plot(t, df, '.')
-    plt.xlabel('update steps')
-    plt.ylabel('F_valid - F_train')
-    plt.savefig('df.png')
-
-    # Save crbm for later inspection
-    with open('saved_rbms/' + fname + '_rbm.pkl', 'wb') as output:
-        cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
+    if save:
+        # Save crbm for later inspection
+        with open('saved_rbms/' + fname + '_rbm.pkl', 'wb') as output:
+            cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
 
 if sys.argv[1] == 'dis':
     print('Training discriminative RBM on Pong on  {}'
@@ -77,38 +71,25 @@ if sys.argv[1] == 'dis':
     pj[pj == 1] = 1 - 1e-5
     bias_init = np.log(pj / (1 - pj))
 
-    my_rbm = ClassRbm(n_inputs=train_set[0].shape[1],
-                      n_hidden=200,
-                      n_labels=n_labels,
-                      bias_vis=pj[:-n_labels],
-                      bias_lab=pj[-n_labels:],
-                      n_epochs=30,
-                      batch_size=10,
-                      rate=.3)
+    for r in [.001, .01, .1]:
+        training_params['lrate'] = r
+        my_rbm = ClassRbm(n_inputs=train_set[0].shape[1],
+                          n_hidden=500,
+                          n_labels=n_labels,
+                          vbias=bias_init)
 
     start = time.time()
-    t, df, pl = my_rbm.train(train_wlabel, cd_steps=5, persistent=True,
-                             cast=False, valid_set=valid_set, momentum=0.1)
+    my_rbm.train(train_wlabel, valid_set=valid_set,
+                 filename='pong_dis_log.txt', **training_params)
 
-    print('Total training time: {:.1f} min'.format((time.time() - start)/60))
+    print('Training took {:.1f} min'.format((time.time() - start)/60))
 
-    # Save monitoring quantities as diagram
-    plt.figure()
-    plt.plot(t, pl, '.')
-    plt.xlabel('update steps')
-    plt.ylabel('log PL')
-    plt.savefig('logpl.png')
-
-    plt.figure()
-    plt.plot(t, df, '.')
-    plt.xlabel('update steps')
-    plt.ylabel('F_valid - F_train')
-    plt.savefig('df.png')
-
-    # Save crbm for later inspection, the training parameters
-    # (rate, batch_size) are also accessible
-    with open('saved_rbms/' + fname + '_crbm.pkl', 'wb') as output:
-        cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
+    if save:
+        # Save crbm for later inspection, the training parameters should be
+        # recorded elsewhere!
+        with open('saved_rbms/' + fname + '_crbm.pkl', 'wb') as output:
+            cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
+        print('Wrote RBM to: ' + fname + '_crbm.pkl')
 
     # # visualize labels
     # dunno = np.concatenate((train_set[0].reshape((train_set[0].shape[0], img_shape[0], 3)),
@@ -125,4 +106,4 @@ if sys.argv[1] == 'dis':
     # plt.imshow(samples, interpolation='Nearest', cmap='gray', origin='lower')
     # plt.title('Examples for trajectory endings + labels')
     # plt.colorbar()
-    # plt.savefig('label_problem.png')
+    # plt.savefig('./figures/label_problem.png')

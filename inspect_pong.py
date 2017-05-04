@@ -3,7 +3,7 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 from util import tile_raster_images, to_1_of_c
-from bm import Rbm, ClassRbm
+from rbm import Rbm, ClassRbm
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -58,3 +58,7 @@ plt.savefig('filters.png')
 # plt.figure()
 # plt.hist(testrbm.w[:testrbm.n_inputs].flatten(), 50)
 # plt.savefig('weight_histo.png')
+
+# Check the probability of each hidden unit being active given instances of a
+# minibatch
+# tbd

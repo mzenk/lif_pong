@@ -28,12 +28,12 @@ np.random.seed(7491055)
 max_angle = 50.
 if fixed_start:
     nstarts = 1
-    nangles = 2*1000
+    nangles = 2*10000
     starts = np.array([[field[1]*.5]])
     fname = pot_str + '_fixed_start{1}x{0}'.format(grid[0], grid[1])
 else:
     nangles = 400
-    nstarts = 70
+    nstarts = 100
     starts = field[1]*np.random.beta(1.5, 1.5, nstarts)
     fname = pot_str + '_var_start{1}x{0}'.format(grid[0], grid[1])
 # draw for each start position nangles angles
@@ -42,6 +42,7 @@ angles = max_angle * 2*(np.random.rand(nstarts, nangles) - .5)
 data = np.zeros((angles.size, np.prod(grid)))
 impact_points = np.zeros(angles.size)
 n = 0
+print('Generating trajectories...')
 for i, s in enumerate(starts):
     for a in angles[i]:
         # # No forces
@@ -98,7 +99,7 @@ if save_data:
     valid_labels = labels[size_train: -size_test]
     test_set = data[-size_test:]
     test_labels = labels[-size_test:]
-
+    # fname = 'label1_var'
     np.savez_compressed('datasets/' + fname,
                         ((train_set, train_labels),
                          (valid_set, valid_labels),

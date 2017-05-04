@@ -8,44 +8,41 @@ import util
 from bm import Rbm, ClassRbm
 
 
-# Load rbm
-with open('mnist_gen_rbm.pkl', 'rb') as f:
+# Load rbm and data
+with open('saved_rbms/mnist_dbn.pkl', 'rb') as f:
     testrbm = cPickle.load(f)
-
-# pong pattern completion
-# Load Pong data
+# for dbn look at bottom BM
+# testrbm = testrbm.rbms[0]
 f = gzip.open('datasets/mnist.pkl.gz', 'rb')
 _, _, test_set = np.load(f)
 f.close()
-
+img_shape = (28, 28)
+n_pixels = np.prod(img_shape)
 # # weight histogram
 # plt.figure()
 # plt.hist(testrbm.w.flatten(), 50)
-# plt.savefig('weight_histo.png')
+# plt.savefig('./figures/weight_histo.png')
 
 # # For visual inspection of filters and samples
-# #filters
-# tiled_filters = util.tile_raster_images(X=testrbm.w.T[:25,:],
-#                         img_shape=(n_pxls,n_pxls),
-#                         tile_shape=(5,5),
-#                         scale_rows_to_unit_interval=True,
-#                         output_pixel_vals=False)
+# tiled_filters = util.tile_raster_images(X=testrbm.w.T[:25, :n_pixels],
+#                                         img_shape=img_shape,
+#                                         tile_shape=(5, 5),
+#                                         scale_rows_to_unit_interval=True,
+#                                         output_pixel_vals=False)
 # plt.figure()
 # plt.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
-# plt.savefig('filters.png')
+# plt.savefig('figures/filters.png')
 
-n_pxls = int(np.sqrt(testrbm.n_visible))
-# samples
-samples = testrbm.draw_samples(10000, ast=True)[500::100, :testrbm.n_visible]
-tiled_samples = util.tile_raster_images(samples,
-                                        img_shape=(n_pxls, n_pxls),
-                                        tile_shape=(10, samples.shape[0]//10),
+samples = testrbm.draw_samples(1e5)
+tiled_samples = util.tile_raster_images(samples[500::1000, :n_pixels],
+                                        img_shape=img_shape,
+                                        tile_shape=(10, 10),
                                         scale_rows_to_unit_interval=True,
                                         output_pixel_vals=False)
 
 plt.figure()
 plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-plt.savefig('samples.png')
+plt.savefig('./figures/samples.png')
 
 # # samples with partially clamped inputs
 # n_pxls = int(np.sqrt(testrbm.n_visible))
@@ -75,7 +72,7 @@ plt.savefig('samples.png')
 
 # plt.figure()
 # plt.imshow(tiled_clamped, interpolation='Nearest', cmap='gray')
-# plt.savefig('clamped.png')
+# plt.savefig('./figures/clamped.png')
 
 # # sample_with_clamped_units from labels --- only for crbms
 # n_pxls = int(np.sqrt(testrbm.n_inputs))
@@ -88,4 +85,4 @@ plt.savefig('samples.png')
 
 # plt.figure()
 # plt.imshow(tiled_clamped, interpolation='Nearest', cmap='gray')
-# plt.savefig('clamped.png')
+# plt.savefig('./figures/clamped.png')
