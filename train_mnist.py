@@ -6,8 +6,8 @@ import gzip
 from util import to_1_of_c, tile_raster_images
 import sys
 import time
-from rbm import Rbm, ClassRbm
-from dbn import Dbn
+from rbm import RBM, CRBM
+from dbm import DBM
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -16,9 +16,10 @@ import matplotlib.pyplot as plt
 f = gzip.open('datasets/mnist.pkl.gz', 'rb')
 train_set, valid_set, test_set = cPickle.load(f)
 f.close()
+n_pixels = train_set[0].shape[1]
 
 training_params = {
-    'n_epochs': 1,
+    'n_epochs': 5,
     'batch_size': 10,
     'lrate': .01,
     'cd_steps': 1,
@@ -37,7 +38,7 @@ if sys.argv[1] == 'gen':
     pj[pj == 0] = 1e-5
     pj[pj == 1] = 1 - 1e-5
     bias_init = np.log(pj / (1 - pj))
-    my_rbm = Rbm(train_set[0].shape[1], 300, vbias=bias_init)
+    my_rbm = RBM(n_pixels, 300, vbias=bias_init)
 
     start = time.time()
     my_rbm.train(train_set[0], valid_set=valid_set[0],
@@ -60,8 +61,8 @@ if sys.argv[1] == 'dis':
     valid_input = np.concatenate((valid_set[0][:1000],
                                  to_1_of_c(valid_set[1][:1000], 10)), axis=1)
 
-    crbm = ClassRbm(n_inputs=train_set[0].shape[1], n_hidden=300,
-                    n_labels=10)
+    crbm = CRBM(n_inputs=n_pixels, n_hidden=300,
+                n_labels=10)
     print('Training Classifying RBM on MNIST...')
     start = time.time()
     crbm.train(train_input, valid_set=valid_input,
@@ -79,24 +80,23 @@ if sys.argv[1] == 'dis':
 if sys.argv[1] == 'deep':
     # ----- test DBN -----
 
-    layers = [100, 200]
-    print('Training DBN {} on MNIST...'.format(layers))
+    layers = [n_pixels, 50, 100]
+    print('Training DBM {} on MNIST...'.format(layers))
     pj = np.average(train_set[0], axis=0)
     pj[pj == 0] = 1e-5
     pj[pj == 1] = 1 - 1e-5
     bias_init = np.log(pj / (1 - pj))
-    my_dbn = Dbn(train_set[0].shape[1], layers, vbias_init=bias_init)
+    my_dbm = DBM(layers, vbias_init=bias_init)
 
     start = time.time()
-    my_dbn.train(train_set[0], valid_set=valid_set[0],
-                 filename='mnist_dbn_log.txt', **training_params)
+    my_dbm.train(train_set[0][:1000], valid_set=None,
+                 filename='mnist_dbm_log.txt', **training_params)
 
     print('Total training time: {:.1f} min'.format((time.time() - start)/60))
-    print('CSL: {}'.format(my_dbn.compute_csl(valid_set[0])))
 
-    # Save crbm for later inspection
+    # Save DBM for later inspection
     with open('saved_rbms/mnist_dbn.pkl', 'wb') as output:
-        cPickle.dump(my_dbn, output, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump(my_dbm, output, cPickle.HIGHEST_PROTOCOL)
 
     # Save monitoring quantities as diagram
     # plt.figure()

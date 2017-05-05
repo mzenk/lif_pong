@@ -4,15 +4,13 @@ from __future__ import print_function
 import numpy as np
 
 
-class Rbm(object):
-    def __init__(
-                self,
-                n_visible,
-                n_hidden,
-                w=None,
-                vbias=None,
-                hbias=None,
-                numpy_seed=None):
+class RBM(object):
+    def __init__(self,
+                 n_visible, n_hidden,
+                 w=None,
+                 vbias=None, hbias=None,
+                 numpy_seed=None,
+                 dbm_factor=[1, 1]):
         # Set seed for reproducatbility
         self.np_rng = np.random.RandomState(numpy_seed)
 
@@ -32,6 +30,11 @@ class Rbm(object):
         self.w = w
         self.vbias = vbias
         self.hbias = hbias
+
+        # This factor is needed during the layerwise DBM training.
+        # Making it a instance variable is not good OOP-style but
+        # a simple solution
+        self.dbm_factor = dbm_factor
 
     def energy(self, v, h):
         return - np.einsum('ik,il,kl->i', v, h, self.w) - \
@@ -65,15 +68,12 @@ class Rbm(object):
         v_curr = v_start
         h_curr = 0
         for t in range(n_samples):
-            # schedule for gamma?
-            # gamma = 10/(1 + t/1e2)
-            if not ast:
-                pv, v_curr, ph, h_curr = self.gibbs_vhv(v_curr)
-                if binary:
-                    samples[:, t, :] = \
-                        np.concatenate((v_curr, h_curr), axis=ax)
-                else:
-                    samples[:, t, :] = np.concatenate((pv, ph), axis=ax)
+            pv, v_curr, ph, h_curr = self.gibbs_vhv(v_curr)
+            if binary:
+                samples[:, t, :] = \
+                    np.concatenate((v_curr, h_curr), axis=ax)
+            else:
+                samples[:, t, :] = np.concatenate((pv, ph), axis=ax)
         return samples.squeeze()
 
     # doesn't work for multiple chains yet
@@ -229,10 +229,10 @@ class Rbm(object):
             # for ast we get an array with 'n_instances' entries
             beta = np.expand_dims(beta, 1)
 
-        u = beta * (v_in.dot(self.w) + self.hbias)
-        p = 1./(1 + np.exp(-u))
-        h_out = (self.np_rng.rand(v_in.shape[0], self.n_hidden) < p)*1
-        return [p.squeeze(), h_out.squeeze()]
+        u = beta * (v_in.dot(self.dbm_factor[0] * self.w) + self.hbias)
+        p_on = 1./(1 + np.exp(-u))
+        h_samples = (self.np_rng.rand(v_in.shape[0], self.n_hidden) < p_on)*1
+        return [p_on.squeeze(), h_samples.squeeze()]
 
     def sample_v_given_h(self, h_in, beta=1.):
         if len(h_in.shape) == 1:
@@ -241,10 +241,10 @@ class Rbm(object):
             # for ast we get an array with 'n_instances' entries
             beta = np.expand_dims(beta, 1)
 
-        u = beta * (h_in.dot(self.w.T) + self.vbias)
-        p = 1./(1 + np.exp(-u))
-        v_out = (self.np_rng.rand(h_in.shape[0], self.n_visible) < p)*1
-        return [p.squeeze(), v_out.squeeze()]
+        u = beta * (h_in.dot(self.dbm_factor[1] * self.w.T) + self.vbias)
+        p_on = 1./(1 + np.exp(-u))
+        v_samples = (self.np_rng.rand(h_in.shape[0], self.n_visible) < p_on)*1
+        return [p_on.squeeze(), v_samples.squeeze()]
 
     # compute CSL; this method can be overwritten for CRBM
     # speed up by numpy array operations is limited by memory consumption of
@@ -492,23 +492,18 @@ class Rbm(object):
               '{}'.format(self.compute_logpl(train_set[subset_ind])))
 
 
-class ClassRbm(Rbm):
+class CRBM(RBM):
     """
         Training should work exactly the same, so the super methods are used.
         Class internals must be adapted, however, and some classification
         methods are added.
     """
     def __init__(self,
-                 n_inputs,
-                 n_hidden,
-                 n_labels,
-                 wv=None,
-                 wl=None,
-                 input_bias=None,
-                 vbias=None,
-                 hbias=None,
-                 lbias=None,
-                 numpy_seed=None):
+                 n_inputs, n_hidden, n_labels,
+                 wv=None, wl=None,
+                 input_bias=None, vbias=None,  hbias=None, lbias=None,
+                 numpy_seed=None,
+                 dbm_factor=[1, 1]):
         # Set seed for reproducatbility
         self.np_rng = np.random.RandomState(numpy_seed)
 
@@ -542,6 +537,11 @@ class ClassRbm(Rbm):
             self.vbias = vbias
         self.lbias = self.vbias[n_inputs:]
         self.hbias = hbias
+
+        # This factor is needed during the layerwise DBM training.
+        # Making it a instance variable is not good OOP-style but
+        # a simple solution
+        self.dbm_factor = dbm_factor
 
     def classify(self, v_data, class_prob=False):
         if len(v_data.shape) == 1:
