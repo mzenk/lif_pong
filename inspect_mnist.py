@@ -9,7 +9,7 @@ from bm import Rbm, ClassRbm
 
 
 # Load rbm and data
-with open('saved_rbms/mnist_dbm.pkl', 'rb') as f:
+with open('saved_rbms/mnist_gen_rbm.pkl', 'rb') as f:
     testrbm = cPickle.load(f)
 f = gzip.open('datasets/mnist.pkl.gz', 'rb')
 _, _, test_set = np.load(f)

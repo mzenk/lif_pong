@@ -19,7 +19,7 @@ f.close()
 n_pixels = train_set[0].shape[1]
 
 training_params = {
-    'n_epochs': 5,
+    'n_epochs': 4,
     'batch_size': 10,
     'lrate': .01,
     'cd_steps': 1,
@@ -80,7 +80,7 @@ if sys.argv[1] == 'dis':
 if sys.argv[1] == 'deep':
     # ----- test DBN -----
 
-    layers = [n_pixels, 50, 100]
+    layers = [n_pixels, 100, 200]
     print('Training DBM {} on MNIST...'.format(layers))
     pj = np.average(train_set[0], axis=0)
     pj[pj == 0] = 1e-5
@@ -89,13 +89,13 @@ if sys.argv[1] == 'deep':
     my_dbm = DBM(layers, vbias_init=bias_init)
 
     start = time.time()
-    my_dbm.train(train_set[0][:1000], valid_set=None,
+    my_dbm.train(train_set[0], valid_set=None,
                  filename='mnist_dbm_log.txt', **training_params)
 
     print('Total training time: {:.1f} min'.format((time.time() - start)/60))
 
     # Save DBM for later inspection
-    with open('saved_rbms/mnist_dbn.pkl', 'wb') as output:
+    with open('saved_rbms/mnist_dbm.pkl', 'wb') as output:
         cPickle.dump(my_dbm, output, cPickle.HIGHEST_PROTOCOL)
 
     # Save monitoring quantities as diagram

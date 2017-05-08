@@ -18,11 +18,10 @@ class DBM(object):
         self.weights = []
         self.hbiases = []
         self.rbms = []
-
-        # initialize weights and biases
         if vbias_init is None:
             vbias_init = np.zeros(self.hidden_layers[0])
         self.vbias = vbias_init
+        # initialize weights and biases
         for i in range(len(self.hidden_layers)):
             if i == 0:
                 dbm_factor = [2, 1]
@@ -104,8 +103,10 @@ class DBM(object):
         return [p_on.squeeze(), samples.squeeze()]
 
     # make a gibbs step starting from the state of v and all other even
-    # numbered layers
-    def gibbs_from_v(self, state):
+    # numbered layers. _state_ is given as a reference and changed inside the
+    # method
+    def gibbs_from_v(self, state, binary=False,
+                     clamped=None, clamped_val=None):
         assert len(state) == len(self.hidden_layers) + 1
         means = [0] * len(state)
         samples = [0] * len(state)
@@ -113,43 +114,72 @@ class DBM(object):
         # # update odd numbered layers
         # for i in np.arange(1, len(self.hidden_layers) + 1, 2):
         #     # special sampling for top layer
-        #     if i == self.hidden_layers.size - 1:
-        #         means[i], samples[i] = \
+        #     if i == len(self.hidden_layers):
+        #         means, samples = \
         #             self.sample_outer_cond(state[i - 1], visible=False)
         #     else:
-        #         means[i], samples[i] = \
+        #         means, samples = \
         #             self.sample_inner_cond(i - 1, h_upper=state[i + 1],
         #                                    h_lower=state[i - 1])
-        # # update even numbered layers
-        # state[0] = self.sample_outer_cond(state[1], visible=True)
-        # for i in np.arange(2, len(self.hidden_layers) + 1, 2):
-        #     # special sampling for top layer
-        #     if i == self.hidden_layers.size - 1:
-        #         means[i], samples[i] = \
-        #             self.sample_outer_cond(state[i - 1], visible=False)
+        #     if binary:
+        #         state[i] = samples
         #     else:
-        #         means[i], samples[i] = \
-        #             self.sample_inner_cond(i - 1, h_upper=state[i + 1],
-        #                                    h_lower=state[i - 1])
+        #         state[i] = means
+        #     # reset clamped units
+        #     if clamped is not None and clamped[i] is not None:
+        #         state[i][clamped[i]] = clamped_val[i]
 
+        # # update even numbered layers
+        # for i in np.arange(0, len(self.hidden_layers) + 1, 2):
+        #     if i == 0:
+        #         means, samples = self.sample_outer_cond(state[1], visible=True)
+        #     # special sampling for top layer
+        #     elif i == len(self.hidden_layers):
+        #         means, samples = \
+        #             self.sample_outer_cond(state[i - 1], visible=False)
+        #     else:
+        #         means, samples = \
+        #             self.sample_inner_cond(i - 1, h_upper=state[i + 1],
+        #                                    h_lower=state[i - 1])
+        #     if binary:
+        #         state[i] = samples
+        #     else:
+        #         state[i] = means
+
+        #     # reset clamped units
+        #     if clamped is not None and clamped[i] is not None:
+        #         state[i][clamped[i]] = clamped_val[i]
         # sequential version
         for i in np.arange(len(self.hidden_layers), -1, -1):
             # special sampling for top and bottom layer
             if i == 0:
-                means[i], samples[i] = \
-                    self.sample_outer_cond(state[i + 1], visible=True)
+                means, samples = \
+                    self.sample_outer_cond(state[1], visible=True)
             elif i == len(self.hidden_layers):
-                means[i], samples[i] = \
+                means, samples = \
                     self.sample_outer_cond(state[i - 1], visible=False)
             else:
-                means[i], samples[i] = \
+                means, samples = \
                     self.sample_inner_cond(i - 1, h_upper=state[i + 1],
                                            h_lower=state[i - 1])
-        return means, samples
+            if binary:
+                state[i] = samples
+            else:
+                state[i] = means
+
+            # reset clamped units
+            if clamped is not None and clamped[i] is not None:
+                state[i][clamped[i]] = clamped_val[i]
 
     # draw visible samples
     # AST is not implemented and only one chain possible
-    def draw_samples(self, n_samples, init_v=None, binary=False):
+    def draw_samples(self, n_samples, init_v=None, binary=False,
+                     clamped=None, clamped_val=None):
+        # clamped are the indices of the clamped units:
+        # clamped = list(layers, indices_in layer)
+        # clamped_val = list(layers, values_in_layer)
+        # list entry None for layers w/o clamped units
+
         n_samples = int(n_samples)
         samples = np.empty((n_samples, self.n_visible))
 
@@ -166,10 +196,8 @@ class DBM(object):
             else:
                 curr_state.append(self.np_rng.rand(size))
 
+        # draw samples for the visible layer
         for t in range(n_samples):
-            if binary:
-                _, curr_state = self.gibbs_from_v(curr_state)
-            else:
-                curr_state, _ = self.gibbs_from_v(curr_state)
-            samples[t, :] = curr_state[0]
+            self.gibbs_from_v(curr_state, binary, clamped, clamped_val)
+            samples[t, :] = curr_state[0].copy()
         return samples
