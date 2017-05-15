@@ -5,11 +5,11 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import util
-from bm import Rbm, ClassRbm
+from rbm import RBM, CRBM
 
 
 # Load rbm and data
-with open('saved_rbms/mnist_gen_rbm.pkl', 'rb') as f:
+with open('saved_rbms/mnist_disc_rbm.pkl', 'rb') as f:
     testrbm = cPickle.load(f)
 f = gzip.open('datasets/mnist.pkl.gz', 'rb')
 _, _, test_set = np.load(f)
@@ -31,16 +31,16 @@ n_pixels = np.prod(img_shape)
 # plt.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
 # plt.savefig('figures/filters.png')
 
-samples = testrbm.draw_samples(1e5)
-tiled_samples = util.tile_raster_images(samples[500::1000, :n_pixels],
-                                        img_shape=img_shape,
-                                        tile_shape=(10, 10),
-                                        scale_rows_to_unit_interval=True,
-                                        output_pixel_vals=False)
+# samples = testrbm.draw_samples(1e5)
+# tiled_samples = util.tile_raster_images(samples[500::1000, :n_pixels],
+#                                         img_shape=img_shape,
+#                                         tile_shape=(10, 10),
+#                                         scale_rows_to_unit_interval=True,
+#                                         output_pixel_vals=False)
 
-plt.figure()
-plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-plt.savefig('./figures/samples.png')
+# plt.figure()
+# plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
+# plt.savefig('./figures/samples.png')
 
 # # samples with partially clamped inputs
 # n_pxls = int(np.sqrt(testrbm.n_visible))
@@ -74,13 +74,20 @@ plt.savefig('./figures/samples.png')
 
 # # sample_with_clamped_units from labels --- only for crbms
 # n_pxls = int(np.sqrt(testrbm.n_inputs))
-# clamped_samples = testrbm.sample_from_label(9,1000)[::40]
+# clamped_samples = testrbm.sample_from_label(3, 1000)[::40]
 # tiled_clamped = util.tile_raster_images(clamped_samples.astype(float),
-#                         img_shape=(n_pxls,n_pxls),
-#                         tile_shape=(5,5),
-#                         scale_rows_to_unit_interval=True,
-#                         output_pixel_vals=False)
+#                                         img_shape=(n_pxls, n_pxls),
+#                                         tile_shape=(5, 5),
+#                                         scale_rows_to_unit_interval=True,
+#                                         output_pixel_vals=False)
 
 # plt.figure()
 # plt.imshow(tiled_clamped, interpolation='Nearest', cmap='gray')
-# plt.savefig('./figures/clamped.png')
+# plt.savefig('./figures/clamped_labels.png')
+
+# # classification performance
+# test_data = test_set[0]
+# test_targets = test_set[1]
+# prediction = testrbm.classify(test_data)
+# crate = 100 * np.average(prediction == test_targets)
+# print('Correct predictions: {:.2f} %'.format(crate))

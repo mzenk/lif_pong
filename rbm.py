@@ -126,7 +126,7 @@ class RBM(object):
         # Create an extra RBM for the h->v step for efficiency
         unclamped_ind = np.setdiff1d(np.arange(self.n_visible), clamped_ind)
 
-        unclamped_rbm = Rbm(n_visible=unclamped_ind.size,
+        unclamped_rbm = RBM(n_visible=unclamped_ind.size,
                             n_hidden=self.n_hidden,
                             w=self.w[unclamped_ind, :],
                             vbias=self.vbias[unclamped_ind],
@@ -229,7 +229,7 @@ class RBM(object):
             # for ast we get an array with 'n_instances' entries
             beta = np.expand_dims(beta, 1)
 
-        u = beta * (v_in.dot(self.dbm_factor[0] * self.w) + self.hbias)
+        u = beta * self.dbm_factor[0] * (v_in.dot(self.w) + self.hbias)
         p_on = 1./(1 + np.exp(-u))
         h_samples = (self.np_rng.rand(v_in.shape[0], self.n_hidden) < p_on)*1
         return [p_on.squeeze(), h_samples.squeeze()]
@@ -241,7 +241,7 @@ class RBM(object):
             # for ast we get an array with 'n_instances' entries
             beta = np.expand_dims(beta, 1)
 
-        u = beta * (h_in.dot(self.dbm_factor[1] * self.w.T) + self.vbias)
+        u = beta * self.dbm_factor[1] * (h_in.dot(self.w.T) + self.vbias)
         p_on = 1./(1 + np.exp(-u))
         v_samples = (self.np_rng.rand(h_in.shape[0], self.n_visible) < p_on)*1
         return [p_on.squeeze(), v_samples.squeeze()]
@@ -367,8 +367,9 @@ class RBM(object):
         n_batches = int(np.ceil(n_instances/batch_size))
         shuffled_data = train_data[self.np_rng.permutation(n_instances), :]
         pchain_init = None
-        prev_grad = [np.zeros_like(self.w), np.zeros_like(self.vbias),
-                     np.zeros_like(self.hbias)]
+        w_incr = np.zeros_like(self.w)
+        vb_incr = np.zeros_like(self.vbias)
+        hb_incr = np.zeros_like(self.hbias)
         initial_lrate = lrate
 
         # log monitoring quantities in this file
@@ -424,14 +425,12 @@ class RBM(object):
                                           cast_variables=cast_variables)
 
                 # update parameters including momentum
-                w_incr = lrate * (momentum*prev_grad[0] +
-                                  (1 - momentum) * grad[0])
+                w_incr = momentum * w_incr + lrate * grad[0]
+                vb_incr = momentum * vb_incr + lrate * grad[1]
+                hb_incr = momentum * hb_incr + lrate * grad[2]
                 self.w += w_incr
-                self.vbias += lrate * (momentum*prev_grad[1] +
-                                       (1 - momentum) * grad[1])
-                self.hbias += lrate * (momentum*prev_grad[2] +
-                                       (1 - momentum) * grad[2])
-                prev_grad = grad
+                self.vbias += vb_incr
+                self.hbias += hb_incr
 
                 # ++++++++++++
                 # new for cast
@@ -482,14 +481,16 @@ class RBM(object):
                     log_file.write('{} {} {}\n'.format(update_step, delta_f,
                                                        pl))
 
-            self.monitor_progress(train_data, valid_set)
+            self.monitor_progress(train_data, valid_set, log_file)
         log_file.close()
         return
 
-    def monitor_progress(self, train_set, valid_set):
+    def monitor_progress(self, train_set, valid_set, output_file):
         subset_ind = self.np_rng.randint(train_set.shape[0], size=10000)
-        print('Log-PL of random training subset: '
-              '{}'.format(self.compute_logpl(train_set[subset_ind])))
+        s = 'Log-PL of random training subset: '\
+            '{}'.format(self.compute_logpl(train_set[subset_ind]))
+        print(s)
+        output_file.write(s + '\n')
 
 
 class CRBM(RBM):
@@ -501,7 +502,7 @@ class CRBM(RBM):
     def __init__(self,
                  n_inputs, n_hidden, n_labels,
                  wv=None, wl=None,
-                 input_bias=None, vbias=None,  hbias=None, lbias=None,
+                 input_bias=None, vbias=None, hbias=None, lbias=None,
                  numpy_seed=None,
                  dbm_factor=[1, 1]):
         # Set seed for reproducatbility
@@ -536,12 +537,30 @@ class CRBM(RBM):
         else:
             self.vbias = vbias
         self.lbias = self.vbias[n_inputs:]
+        self.ibias = self.vbias[:n_inputs]
         self.hbias = hbias
 
         # This factor is needed during the layerwise DBM training.
         # Making it a instance variable is not good OOP-style but
         # a simple solution
         self.dbm_factor = dbm_factor
+
+    # For the CDBM I need a special sampling method for the top layer, which
+    # is a CRBM.
+    def sample_v_given_h(self, h_in, beta=1.):
+        if len(h_in.shape) == 1:
+            h_in = np.expand_dims(h_in, 0)
+        if hasattr(beta, "__len__"):
+            # for ast we get an array with 'n_instances' entries
+            beta = np.expand_dims(beta, 1)
+
+        u_inp = beta * self.dbm_factor[1] * (h_in.dot(self.wv.T) + self.ibias)
+        u_lab = beta * (h_in.dot(self.wl.T) + self.lbias)
+        pi_on = 1./(1 + np.exp(-u_inp))
+        pl_on = 1./(1 + np.exp(-u_lab))
+        p_on = np.hstack((pi_on, pl_on))
+        v_samples = (self.np_rng.rand(h_in.shape[0], self.n_visible) < p_on)*1
+        return [p_on.squeeze(), v_samples.squeeze()]
 
     def classify(self, v_data, class_prob=False):
         if len(v_data.shape) == 1:
@@ -581,15 +600,20 @@ class CRBM(RBM):
                                               clamped_ind=clamped_ind,
                                               clamped_val=bin_labels)
 
-    def monitor_progress(self, train_set, valid_set):
+    def monitor_progress(self, train_set, valid_set, output_file):
         prediction = self.classify(train_set[:, :self.n_inputs])
         labels = np.argmax(train_set[:, self.n_inputs:], axis=1)
-        print('Correct classifications on training set: '
-              '{:.3f}'.format(np.average(prediction == labels)), end='')
+        s = 'Correct classifications on training set: '\
+            '{:.3f}'.format(np.average(prediction == labels))
+        print(s, end='')
+        output_file.write(s)
         if valid_set is not None:
             prediction = self.classify(valid_set[:, :self.n_inputs])
             labels = np.argmax(valid_set[:, self.n_inputs:], axis=1)
-            print('; validation set: '
-                  '{:.3f}'.format(np.average(prediction == labels)))
+            s = '; validation set: '\
+                '{:.3f}'.format(np.average(prediction == labels))
+            print(s)
+            output_file.write(s + '\n')
         else:
             print('')
+            output_file.write('\n')
