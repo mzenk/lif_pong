@@ -361,7 +361,7 @@ class RBM(object):
 
     def train(self, train_data, n_epochs=5, batch_size=10, lrate=.01,
               cd_steps=1, persistent=False, cast=False, valid_set=None,
-              momentum=0., filename='train_log.txt'):
+              momentum=0, filename='train_log.txt'):
         # initializations
         n_instances = train_data.shape[0]
         n_batches = int(np.ceil(n_instances/batch_size))
@@ -404,6 +404,8 @@ class RBM(object):
 
         for epoch_index in range(n_epochs):
             print('Epoch {}'.format(epoch_index + 1))
+            if momentum != 0 and epoch_index > 5:
+                momentum = .9
 
             for batch_index in range(n_batches):
                 update_step = batch_index + n_batches * epoch_index

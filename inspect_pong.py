@@ -20,7 +20,6 @@ assert np.prod(img_shape) == train_set[0].shape[1]
 print('Number of samples: {}, {}'.format(train_set[0].shape[0],
                                          test_set[0].shape[0]))
 
-print(train_set[1].shape)
 # # inspect data
 # samples = tile_raster_images(train_set[0][:16],
 #                              img_shape=img_shape,

@@ -274,7 +274,7 @@ class CDBM(DBM):
             if i > 0 and i < self.n_layers - 2:
                 self.weights[i] *= .5
 
-    def classify(self, v_data, probability=False):
+    def classify(self, v_data, class_prob=False):
         # draw samples with clamped visible units and argmax the label units
         clamped = [None] * (1 + self.n_layers)
         clamped[0] = np.arange(self.n_visible)
@@ -284,7 +284,7 @@ class CDBM(DBM):
         # when passed multiple instances a loop is hard to avoid
         if len(v_data.shape) == 1:
             v_data = np.expand_dims(v_data, 0)
-        if probability:
+        if class_prob:
             labels = np.zeros((v_data.shape[0], self.hidden_layers[-1]))
         else:
             labels = np.zeros(v_data.shape[0])
@@ -294,7 +294,7 @@ class CDBM(DBM):
             samples = self.draw_samples(burn_in+100, clamped=clamped,
                                         clamped_val=clamped_val,
                                         layer_ind=self.n_layers)
-            if probability:
+            if class_prob:
                 labels[i] = np.average(samples, axis=0)
             else:
                 labels[i] = np.argmax(np.sum(samples, axis=0))
