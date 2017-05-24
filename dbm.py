@@ -2,6 +2,7 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
+from copy import deepcopy
 from rbm import RBM, CRBM
 
 
@@ -68,85 +69,84 @@ class DBM(object):
 
     # conditional sampling functions are vectorized
     # beta factor is used in AST
-    def sample_inner_cond(self, index, h_upper, h_lower):
+    def sample_inner_cond(self, index, h_upper, h_lower, beta=1.):
         act = h_upper.dot(self.weights[index + 1].T) + \
               h_lower.dot(self.weights[index]) + self.hbiases[index]
-        p_on = 1./(1 + np.exp(-act))
-        h_samples = (self.np_rng.rand(self.hidden_layers[index]) < p_on)*1
+        p_on = 1./(1 + np.exp(-beta*act))
+        h_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
         return [p_on.squeeze(), h_samples.squeeze()]
 
-    def sample_outer_cond(self, h_in, visible=True):
+    def sample_outer_cond(self, h_in, visible=True, beta=1.):
         if visible:
-            layer_size = self.n_visible
             bias = self.vbias
             weight = self.weights[0].T
         else:
-            layer_size = self.hidden_layers[-1]
             bias = self.hbiases[-1]
             weight = self.weights[-1]
 
         act = h_in.dot(weight) + bias
-        p_on = 1./(1 + np.exp(-act))
-        samples = (self.np_rng.rand(layer_size) < p_on)*1
+        p_on = 1./(1 + np.exp(-beta*act))
+        samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
         return [p_on.squeeze(), samples.squeeze()]
 
-    # make a gibbs step starting from the state of v and all other even
-    # numbered layers. _state_ is passed by reference!
-    def gibbs_from_v(self, state, clamped=None, clamped_val=None):
-        assert len(state) == self.n_layers + 1
-        means = [0] * len(state)
-        # the loops can be parallelised -> add if necessary
-        # update odd numbered layers
+    # update even-numbered layers
+    def update_even(self, state, mean, clamped=None, clamped_val=None, beta=1):
+        for i in np.arange(0, self.n_layers + 1, 2):
+            if i == 0:
+                mean[i], state[i] = \
+                    self.sample_outer_cond(state[1], visible=True, beta=beta)
+            # special sampling for top layer
+            elif i == self.n_layers:
+                mean[i], state[i] = \
+                    self.sample_outer_cond(state[i - 1], visible=False,
+                                           beta=beta)
+            else:
+                mean[i], state[i] = \
+                    self.sample_inner_cond(i - 1, h_upper=state[i + 1],
+                                           h_lower=state[i - 1], beta=beta)
+            # reset clamped units
+            if clamped is not None and clamped[i] is not None:
+                state[i] = state[i].astype(float)
+                state[i][clamped[i]] = clamped_val[i]
+
+        return state
+
+    # update odd numbered layers
+    def update_odd(self, state, mean, clamped=None, clamped_val=None, beta=1):
         for i in np.arange(1, self.n_layers + 1, 2):
             # special sampling for top layer
             if i == self.n_layers:
-                means[i], state[i] = \
-                    self.sample_outer_cond(state[i - 1], visible=False)
+                mean[i], state[i] = \
+                    self.sample_outer_cond(state[i - 1], visible=False,
+                                           beta=beta)
             else:
-                means[i], state[i] = \
+                mean[i], state[i] = \
                     self.sample_inner_cond(i - 1, h_upper=state[i + 1],
-                                           h_lower=state[i - 1])
+                                           h_lower=state[i - 1], beta=beta)
             # reset clamped units
             if clamped is not None and clamped[i] is not None:
                 state[i] = state[i].astype(float)
                 state[i][clamped[i]] = clamped_val[i]
 
-        # update even numbered layers
-        for i in np.arange(0, self.n_layers + 1, 2):
-            if i == 0:
-                means[i], state[i] = \
-                    self.sample_outer_cond(state[1], visible=True)
-            # special sampling for top layer
-            elif i == self.n_layers:
-                means[i], state[i] = \
-                    self.sample_outer_cond(state[i - 1], visible=False)
-            else:
-                means[i], state[i] = \
-                    self.sample_inner_cond(i - 1, h_upper=state[i + 1],
-                                           h_lower=state[i - 1])
-            # reset clamped units
-            if clamped is not None and clamped[i] is not None:
-                state[i] = state[i].astype(float)
-                state[i][clamped[i]] = clamped_val[i]
-        # # sequential version
-        # for i in np.arange(self.n_layers, -1, -1):
-        #     # special sampling for top and bottom layer
-        #     if i == 0:
-        #         means[i], state[i] = \
-        #             self.sample_outer_cond(state[i + 1], visible=True)
-        #     elif i == self.n_layers:
-        #         means[i], state[i] = \
-        #             self.sample_outer_cond(state[i - 1], visible=False)
-        #     else:
-        #         means[i], state[i] = \
-        #             self.sample_inner_cond(i - 1, h_upper=state[i + 1],
-        #                                    h_lower=state[i - 1])
+        return state
 
-        #     # reset clamped units
-        #     if clamped is not None and clamped[i] is not None:
-        #         state[i] = state[i].astype(float)
-        #         state[i][clamped[i]] = clamped_val[i]
-        return means
+    # make a gibbs step starting from the state of v and all other even
+    # numbered layers.
+    def gibbs_from_v(self, state, clamped=None, clamped_val=None, beta=1.):
+        assert len(state) == self.n_layers + 1
+        means = [0] * len(state)
+        state = self.update_odd(state, means, clamped, clamped_val, beta)
+        state = self.update_even(state, means, clamped, clamped_val, beta)
+        return state, means
+
+    # make a gibbs step starting from the state of h1 and all other odd
+    # numbered layers.
+    def gibbs_from_h(self, state, clamped=None, clamped_val=None, beta=1.):
+        assert len(state) == self.n_layers + 1
+        means = [0] * len(state)
+        state = self.update_even(state, means, clamped, clamped_val, beta)
+        state = self.update_odd(state, means, clamped, clamped_val, beta)
+        return state, means
 
     # draw visible samples using Gibbs sampling
     def draw_samples(self, n_samples, init_v=None, binary=False,
@@ -160,6 +160,8 @@ class DBM(object):
         n_samples = int(n_samples)
         if layer_ind == 0:
             sample_size = self.n_visible
+        elif layer_ind == 'all':
+            sample_size = self.n_visible + np.sum(self.hidden_layers)
         else:
             sample_size = self.hidden_layers[layer_ind - 1]
         samples = np.empty((n_samples, sample_size))
@@ -185,19 +187,26 @@ class DBM(object):
 
         # draw samples and save for one layer
         for t in range(n_samples):
-            curr_means = self.gibbs_from_v(curr_state, clamped, clamped_val)
+            curr_state, curr_means = \
+                self.gibbs_from_v(curr_state, clamped, clamped_val)
             if binary:
-                samples[t, :] = curr_state[layer_ind].copy()
+                if layer_ind == 'all':
+                    samples[t, :] = np.concatenate(deepcopy(curr_state))
+                else:
+                    samples[t, :] = curr_state[layer_ind].copy()
             else:
-                samples[t, :] = curr_means[layer_ind].copy()
+                if layer_ind == 'all':
+                    samples[t, :] = np.concatenate(deepcopy(curr_means))
+                else:
+                    samples[t, :] = curr_means[layer_ind].copy()
         return samples
 
 
 # Sampling for CDBM works exactly as DBM, just with an additional label layer
-# at the top
+# at the top; training is modified
 class CDBM(DBM):
     def __init__(self, layer_sizes, labels, vbias_init=None, numpy_seed=None):
-        if len(layer_sizes) < 2:
+        if len(layer_sizes) < 3:
             'Please use the RBM class for just one layer'
         # Set seed for reproducatbility
         self.np_rng = np.random.RandomState(numpy_seed)
@@ -224,6 +233,9 @@ class CDBM(DBM):
     # greedy layerwise training
     # all training hyperparameters from RBM.train can be used as kwargs
     def train(self, train_data, train_targets, **kwargs):
+        if len(train_targets.shape) == 1:
+            print('Please pass the labels in one-hot representation.')
+            return
         curr_input = train_data
         for i in range(self.n_layers - 1):
             print('Training layer {} of {}'.format(i + 1, self.n_layers - 1))
@@ -274,6 +286,161 @@ class CDBM(DBM):
             if i > 0 and i < self.n_layers - 2:
                 self.weights[i] *= .5
 
+    def train_mf(self, train_data, train_targets, n_epochs=5, batch_size=10,
+                 lrate=.01, cd_steps=5, valid_set=None, momentum=0,
+                 filename='train_log.txt'):
+        # algorithm similar to normal RBM-train
+        # i) find mf-optimal approximate posteriors
+        # ii) compute data term of gradient (positive grad)
+        # iii) compute model term of gradient (negative grad)
+        # iv) update parameters
+        # initializations
+        n_instances = train_data.shape[0]
+        n_batches = int(np.ceil(n_instances/batch_size))
+        rand_perm = self.np_rng.permutation(n_instances)
+        shuffled_data = train_data[rand_perm]
+        shuffled_targets = train_targets[rand_perm]
+        initial_lrate = lrate
+        wincr = [0] * self.n_layers
+        hbincr = [0] * (self.n_layers - 1)
+        vbincr = 0
+        lbincr = 0
+
+        # initialize persistent state
+        pinit = self.np_rng.choice(shuffled_data.shape[0], batch_size,
+                                   replace=False)
+        pers_state = [(self.np_rng.rand(batch_size, self.n_visible) <
+                       shuffled_data[pinit])*1.]
+        for i, size in enumerate(self.hidden_layers):
+            hidprob = 1/(1 + np.exp(-pers_state[-1].dot(2 * self.weights[i]) -
+                                    self.hbiases[i]))
+            pers_state.append((self.np_rng.rand(*hidprob.shape) < hidprob)*1.)
+
+        # log monitoring quantities in this file
+        log_file = open(filename, 'w')
+        log_file.write('---------------------------------------------\n')
+        log_file.write('layers: {}\nBatch size: {}\nLearning_rate: {}\n'
+                       'CD-steps: {}\n'.format(self.hidden_layers, batch_size,
+                                               lrate, cd_steps))
+        for epoch in range(n_epochs):
+            print('Epoch {}'.format(epoch + 1))
+            if momentum != 0 and epoch > 5:
+                momentum = .9
+            err_sum = 0
+            for batch_index in range(n_batches):
+                # Other lrate schedules are possible
+                update_step = batch_index + n_batches * epoch
+                # lrate = initial_lrate * 2000 / (2000 + update_step)
+                lrate /= (1.000015**(epoch*600))
+
+                # pick mini-batch randomly
+                start = batch_index*batch_size
+                end = min((batch_index + 1)*batch_size, n_instances)
+                batch = shuffled_data[start:end]
+                batch_targets = shuffled_targets[start:end]
+                n_batch = batch.shape[0]
+
+                # Start of positive phase
+                # Compute approximate posterior and from it positive gradient
+                posteriors = self.get_mf_posterior(batch, batch_targets)
+                gradw = [0] * self.n_layers
+                gradhb = [0] * (self.n_layers - 1)
+                gradvb = 0
+                gradlb = 0
+
+                for l in range(self.n_layers - 1):
+                    if l == 0:
+                        gradw[l] += batch.T.dot(posteriors[l]) / n_batch
+                        gradvb += np.mean(batch, axis=0)
+                    else:
+                        gradw[l] += \
+                            posteriors[l-1].T.dot(posteriors[l]) / n_batch
+                    gradhb[l] += np.mean(posteriors[l], axis=0)
+
+                # label layer
+                gradlb += np.mean(batch_targets, axis=0)
+                gradw[-1] += posteriors[-1].T.dot(batch_targets) / n_batch
+                # End of positive phase
+
+                # Reconstruction error
+                act = posteriors[0].dot(self.weights[0].T) + self.vbias
+                recon_batch = 1/(1 + np.exp(-act))
+                err_sum += np.sum((batch - recon_batch)**2)
+
+                # Start of negative phase
+                # Sample from model distribution and estimate model average
+                for k in range(cd_steps):
+                    pers_state, pers_mean = self.gibbs_from_v(pers_state)
+                for l in range(self.n_layers):
+                    if l == 0:
+                        gradvb -= np.mean(pers_mean[0], axis=0)
+                    if l == self.n_layers - 1:
+                        gradlb -= np.mean(pers_mean[-1], axis=0)
+                    else:
+                        gradhb[l] -= np.mean(pers_mean[l+1], axis=0)
+                    gradw[l] -= pers_mean[l].T.dot(pers_mean[l+1]) / batch_size
+
+                # End of negative phase
+
+                # Update parameters
+                vbincr = momentum * vbincr + lrate * gradvb
+                lbincr = momentum * lbincr + lrate * gradlb
+                for l in range(self.n_layers - 1):
+                    wincr[l] = momentum * wincr[l] + lrate * gradw[l]
+                    hbincr[l] = momentum * hbincr[l] + lrate * gradhb[l]
+                    self.weights[l] += wincr[l]
+                    self.hbiases[l] += hbincr[l]
+                self.hbiases[-1] += lbincr
+                self.vbias += vbincr
+            log_file.write('Reconstruction error: {}\n'.format(err_sum))
+            self.monitor_progress((train_data, train_targets), valid_set,
+                                  log_file)
+
+    def get_mf_posterior(self, data, targets=None, iterations=10):
+        # compute some reusable quantities
+        data_bias = data.dot(self.weights[0])
+        if targets is not None:
+            lab_bias = targets.dot(self.weights[-1].T)
+
+        # initialize the posterior distributions\
+        totin = data.dot(self.weights[0]) + self.hbiases[0]
+        mus = [1/(1 + np.exp(-totin))]
+        for l in range(1, self.n_layers):
+            if l == self.n_layers - 2 and type(self) is CDBM:
+                # label layer
+                totin = mus[l - 1].dot(self.weights[l]) + self.hbiases[l] + \
+                    lab_bias
+                mus.append(1/(1 + np.exp(-totin)))
+                break
+            else:
+                totin = mus[l - 1].dot(self.weights[l]) + self.hbiases[l]
+                mus.append(1/(1 + np.exp(-totin)))
+
+        # do mean field updates until convergence
+        for n in range(iterations):
+            diff_h = 0
+            for l in range(len(mus)):
+                mu_old = mus[l]
+                if type(self) is CDBM and l == self.n_layers - 2:
+                    totin = mus[l - 1].dot(self.weights[l]) + lab_bias + \
+                        self.hbiases[l]
+                    mus[l] = 1/(1 + np.exp(-totin))
+                    break
+                if l == 0:
+                    totin = mus[l + 1].dot(self.weights[l + 1].T) + \
+                                data_bias + self.hbiases[l]
+                elif l == self.n_layers - 1:
+                    totin = mus[l - 1].dot(self.weights[l]) + self.hbiases[l]
+                else:
+                    totin = mus[l - 1].dot(self.weights[l]) + \
+                        mus[l + 1].dot(self.weights[l + 1].T) + self.hbiases[l]
+                mus[l] = 1/(1 + np.exp(-totin))
+                diff_h += np.mean(np.abs(mus[l] - mu_old))
+
+            if diff_h < 1e-7 * data.shape[0]:
+                break
+        return mus
+
     def classify(self, v_data, class_prob=False):
         # draw samples with clamped visible units and argmax the label units
         clamped = [None] * (1 + self.n_layers)
@@ -299,3 +466,22 @@ class CDBM(DBM):
             else:
                 labels[i] = np.argmax(np.sum(samples, axis=0))
         return labels
+
+    def monitor_progress(self, train_set, valid_set, output_file):
+        subt = self.np_rng.choice(train_set[0].shape[0], 1000, replace=False)
+        prediction = self.classify(train_set[0][subt])
+        labels = np.argmax(train_set[1][subt], axis=1)
+        s = 'Correct classifications on training set: '\
+            '{:.3f}'.format(np.average(prediction == labels))
+        output_file.write(s)
+
+        if valid_set is not None:
+            subv = self.np_rng.choice(valid_set[0].shape[0], 1000,
+                                      replace=False)
+            prediction = self.classify(valid_set[0][subv])
+            labels = valid_set[1][subv]
+            s = '; validation set: '\
+                '{:.3f}'.format(np.average(prediction == labels))
+            output_file.write(s + '\n')
+        else:
+            output_file.write('\n')

@@ -8,14 +8,14 @@ import itertools
 
 # numerical stability
 def logsum(x, axis=0):
-    # alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
-    alpha = np.max(x, axis=axis)
+    alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
+    # alpha = np.max(x, axis=axis)
     return alpha + np.log(np.sum(np.exp(x - alpha), axis=axis))
 
 
 def logdiff(x, axis=0):
-    # alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
-    alpha = np.max(x, axis=axis)
+    alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
+    # alpha = np.max(x, axis=axis)
     return alpha + np.log(np.diff(np.exp(x - alpha), axis=axis)).squeeze()
 
 
@@ -25,16 +25,15 @@ def compute_partition_sum(rbm):
     log_ph = np.zeros(0)
     n_chunks = np.ceil(h_all.shape[0] * rbm.n_visible // 1e8)
     for h_chunk in np.array_split(h_all, n_chunks):
-        tmp = h_chunk.dot(rbm.hbias) + \
-            np.sum(np.log(1 + np.exp(h_chunk.dot(rbm.w.T) + rbm.vbias)), axis=1)
+        expW = np.exp(h_chunk.dot(rbm.w.T) + rbm.vbias)
+        tmp = h_chunk.dot(rbm.hbias) + np.sum(np.log(1 + expW), axis=1)
         log_ph = np.concatenate((log_ph, tmp))
     return logsum(log_ph)
 
 
 def estimate_partition_sum(rbm, n_runs, betas):
     # draw samples from the base model (uniform distr) and initialise logw
-    samples = np.random.rand(n_runs, rbm.n_visible)
-    # logw = - 2*np.log(rbm.n_hidden) -> in salakhutdinov's code; wrong?
+    samples = np.random.randint(2, size=(n_runs, rbm.n_visible))
     logw = 0
 
     # main AIS loop
@@ -60,7 +59,8 @@ def estimate_partition_sum(rbm, n_runs, betas):
     # print(r_ais, np.log(np.average(np.exp(logw))))
     # numerical stability
     logw_avg = np.mean(logw)
-    logstd_rais = np.std(np.exp(logw - logw_avg)) + logw_avg - np.log(n_runs)/2
+    logstd_rais = np.log(np.std(np.exp(logw - logw_avg))) + logw_avg -\
+        np.log(n_runs)/2
     logZ_base = rbm.n_visible * np.log(2)
     logZ = r_ais + logZ_base
     logZ_up = logsum([logstd_rais + np.log(3), r_ais]) + logZ_base
@@ -76,17 +76,19 @@ if __name__ == '__main__':
     f = gzip.open('datasets/mnist.pkl.gz', 'rb')
     _, _, test_set = cPickle.load(f)
     f.close()
+    test_data = test_set[0]
+    test_targets = test_set[1]
 
     if rbm.n_hidden < 30:
         # compute the true partition sum of the RBM (if possible)
         logZ_true = compute_partition_sum(rbm)
-        avg_ll_true = np.mean(-rbm.free_energy(test_set)) - logZ_true
+        avg_ll_true = np.mean(-rbm.free_energy(test_data)) - logZ_true
     else:
         logZ_true = -1
         avg_ll_true = -1
 
     # Use AIS to estimate the partition sum
-    n_runs = 1000
+    n_runs = 100
     betas = np.concatenate((np.linspace(0, .5, 500, endpoint=False),
                             np.linspace(.5, .9, 10000, endpoint=False),
                             np.linspace(.9, 1., 4000)))
@@ -94,7 +96,7 @@ if __name__ == '__main__':
         estimate_partition_sum(rbm, n_runs, betas)
 
     # compute the estimated average log likelihood of a test set
-    avg_ll_est = np.mean(-rbm.free_energy(test_set)) - logZ_est
+    avg_ll_est = np.mean(-rbm.free_energy(test_data)) - logZ_est
     print('True partition sum: {:.2f}'.format(logZ_true))
     print('Est. partition sum (+- 3*std): {:.2f}, {:.2f}, {:.2f}'
           ''.format(logZ_est, est_up, est_down))

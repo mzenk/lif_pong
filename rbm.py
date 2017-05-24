@@ -231,7 +231,7 @@ class RBM(object):
 
         u = beta * self.dbm_factor[0] * (v_in.dot(self.w) + self.hbias)
         p_on = 1./(1 + np.exp(-u))
-        h_samples = (self.np_rng.rand(v_in.shape[0], self.n_hidden) < p_on)*1
+        h_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
         return [p_on.squeeze(), h_samples.squeeze()]
 
     def sample_v_given_h(self, h_in, beta=1.):
@@ -243,7 +243,7 @@ class RBM(object):
 
         u = beta * self.dbm_factor[1] * (h_in.dot(self.w.T) + self.vbias)
         p_on = 1./(1 + np.exp(-u))
-        v_samples = (self.np_rng.rand(h_in.shape[0], self.n_visible) < p_on)*1
+        v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
         return [p_on.squeeze(), v_samples.squeeze()]
 
     # compute CSL; this method can be overwritten for CRBM
@@ -468,8 +468,8 @@ class RBM(object):
                     delta_f = 0
 
                     # random subset
-                    subset_ind = self.np_rng.randint(valid_set.shape[0],
-                                                     size=1000)
+                    subset_ind = self.np_rng.choice(valid_set.shape[0], 1000,
+                                                    replace=False)
                     # # CSL monitoring -> much too slow
                     # csl = self.compute_csl(valid_set[subset_ind, :])
 
