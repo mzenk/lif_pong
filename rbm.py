@@ -361,7 +361,7 @@ class RBM(object):
 
     def train(self, train_data, n_epochs=5, batch_size=10, lrate=.01,
               cd_steps=1, persistent=False, cast=False, valid_set=None,
-              momentum=0, filename='train_log.txt'):
+              momentum=0, weight_cost=1e-5, filename='train_log.txt'):
         # initializations
         n_instances = train_data.shape[0]
         n_batches = int(np.ceil(n_instances/batch_size))
@@ -379,7 +379,8 @@ class RBM(object):
                        'CD-steps: {}\nPersistent: {}\nCAST: {}\n'
                        ''.format(self.n_hidden, batch_size, lrate, cd_steps,
                                  persistent, cast))
-        log_file.write('update step | free energy difference | log PL\n')
+        if type(self) is not CRBM:
+            log_file.write('update step | free energy difference | log PL\n')
 
         # ++++++++++++
         # new for cast
@@ -404,8 +405,9 @@ class RBM(object):
 
         for epoch_index in range(n_epochs):
             print('Epoch {}'.format(epoch_index + 1))
-            if momentum != 0 and epoch_index > 5:
-                momentum = .9
+            # if momentum != 0 and epoch_index > 5:
+            #     # momentum = min(momentum + .1, .9)
+            #     momentum = .9
 
             for batch_index in range(n_batches):
                 update_step = batch_index + n_batches * epoch_index
@@ -427,7 +429,8 @@ class RBM(object):
                                           cast_variables=cast_variables)
 
                 # update parameters including momentum
-                w_incr = momentum * w_incr + lrate * grad[0]
+                w_incr = momentum * w_incr + \
+                    lrate * (grad[0] - weight_cost * self.w)
                 vb_incr = momentum * vb_incr + lrate * grad[1]
                 hb_incr = momentum * hb_incr + lrate * grad[2]
                 self.w += w_incr
@@ -488,7 +491,7 @@ class RBM(object):
         return
 
     def monitor_progress(self, train_set, valid_set, output_file):
-        subset_ind = self.np_rng.randint(train_set.shape[0], size=10000)
+        subset_ind = self.np_rng.randint(train_set.shape[0], size=5000)
         s = 'Log-PL of random training subset: '\
             '{}'.format(self.compute_logpl(train_set[subset_ind]))
         print(s)

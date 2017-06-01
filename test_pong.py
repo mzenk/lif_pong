@@ -3,7 +3,6 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 from util import tile_raster_images, to_1_of_c, get_windowed_image_index
-from rbm import Rbm, ClassRbm
 import sys
 import matplotlib
 matplotlib.use('agg')
@@ -24,52 +23,66 @@ if discriminative:
 else:
     rbm_name = data_name + '_rbm.pkl'
 
+rbm_name = 'pong_cdbm.pkl'
 # Load rbm
 with open('saved_rbms/' + rbm_name, 'rb') as f:
     testrbm = cPickle.load(f)
 
+# Produce visual example for a pattern completion
+my_test = test_set[0][141]
+for fraction in np.linspace(.1, .9, 9):
+    # first get the prediction
+    clamped_ind = get_windowed_image_index(img_shape, fraction,
+                                           fractional=True, window_size=100)
+    clamped_input = my_test[clamped_ind]
+    # RBM - the interface is a bit different for DBM; if there's time,
+    # make them equal
+    # if discriminative:
+    #     end_visible = -testrbm.n_labels
+    #     index_range = testrbm.n_inputs
+    # else:
+    #     end_visible = testrbm.n_visible
+    #     index_range = testrbm.n_visible
+    # samples = \
+    #     testrbm.sample_with_clamped_units(100, clamped_ind,
+    #                                       clamped_input)[10:, :end_visible]
 
-if discriminative:
-    end_visible = -testrbm.n_labels
-    index_range = testrbm.n_inputs
-else:
-    end_visible = testrbm.n_visible
-    index_range = testrbm.n_visible
+    # inferred_img = np.zeros(np.prod(img_shape))
+    # # use rgb to make the clamped part distinguishable from the unclamped part
+    # inferred_img[clamped_ind] = clamped_input
+    # inferred_img = np.tile(inferred_img, (3, 1)).T
+    # if not clamped_ind.size == np.prod(img_shape):
+    #     inferred_img[np.setdiff1d(np.arange(index_range), clamped_ind), 0] = \
+    #         np.average(samples, axis=0)
 
-# # Produce visual example for a pattern completion
-# my_test = test_set[0][141]
-# for fraction in np.linspace(.1, .9, 9):
-#     # first get the prediction
-#     clamped_ind = get_windowed_image_index(img_shape, fraction,
-#                                            fractional=True, window_size=4)
-#     clamped_input = my_test[clamped_ind]
-#     samples = \
-#         testrbm.sample_with_clamped_units(100, clamped_ind,
-#                                           clamped_input)[10:, :end_visible]
+    # DBM
+    clamped = [None] * (1 + testrbm.n_layers)
+    clamped[0] = clamped_ind
+    clamped_val = [None] * (1 + testrbm.n_layers)
+    clamped_val[0] = clamped_input
+    samples = testrbm.draw_samples(100, clamped=clamped,
+                                   clamped_val=clamped_val)[10:]
+    inferred_img = np.average(samples, axis=0)
+    inferred_img = np.tile(inferred_img, (3, 1)).T
+    if not clamped_ind.size == np.prod(img_shape):
+        inferred_img[np.setdiff1d(np.arange(testrbm.n_visible),
+                                  clamped_ind), 1:] = 0
 
-#     inferred_img = np.zeros(np.prod(img_shape))
-#     # use rgb to make the clamped part distinguishable from the unclamped part
-#     inferred_img[clamped_ind] = clamped_input
-#     inferred_img = np.tile(inferred_img, (3, 1)).T
-#     if not clamped_ind.size == np.prod(img_shape):
-#         inferred_img[np.setdiff1d(np.arange(index_range), clamped_ind), 1] = \
-#             np.average(samples, axis=0)
-#     inferred_img = inferred_img.reshape((img_shape[0], img_shape[1], 3))
-
-#     # plotting - though ugly, this is the best working implementation I found
-#     fig = plt.figure()
-#     width = .7
-#     ax1 = fig.add_axes([.05, .2, width, width*3/4])
-#     ax2 = fig.add_axes([width - .02, .2, .2, width*3/4])
-#     ax1.imshow(inferred_img, interpolation='Nearest', cmap='gray',
-#                origin='lower')
-#     ax2.barh(np.arange(inferred_img.shape[0]) - .5, inferred_img[:, -1, 1],
-#              height=np.ones(inferred_img.shape[0]), color='g')
-#     ax2.set_ylim([-.5, inferred_img.shape[0] - .5])
-#     ax2.xaxis.set_ticks([0., 0.5, 1.])
-#     ax2.tick_params(left='off', right='off', labelleft='off', labelright='off')
-#     fig.savefig('windowed_traj{:.1f}.png'.format(fraction),
-#                 bbox_inches='tight')
+    inferred_img = inferred_img.reshape((img_shape[0], img_shape[1], 3))
+    # plotting - though ugly, this is the best working implementation I found
+    fig = plt.figure()
+    width = .7
+    ax1 = fig.add_axes([.05, .2, width, width*3/4])
+    ax2 = fig.add_axes([width - .02, .2, .2, width*3/4])
+    ax1.imshow(inferred_img, interpolation='Nearest', cmap='gray',
+               origin='lower')
+    ax2.barh(np.arange(inferred_img.shape[0]) - .5, inferred_img[:, -1, 0],
+             height=np.ones(inferred_img.shape[0]), color='r')
+    ax2.set_ylim([-.5, inferred_img.shape[0] - .5])
+    ax2.xaxis.set_ticks([0., 0.5, 1.])
+    ax2.tick_params(left='off', right='off', labelleft='off', labelright='off')
+    fig.savefig('figures/windowed_traj{:.1f}.png'.format(fraction),
+                bbox_inches='tight')
 
 # # Test the "classification performance", i.e. how much of the picture does
 # # the RBM need to predict the correct outcome
@@ -132,14 +145,14 @@ else:
 # plt.savefig('samples.png', bbox_inches = 'tight')
 
 # # whole set performance
-my_set = train_set
+# my_set = test_set
 
-# For the wrong cases, how do the class probabilities look?
-class_prob = testrbm.classify(my_set[0], class_prob=True)
-prediction = np.argmax(class_prob, axis=1)
-print('Correct predictions: '
-      '{}'.format(np.average(prediction == my_set[1])))
-wrong_ind = np.where(np.argmax(class_prob, axis=1) != my_set[1])[0]
+# # For the wrong cases, how do the class probabilities look?
+# class_prob = testrbm.classify(my_set[0], class_prob=True)
+# prediction = np.argmax(class_prob, axis=1)
+# print('Correct predictions: '
+#       '{}'.format(np.average(prediction == my_set[1])))
+# wrong_ind = np.where(np.argmax(class_prob, axis=1) != my_set[1])[0]
 # plt.figure()
 # for i in range(9):
 #     plt.subplot(3, 3, i + 1)
@@ -147,28 +160,28 @@ wrong_ind = np.where(np.argmax(class_prob, axis=1) != my_set[1])[0]
 # plt.tight_layout()
 # plt.savefig('class_prob.png')
 
-# How much off are the labels?
-# also check the distance to second best label guess
-sorted_ind = np.argsort(class_prob[wrong_ind], axis=1)
-difference1 = my_set[1][wrong_ind] - sorted_ind[:, -1]
-difference2 = my_set[1][wrong_ind] - sorted_ind[:, -2]
-plt.figure()
-plt.hist(difference1, align='left', color='g', label='1st guess',
-         bins=np.arange(-testrbm.n_labels + 1, testrbm.n_labels - 1))
-plt.hist(difference2, align='left', color='b', label='2nd guess', alpha=.7,
-         bins=np.arange(-testrbm.n_labels + 1, testrbm.n_labels - 1))
-plt.xlim([-5, 5])
-plt.legend()
-plt.xlabel('Correct label - predicted label')
-plt.savefig('wrong_difference.png')
+# # How much off are the labels?
+# # also check the distance to second best label guess
+# sorted_ind = np.argsort(class_prob[wrong_ind], axis=1)
+# difference1 = my_set[1][wrong_ind] - sorted_ind[:, -1]
+# difference2 = my_set[1][wrong_ind] - sorted_ind[:, -2]
+# plt.figure()
+# plt.hist(difference1, align='left', color='g', label='1st guess',
+#          bins=np.arange(-testrbm.n_labels + 1, testrbm.n_labels - 1))
+# plt.hist(difference2, align='left', color='b', label='2nd guess', alpha=.7,
+#          bins=np.arange(-testrbm.n_labels + 1, testrbm.n_labels - 1))
+# plt.xlim([-5, 5])
+# plt.legend()
+# plt.xlabel('Correct label - predicted label')
+# plt.savefig('wrong_difference.png')
 
-# ...and the difference in probability between first and second guess
-sorted_probs = np.sort(class_prob[wrong_ind], axis=1)
-prob_diffs = sorted_probs[:, -1] - sorted_probs[:, -2]
-plt.figure()
-plt.hist(prob_diffs, align='left', bins=10)
-plt.xlabel('Probability difference between 1st and 2nd guess')
-plt.savefig('prob_differences.png')
+# # ...and the difference in probability between first and second guess
+# sorted_probs = np.sort(class_prob[wrong_ind], axis=1)
+# prob_diffs = sorted_probs[:, -1] - sorted_probs[:, -2]
+# plt.figure()
+# plt.hist(prob_diffs, align='left', bins=10)
+# plt.xlabel('Probability difference between 1st and 2nd guess')
+# plt.savefig('prob_differences.png')
 
 # # inspect some wrong predictions
 # wrong_ind = np.where(prediction != my_set[1])[0]

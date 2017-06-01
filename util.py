@@ -56,9 +56,22 @@ def get_windowed_image_index(img_shape, end_index,
     uncovered_ind = np.nonzero(mask.flatten())[0]
     return uncovered_ind
 
+
+# for MNIST --- make batches each containing equal number of labels
+# not used yet. mnist has not exactly same number of train inst. for each class
+def makebatches(data, targets, batchsize):
+    assert data.shape[0] % batchsize == 0 and batchsize % 10 == 0
+    sorting_ind = np.argsort(targets)
+    sorted_data = data[sorting_ind]
+    sorted_targets = targets[sorting_ind]
+    n_batches = data.shape[0] / batchsize
+    batchdata = sorted_data.reshape(batchsize, n_batches, data.shape[1])
+    batchtargets = sorted_targets.reshape(batchsize, n_batches)
+    return (np.swapaxes(batchdata, 0, 1), np.swapaxes(batchtargets, 0, 1))
+
+
 # -----------------------------------------------------------------------------
 # Taken from http://deeplearning.net/tutorial/utilities.html#how-to-plot
-
 
 def scale_to_unit_interval(ndar, eps=1e-8):
     """ Scales all values in the ndarray ndar to be between 0 and 1 """

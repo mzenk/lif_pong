@@ -19,13 +19,23 @@ f.close()
 n_pixels = train_set[0].shape[1]
 
 training_params = {
-    'n_epochs': 10,
-    'batch_size': 10,
+    'n_epochs': 20,
+    'batch_size': 20,
     'lrate': .05,
     'cd_steps': 1,
     'persistent': True,
     'momentum': 0.5,
+    'weight_cost': .001,
     'cast': False,
+}
+
+mf_params = {
+    'n_epochs': 20,
+    'batch_size': 100,
+    'lrate': .001,
+    'cd_steps': 5,
+    'momentum': 0.5,
+    'weight_cost': .0002
 }
 
 # initialize visible biases as in Hinton's guide
@@ -34,17 +44,18 @@ pj[pj == 0] = 1e-5
 pj[pj == 1] = 1 - 1e-5
 bias_init = np.log(pj / (1 - pj))
 
-np.random.seed(68467324)
+# seed = 68467324
 if sys.argv[1] == 'gen':
     # ----- test generative RBM -----
 
     print('Training generative RBM on MNIST...')
     # whole MNIST
-    my_rbm = RBM(n_pixels, 300, vbias=bias_init)
+    n_hidden = 500
+    my_rbm = RBM(n_pixels, n_hidden, vbias=bias_init)
 
     start = time.time()
-    my_rbm.train(train_set[0], valid_set=valid_set[0],
-                 filename='mnist_gen_log.txt', **training_params)
+    my_rbm.train(train_set[0], valid_set=None,
+                 filename='./log/mnist_gen_log.txt', **training_params)
 
     print('Total training time: {:.1f} min'.format((time.time() - start)/60))
     print('log-PL of training set: '
@@ -58,15 +69,15 @@ if sys.argv[1] == 'dis':
     # ----- test ClassRBM -----
     # whole MNIST
     train_input = np.hstack((train_set[0], to_1_of_c(train_set[1], 10)))
-    valid_input = np.hstack((valid_set[0][:1000],
-                            to_1_of_c(valid_set[1][:1000], 10)))
+    valid_input = np.hstack((valid_set[0], to_1_of_c(valid_set[1], 10)))
 
-    crbm = CRBM(n_inputs=n_pixels, n_hidden=300, n_labels=10,
+    n_hidden = 500
+    crbm = CRBM(n_inputs=n_pixels, n_hidden=n_hidden, n_labels=10,
                 input_bias=bias_init)
     print('Training Classifying RBM on MNIST...')
     start = time.time()
     crbm.train(train_input, valid_set=None,
-               filename='mnist_crbm_log.txt', **training_params)
+               filename='./log/mnist_crbm_log.txt', **training_params)
     print('Total training time: {:.1f} min'.format((time.time() - start)/60))
 
     prediction = crbm.classify(test_set[0])
@@ -78,9 +89,9 @@ if sys.argv[1] == 'dis':
         cPickle.dump(crbm, output, cPickle.HIGHEST_PROTOCOL)
 
 if sys.argv[1] == 'deep':
-    # ----- test DBN/DBM -----
+    # ----- test (C)DBM -----
 
-    layers = [n_pixels, 300, 400]
+    layers = [n_pixels, 400, 600]
     fn = 'mnist_cdbm'
     print('Training DBM {} on MNIST...'.format(layers))
 
@@ -89,12 +100,31 @@ if sys.argv[1] == 'deep':
 
     start = time.time()
     my_dbm.train(train_set[0], to_1_of_c(train_set[1], 10), valid_set=None,
-                 filename=fn + '_log.txt', **training_params)
+                 filename='log/' + fn + '_log.txt', **training_params)
+    # my_dbm.train(train_set[0], valid_set=None,
+    #              filename='log/' + fn + '_log.txt', **training_params)
 
     print('Total training time: {:.1f} min'.format((time.time() - start)/60))
 
     # Save DBM for later inspection
     with open('saved_rbms/' + fn + '.pkl', 'wb') as output:
+        cPickle.dump(my_dbm, output, cPickle.HIGHEST_PROTOCOL)
+
+if sys.argv[1] == 'mf':
+    fn = 'mnist_cdbm'
+    with open('saved_rbms/' + fn + '.pkl', 'rb') as f:
+        my_dbm = cPickle.load(f)
+
+    print('Training DBM {} on MNIST with MF...'.format(my_dbm.hidden_layers))
+
+    start = time.time()
+    my_dbm.train_mf(train_set[0], to_1_of_c(train_set[1], 10),
+                    valid_set=valid_set, filename='log/' + fn + '_mf_log.txt',
+                    **mf_params)
+
+    print('Total training time: {:.1f} min'.format((time.time() - start)/60))
+    # Save DBM for later inspection
+    with open('saved_rbms/' + fn + '_mf.pkl', 'wb') as output:
         cPickle.dump(my_dbm, output, cPickle.HIGHEST_PROTOCOL)
 
     # Save monitoring quantities as diagram

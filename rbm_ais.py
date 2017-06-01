@@ -4,6 +4,8 @@ import sys
 import numpy as np
 import cPickle, gzip
 import itertools
+from util import to_1_of_c
+from rbm import CRBM
 
 
 # numerical stability
@@ -65,40 +67,47 @@ def estimate_partition_sum(rbm, n_runs, betas):
     logZ = r_ais + logZ_base
     logZ_up = logsum([logstd_rais + np.log(3), r_ais]) + logZ_base
     logZ_down = logdiff([logstd_rais + np.log(3), r_ais]) + logZ_base
-    return logZ, logstd_rais, logZ_up, logZ_down
+    return logZ, logstd_rais + logZ_base, logZ_up, logZ_down
 
-if __name__ == '__main__':
-    # load RBM
-    with open('saved_rbms/mnist_smallh.pkl', 'rb') as f:
-        rbm = cPickle.load(f)
 
-    # load test set
-    f = gzip.open('datasets/mnist.pkl.gz', 'rb')
-    _, _, test_set = cPickle.load(f)
-    f.close()
-    test_data = test_set[0]
-    test_targets = test_set[1]
-
-    if rbm.n_hidden < 30:
+def run_ais(rbm, test_data, train_data=None, n_runs=100, exact=False):
+    if exact:
         # compute the true partition sum of the RBM (if possible)
         logZ_true = compute_partition_sum(rbm)
         avg_ll_true = np.mean(-rbm.free_energy(test_data)) - logZ_true
-    else:
-        logZ_true = -1
-        avg_ll_true = -1
+        print('True partition sum: {:.2f}'.format(logZ_true))
+        print('True average loglik: {:.2f}'.format(avg_ll_true))
 
     # Use AIS to estimate the partition sum
-    n_runs = 100
-    betas = np.concatenate((np.linspace(0, .5, 500, endpoint=False),
-                            np.linspace(.5, .9, 10000, endpoint=False),
-                            np.linspace(.9, 1., 4000)))
+    # betas = np.concatenate((np.linspace(0, .5, 500, endpoint=False),
+    #                         np.linspace(.5, .9, 10000, endpoint=False),
+    #                         np.linspace(.9, 1., 4000)))
+    betas = np.linspace(0, 1, 20000)
     logZ_est, logstdZ, est_up, est_down = \
         estimate_partition_sum(rbm, n_runs, betas)
 
     # compute the estimated average log likelihood of a test set
-    avg_ll_est = np.mean(-rbm.free_energy(test_data)) - logZ_est
-    print('True partition sum: {:.2f}'.format(logZ_true))
+    avg_ll_est_test = np.mean(-rbm.free_energy(test_data)) - logZ_est
     print('Est. partition sum (+- 3*std): {:.2f}, {:.2f}, {:.2f}'
           ''.format(logZ_est, est_up, est_down))
-    print('True average loglik: {:.2f}'.format(avg_ll_true))
-    print('Est. average loglik: {:.2f}'.format(avg_ll_est))
+    print('Est. average loglik (test): {:.2f}'.format(avg_ll_est_test))
+    if train_data is not None:
+        avg_ll_est_train = np.mean(-rbm.free_energy(train_data)) - logZ_est
+        print('Est. average loglik (train): {:.2f}'.format(avg_ll_est_train))
+
+if __name__ == '__main__':
+    # load RBM
+    with open('saved_rbms/mnist_gen500_rbm.pkl', 'rb') as f:
+        rbm = cPickle.load(f)
+
+    # load test set
+    f = gzip.open('datasets/mnist.pkl.gz', 'rb')
+    train_set, _, test_set = cPickle.load(f)
+    f.close()
+    test_data = test_set[0]
+    train_data = train_set[0]
+    if type(rbm) is CRBM:
+        test_data = np.hstack((test_data, to_1_of_c(test_set[1], 10)))
+        train_data = np.hstack((train_data, to_1_of_c(train_set[1], 10)))
+
+    run_ais(rbm, train_data, test_data)

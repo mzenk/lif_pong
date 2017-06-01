@@ -12,7 +12,7 @@ class DBM(object):
         if len(layer_sizes) < 2:
             'Please use the RBM class for just one layer'
         # Set seed for reproducatbility
-        self.np_rng = np.random.RandomState(numpy_seed)
+        self.rng = np.random.RandomState(numpy_seed)
         # layers should be a list (nv, nh1, nh2, ..., nhl)
         self.n_visible = layer_sizes[0]
         self.hidden_layers = layer_sizes[1:]
@@ -38,7 +38,7 @@ class DBM(object):
                     dbm_factor = [1, 2]
 
             self.hbiases.append(np.zeros(self.hidden_layers[i]))
-            w = .01*self.np_rng.randn(input_size, self.hidden_layers[i])
+            w = .01*self.rng.randn(input_size, self.hidden_layers[i])
             self.weights.append(w)
 
             # The RBMs share the parameters with the DBM; unlike Bengio, I
@@ -73,7 +73,7 @@ class DBM(object):
         act = h_upper.dot(self.weights[index + 1].T) + \
               h_lower.dot(self.weights[index]) + self.hbiases[index]
         p_on = 1./(1 + np.exp(-beta*act))
-        h_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
+        h_samples = (self.rng.rand(*p_on.shape) < p_on)*1.
         return [p_on.squeeze(), h_samples.squeeze()]
 
     def sample_outer_cond(self, h_in, visible=True, beta=1.):
@@ -86,7 +86,7 @@ class DBM(object):
 
         act = h_in.dot(weight) + bias
         p_on = 1./(1 + np.exp(-beta*act))
-        samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
+        samples = (self.rng.rand(*p_on.shape) < p_on)*1.
         return [p_on.squeeze(), samples.squeeze()]
 
     # update even-numbered layers
@@ -106,8 +106,13 @@ class DBM(object):
                                            h_lower=state[i - 1], beta=beta)
             # reset clamped units
             if clamped is not None and clamped[i] is not None:
-                state[i] = state[i].astype(float)
-                state[i][clamped[i]] = clamped_val[i]
+                # state[i] = state[i].astype(float)
+                if len(state[i].shape) == 2:
+                    state[i][:, clamped[i]] = clamped_val[i]
+                    mean[i][:, clamped[i]] = clamped_val[i]
+                if len(state[i].shape) == 1:
+                    state[i][clamped[i]] = clamped_val[i]
+                    mean[i][clamped[i]] = clamped_val[i]
 
         return state
 
@@ -125,8 +130,14 @@ class DBM(object):
                                            h_lower=state[i - 1], beta=beta)
             # reset clamped units
             if clamped is not None and clamped[i] is not None:
-                state[i] = state[i].astype(float)
-                state[i][clamped[i]] = clamped_val[i]
+                # float cast is needed because binaty samples
+                # state[i] = state[i].astype(float)
+                if len(state[i].shape) == 2:
+                    state[i][:, clamped[i]] = clamped_val[i]
+                    mean[i][:, clamped[i]] = clamped_val[i]
+                if len(state[i].shape) == 1:
+                    state[i][clamped[i]] = clamped_val[i]
+                    mean[i][clamped[i]] = clamped_val[i]
 
         return state
 
@@ -149,7 +160,7 @@ class DBM(object):
         return state, means
 
     # draw visible samples using Gibbs sampling
-    def draw_samples(self, n_samples, init_v=None, binary=False,
+    def draw_samples(self, n_samples, n_chains=1, init_v=None, binary=False,
                      clamped=None, clamped_val=None, layer_ind=0):
         # clamped are the indices of the clamped units:
         # clamped = list(layers, indices_in layer)
@@ -164,26 +175,28 @@ class DBM(object):
             sample_size = self.n_visible + np.sum(self.hidden_layers)
         else:
             sample_size = self.hidden_layers[layer_ind - 1]
-        samples = np.empty((n_samples, sample_size))
+        samples = np.empty((n_samples, n_chains, sample_size))
 
         # initialize the chain
         if init_v is None:
             if binary:
-                init_v = self.np_rng.randint(2, size=self.n_visible).astype(float)
+                init_v = self.rng.randint(2, size=(n_chains, self.n_visible)).\
+                    astype(float)
             else:
-                init_v = self.np_rng.rand(self.n_visible)
+                init_v = self.rng.rand(n_chains, self.n_visible)
         curr_state = [init_v]
         for i, size in enumerate(self.hidden_layers):
             if binary:
-                curr_state.append(self.np_rng.randint(2, size=size).astype(float))
+                curr_state.append(self.rng.randint(2, size=(n_chains, size)).
+                                  astype(float))
             else:
-                curr_state.append(self.np_rng.rand(size))
+                curr_state.append(self.rng.rand(n_chains, size))
 
         # initialize clamped units correctly
         if clamped is not None:
             for i, i_clamped in enumerate(clamped):
                 if i_clamped is not None:
-                    curr_state[i][i_clamped] = clamped_val[i]
+                    curr_state[i][:, i_clamped] = clamped_val[i]
 
         # draw samples and save for one layer
         for t in range(n_samples):
@@ -191,15 +204,15 @@ class DBM(object):
                 self.gibbs_from_v(curr_state, clamped, clamped_val)
             if binary:
                 if layer_ind == 'all':
-                    samples[t, :] = np.concatenate(deepcopy(curr_state))
+                    samples[t] = np.concatenate(deepcopy(curr_state), axis=1)
                 else:
-                    samples[t, :] = curr_state[layer_ind].copy()
+                    samples[t] = curr_state[layer_ind].copy()
             else:
                 if layer_ind == 'all':
-                    samples[t, :] = np.concatenate(deepcopy(curr_means))
+                    samples[t] = np.concatenate(deepcopy(curr_means), axis=1)
                 else:
-                    samples[t, :] = curr_means[layer_ind].copy()
-        return samples
+                    samples[t] = curr_means[layer_ind].copy()
+        return samples.squeeze()
 
 
 # Sampling for CDBM works exactly as DBM, just with an additional label layer
@@ -209,7 +222,7 @@ class CDBM(DBM):
         if len(layer_sizes) < 3:
             'Please use the RBM class for just one layer'
         # Set seed for reproducatbility
-        self.np_rng = np.random.RandomState(numpy_seed)
+        self.rng = np.random.RandomState(numpy_seed)
         # layers should be a list (nv, nh1, nh2, ..., nhl)
         self.n_visible = layer_sizes[0]
         self.hidden_layers = layer_sizes[1:] + [labels]
@@ -227,7 +240,7 @@ class CDBM(DBM):
                 input_size = self.hidden_layers[i - 1]
 
             self.hbiases.append(np.zeros(self.hidden_layers[i]))
-            w = .01*self.np_rng.randn(input_size, self.hidden_layers[i])
+            w = .01*self.rng.randn(input_size, self.hidden_layers[i])
             self.weights.append(w)
 
     # greedy layerwise training
@@ -288,16 +301,12 @@ class CDBM(DBM):
 
     def train_mf(self, train_data, train_targets, n_epochs=5, batch_size=10,
                  lrate=.01, cd_steps=5, valid_set=None, momentum=0,
-                 filename='train_log.txt'):
-        # algorithm similar to normal RBM-train
-        # i) find mf-optimal approximate posteriors
-        # ii) compute data term of gradient (positive grad)
-        # iii) compute model term of gradient (negative grad)
-        # iv) update parameters
+                 weight_cost=1e-5, filename='train_log.txt'):
+
         # initializations
         n_instances = train_data.shape[0]
         n_batches = int(np.ceil(n_instances/batch_size))
-        rand_perm = self.np_rng.permutation(n_instances)
+        rand_perm = self.rng.permutation(n_instances)
         shuffled_data = train_data[rand_perm]
         shuffled_targets = train_targets[rand_perm]
         initial_lrate = lrate
@@ -307,14 +316,14 @@ class CDBM(DBM):
         lbincr = 0
 
         # initialize persistent state
-        pinit = self.np_rng.choice(shuffled_data.shape[0], batch_size,
-                                   replace=False)
-        pers_state = [(self.np_rng.rand(batch_size, self.n_visible) <
+        pinit = self.rng.choice(shuffled_data.shape[0], batch_size,
+                                replace=False)
+        pers_state = [(self.rng.rand(batch_size, self.n_visible) <
                        shuffled_data[pinit])*1.]
         for i, size in enumerate(self.hidden_layers):
             hidprob = 1/(1 + np.exp(-pers_state[-1].dot(2 * self.weights[i]) -
                                     self.hbiases[i]))
-            pers_state.append((self.np_rng.rand(*hidprob.shape) < hidprob)*1.)
+            pers_state.append((self.rng.rand(*hidprob.shape) < hidprob)*1.)
 
         # log monitoring quantities in this file
         log_file = open(filename, 'w')
@@ -324,14 +333,14 @@ class CDBM(DBM):
                                                lrate, cd_steps))
         for epoch in range(n_epochs):
             print('Epoch {}'.format(epoch + 1))
-            if momentum != 0 and epoch > 5:
-                momentum = .9
+            # if momentum != 0 and epoch > 5:
+            #     momentum = .9
             err_sum = 0
             for batch_index in range(n_batches):
                 # Other lrate schedules are possible
                 update_step = batch_index + n_batches * epoch
-                # lrate = initial_lrate * 2000 / (2000 + update_step)
-                lrate /= (1.000015**(epoch*600))
+                lrate = initial_lrate * 2000 / (2000 + update_step)
+                # lrate /= (1.000015**(epoch*600))
 
                 # pick mini-batch randomly
                 start = batch_index*batch_size
@@ -386,7 +395,8 @@ class CDBM(DBM):
                 vbincr = momentum * vbincr + lrate * gradvb
                 lbincr = momentum * lbincr + lrate * gradlb
                 for l in range(self.n_layers - 1):
-                    wincr[l] = momentum * wincr[l] + lrate * gradw[l]
+                    wincr[l] = momentum * wincr[l] + \
+                        lrate * (gradw[l] - weight_cost * self.weights[l])
                     hbincr[l] = momentum * hbincr[l] + lrate * gradhb[l]
                     self.weights[l] += wincr[l]
                     self.hbiases[l] += hbincr[l]
@@ -397,7 +407,7 @@ class CDBM(DBM):
                                   log_file)
 
     def get_mf_posterior(self, data, targets=None, iterations=10):
-        # compute some reusable quantities
+        # compute some data-dependent quantities in advance
         data_bias = data.dot(self.weights[0])
         if targets is not None:
             lab_bias = targets.dot(self.weights[-1].T)
@@ -448,27 +458,22 @@ class CDBM(DBM):
         clamped_val = [None] * (1 + self.n_layers)
         burn_in = 10
 
-        # when passed multiple instances a loop is hard to avoid
         if len(v_data.shape) == 1:
             v_data = np.expand_dims(v_data, 0)
-        if class_prob:
-            labels = np.zeros((v_data.shape[0], self.hidden_layers[-1]))
-        else:
-            labels = np.zeros(v_data.shape[0])
 
-        for i, v_input in enumerate(v_data):
-            clamped_val[0] = v_input
-            samples = self.draw_samples(burn_in+100, clamped=clamped,
-                                        clamped_val=clamped_val,
-                                        layer_ind=self.n_layers)
-            if class_prob:
-                labels[i] = np.average(samples, axis=0)
-            else:
-                labels[i] = np.argmax(np.sum(samples, axis=0))
-        return labels
+        clamped_val[0] = v_data
+        samples = self.draw_samples(burn_in + 100, n_chains=v_data.shape[0],
+                                    clamped=clamped,
+                                    clamped_val=clamped_val,
+                                    layer_ind=self.n_layers)[burn_in:]
+        labprobs = np.average(samples, axis=0)
+        if class_prob:
+            return labprobs
+        else:
+            return np.argmax(labprobs, axis=1)
 
     def monitor_progress(self, train_set, valid_set, output_file):
-        subt = self.np_rng.choice(train_set[0].shape[0], 1000, replace=False)
+        subt = self.rng.choice(train_set[0].shape[0], 1000, replace=False)
         prediction = self.classify(train_set[0][subt])
         labels = np.argmax(train_set[1][subt], axis=1)
         s = 'Correct classifications on training set: '\
@@ -476,8 +481,8 @@ class CDBM(DBM):
         output_file.write(s)
 
         if valid_set is not None:
-            subv = self.np_rng.choice(valid_set[0].shape[0], 1000,
-                                      replace=False)
+            subv = self.rng.choice(valid_set[0].shape[0], 1000,
+                                   replace=False)
             prediction = self.classify(valid_set[0][subv])
             labels = valid_set[1][subv]
             s = '; validation set: '\
