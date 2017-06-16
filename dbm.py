@@ -160,7 +160,7 @@ class DBM(object):
         return state, means
 
     # draw visible samples using Gibbs sampling
-    def draw_samples(self, n_samples, n_chains=1, init_v=None, binary=False,
+    def draw_samples(self, n_samples, n_chains=1, v_init=None, binary=False,
                      clamped=None, clamped_val=None, layer_ind=0):
         # clamped are the indices of the clamped units:
         # clamped = list(layers, indices_in layer)
@@ -168,23 +168,19 @@ class DBM(object):
         # list entry None for layers w/o clamped units
         # layer_ind: specifies from which layer samples are returned
 
-        n_samples = int(n_samples)
-        if layer_ind == 0:
-            sample_size = self.n_visible
-        elif layer_ind == 'all':
-            sample_size = self.n_visible + np.sum(self.hidden_layers)
-        else:
-            sample_size = self.hidden_layers[layer_ind - 1]
-        samples = np.empty((n_samples, n_chains, sample_size))
-
         # initialize the chain
-        if init_v is None:
+        if v_init is None:
+            if clamped is not None:
+                n_chains = clamped_val.shape[0]
             if binary:
-                init_v = self.rng.randint(2, size=(n_chains, self.n_visible)).\
+                v_init = self.rng.randint(2, size=(n_chains, self.n_visible)).\
                     astype(float)
             else:
-                init_v = self.rng.rand(n_chains, self.n_visible)
-        curr_state = [init_v]
+                v_init = self.rng.rand(n_chains, self.n_visible)
+        elif len(v_init.shape) == 2:
+            n_chains = v_init.shape[0]
+
+        curr_state = [v_init]
         for i, size in enumerate(self.hidden_layers):
             if binary:
                 curr_state.append(self.rng.randint(2, size=(n_chains, size)).
@@ -194,9 +190,20 @@ class DBM(object):
 
         # initialize clamped units correctly
         if clamped is not None:
+            if v_init is not None:
+                assert n_chains == clamped_val.shape[0]
             for i, i_clamped in enumerate(clamped):
                 if i_clamped is not None:
                     curr_state[i][:, i_clamped] = clamped_val[i]
+
+        n_samples = int(n_samples)
+        if layer_ind == 0:
+            sample_size = self.n_visible
+        elif layer_ind == 'all':
+            sample_size = self.n_visible + np.sum(self.hidden_layers)
+        else:
+            sample_size = self.hidden_layers[layer_ind - 1]
+        samples = np.empty((n_samples, n_chains, sample_size))
 
         # draw samples and save for one layer
         for t in range(n_samples):
@@ -484,7 +491,7 @@ class CDBM(DBM):
             subv = self.rng.choice(valid_set[0].shape[0], 1000,
                                    replace=False)
             prediction = self.classify(valid_set[0][subv])
-            labels = valid_set[1][subv]
+            labels = np.argmax(valid_set[1][subv], axis=1)
             s = '; validation set: '\
                 '{:.3f}'.format(np.average(prediction == labels))
             output_file.write(s + '\n')

@@ -21,15 +21,15 @@ n_pixels = np.prod(img_shape)
 # plt.hist(testrbm.w.flatten(), 50)
 # plt.savefig('./figures/weight_histo.png')
 
-# For visual inspection of filters and samples
-tiled_filters = util.tile_raster_images(X=testrbm.w.T[:25, :n_pixels],
-                                        img_shape=img_shape,
-                                        tile_shape=(5, 5),
-                                        scale_rows_to_unit_interval=False,
-                                        output_pixel_vals=False)
-plt.figure()
-plt.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
-plt.savefig('figures/filters.png')
+# # For visual inspection of filters and samples
+# tiled_filters = util.tile_raster_images(X=testrbm.w.T[:25, :n_pixels],
+#                                         img_shape=img_shape,
+#                                         tile_shape=(5, 5),
+#                                         scale_rows_to_unit_interval=False,
+#                                         output_pixel_vals=False)
+# plt.figure()
+# plt.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
+# plt.savefig('figures/filters.png')
 
 # samples = testrbm.draw_samples(1e5)
 # tiled_samples = util.tile_raster_images(samples[500::1000, :n_pixels],
@@ -45,7 +45,7 @@ plt.savefig('figures/filters.png')
 # samples with partially clamped inputs
 pxls_x = int(np.sqrt(testrbm.n_visible))
 n_samples = 100
-
+burn_in = 100
 # # design clamped image pixels
 # clamped_input = np.zeros((pxls_x, pxls_x))
 # # clamped_input[pxls_x//2 - 1: pxls_x//2 + 1, pxls_x//2 - 3: pxls_x//2 + 3] = 1
@@ -55,7 +55,7 @@ n_samples = 100
 # clamped_input = clamped_input[np.nonzero(clamped_input)]
 
 # take half MNIST image
-test_img = test_set[0][test_set[1] == 9][0]
+test_img = test_set[0][test_set[1] == 6][1]
 clamped_input = np.zeros((pxls_x, pxls_x))
 clamped_input[:pxls_x//2, :] = 1
 clamped_input = clamped_input.flatten()
@@ -63,8 +63,8 @@ clamped_ind = np.nonzero(clamped_input == 1)[0]
 clamped_input = test_img[clamped_ind]
 
 clamped_samples = \
-    testrbm.sample_with_clamped_units(100 + n_samples, clamped_ind,
-                                      clamped_input)[100:]
+    testrbm.sample_with_clamped_units(burn_in + n_samples, clamped_ind,
+                                      clamped_input)[burn_in:]
 
 inferred_imgs = np.zeros((n_samples, pxls_x**2))
 inferred_imgs[:, clamped_ind] = clamped_input

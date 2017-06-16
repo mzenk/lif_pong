@@ -50,34 +50,52 @@ class RBM(object):
     # generalized method for sampling quickly from many chains (numpy).
     # AST still causes problems: for single chain indexing with k, for
     # multiple chains need to figure out how to store samples (asynchronous)
-    def draw_samples(self, n_samples, v_start=None, n_chains=1, binary=False,
-                     ast=False):
-        n_samples = int(n_samples)
+    def draw_samples(self, n_samples, v_init=None, n_chains=1, binary=False,
+                     clamped=None, clamped_val=None, ast=False):
         if ast:
-            return self.draw_samples_ast(n_samples, binary=binary)
+            if clamped is not None:
+                print('No clamped sampling with AST')
+                return 0
+            return self.draw_samples_ast(n_samples, v_init, binary)
 
-        samples = np.empty((n_chains, n_samples, self.n_visible +
+        # initialize the chains
+        if v_init is None:
+            if clamped is not None and len(clamped_val.shape) == 2:
+                n_chains = clamped_val.shape[0]
+            v_init = self.np_rng.randint(2, size=(n_chains, self.n_visible))
+        else:
+            if len(v_init.shape) == 2:
+                n_chains = v_init.shape[0]
+            else:
+                v_init = np.expand_dims(v_init, 0)
+        v_curr = v_init.astype(float)
+
+        if clamped is not None:
+            if len(clamped_val.shape) == 2:
+                assert n_chains == clamped_val.shape[0]
+            v_curr[:, clamped] = clamped_val
+
+        n_samples = int(n_samples)
+        samples = np.empty((n_samples, n_chains, self.n_visible +
                             self.n_hidden))
-        if v_start is None:
-            v_start = self.np_rng.randint(2, size=(n_chains, self.n_visible))
-
-        ax = 0
-        if n_chains > 1:
-            ax = 1
-
-        v_curr = v_start
-        h_curr = 0
+        samples = samples.squeeze()
+        # update units and renew clamping if necessary
         for t in range(n_samples):
             pv, v_curr, ph, h_curr = self.gibbs_vhv(v_curr)
+            if clamped is not None:
+                if n_chains == 1:
+                    v_curr = np.expand_dims(v_curr, 0).astype(float)
+                    pv = np.expand_dims(pv, 0).astype(float)
+                v_curr[:, clamped] = clamped_val
+                pv[:, clamped] = clamped_val
             if binary:
-                samples[:, t, :] = \
-                    np.concatenate((v_curr, h_curr), axis=ax)
+                samples[t] = np.hstack((v_curr.squeeze(), h_curr))
             else:
-                samples[:, t, :] = np.concatenate((pv, ph), axis=ax)
+                samples[t] = np.hstack((pv.squeeze(), ph))
         return samples.squeeze()
 
     # doesn't work for multiple chains yet
-    def draw_samples_ast(self, n_samples, v_start=None, binary=False):
+    def draw_samples_ast(self, n_samples, v_init=None, binary=False):
         n_samples = int(n_samples)
         # setup ast
         betas = np.linspace(1., .5, 10)
@@ -85,9 +103,9 @@ class RBM(object):
         gamma = 10
 
         samples = np.empty((n_samples, self.n_visible + self.n_hidden))
-        if v_start is None:
-            v_start = self.np_rng.randint(2, size=self.n_visible)
-        v_curr = v_start
+        if v_init is None:
+            v_init = self.np_rng.randint(2, size=self.n_visible)
+        v_curr = v_init
         k_curr = np.array(0)
         h_curr = np.zeros(self.n_hidden)
 
@@ -108,8 +126,10 @@ class RBM(object):
                 samples[t] = np.concatenate((pv, ph))
         return samples
 
+    # for simplicity one could replace this method by modifying the normal
+    # sampling method as in DBM
     def sample_with_clamped_units(self, n_samples, clamped_ind, clamped_val,
-                                  binary=False):
+                                  binary=False, v_init=None):
         """
             clamped_ind: indices of clamped values (same for each input)
             clamped_val: (n_instances, n_clamped)
@@ -122,10 +142,18 @@ class RBM(object):
               classification (clamped input, sampled labels)
               or generative mode (clamped label, sample input)
         """
-
-        # Create an extra RBM for the h->v step for efficiency
+        n_samples = int(n_samples)
         unclamped_ind = np.setdiff1d(np.arange(self.n_visible), clamped_ind)
 
+        # # this is a less efficient variant but uses draw_samples
+        # samp = self.draw_samples(n_samples, binary=binary, v_init=v_init,
+        #                          clamped=clamped_ind, clamped_val=clamped_val)
+        # if len(samp.shape) == 3:
+        #     return samp[:, :, unclamped_ind]
+        # else:
+        #     return samp[:, unclamped_ind]
+
+        # Create an extra RBM for the h->v step for efficiency
         unclamped_rbm = RBM(n_visible=unclamped_ind.size,
                             n_hidden=self.n_hidden,
                             w=self.w[unclamped_ind, :],
@@ -137,7 +165,13 @@ class RBM(object):
 
         samples = np.zeros((n_samples, clamped_val.shape[0],
                             unclamped_ind.size))
-        v_curr = np.zeros((clamped_val.shape[0], self.n_visible))
+
+        if v_init is None:
+            v_init = self.np_rng.randint(2, size=(clamped_val.shape[0],
+                                                  self.n_visible))
+        elif len(v_init.shape) == 1:
+            v_init = np.expand_dims(v_init, 0)
+        v_curr = v_init.astype(float)
         v_curr[:, clamped_ind] = clamped_val
 
         # sample starting from  multiple initial values
@@ -150,7 +184,6 @@ class RBM(object):
                 samples[t] = unclamped_samples
             else:
                 samples[t] = unclamped_mean
-
         return samples.squeeze()
 
     def gibbs_hvh(self, h_start, beta=1.):
@@ -246,9 +279,7 @@ class RBM(object):
         v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
         return [p_on.squeeze(), v_samples.squeeze()]
 
-    # compute CSL; this method can be overwritten for CRBM
-    # speed up by numpy array operations is limited by memory consumption of
-    # resulting arrays
+    # deprecated: compute CSL
     def compute_csl(self, valid_set):
         # compute CSL for validation set
         n_data = valid_set.shape[0]
@@ -471,10 +502,10 @@ class RBM(object):
                     delta_f = 0
 
                     # random subset
-                    subset_ind = self.np_rng.choice(valid_set.shape[0], 1000,
-                                                    replace=False)
-                    # # CSL monitoring -> much too slow
-                    # csl = self.compute_csl(valid_set[subset_ind, :])
+                    subset_ind = \
+                        self.np_rng.choice(valid_set.shape[0],
+                                           min(1000, valid_set.shape[0]),
+                                           replace=False)
 
                     # pseudo-likelihood
                     pl = self.compute_logpl(valid_set[subset_ind, :])
@@ -490,12 +521,11 @@ class RBM(object):
         log_file.close()
         return
 
-    def monitor_progress(self, train_set, valid_set, output_file):
+    def monitor_progress(self, train_set, valid_set):
         subset_ind = self.np_rng.randint(train_set.shape[0], size=5000)
         s = 'Log-PL of random training subset: '\
             '{}'.format(self.compute_logpl(train_set[subset_ind]))
         print(s)
-        output_file.write(s + '\n')
 
 
 class CRBM(RBM):

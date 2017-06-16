@@ -49,6 +49,8 @@ def get_windowed_image_index(img_shape, end_index,
     mask = np.zeros(img_shape)
     if fractional:
         end_index = int(end_index * img_shape[1])
+    else:
+        assert isinstance(end_index, int)
     if window_size < 0:
         window_size = end_index
     start_index = max(0, end_index - window_size)
