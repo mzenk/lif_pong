@@ -521,7 +521,7 @@ class RBM(object):
         log_file.close()
         return
 
-    def monitor_progress(self, train_set, valid_set):
+    def monitor_progress(self, train_set, valid_set, output_file):
         subset_ind = self.np_rng.randint(train_set.shape[0], size=5000)
         s = 'Log-PL of random training subset: '\
             '{}'.format(self.compute_logpl(train_set[subset_ind]))
@@ -594,7 +594,7 @@ class CRBM(RBM):
         pi_on = 1./(1 + np.exp(-u_inp))
         pl_on = 1./(1 + np.exp(-u_lab))
         p_on = np.hstack((pi_on, pl_on))
-        v_samples = (self.np_rng.rand(h_in.shape[0], self.n_visible) < p_on)*1
+        v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
         return [p_on.squeeze(), v_samples.squeeze()]
 
     def classify(self, v_data, class_prob=False):

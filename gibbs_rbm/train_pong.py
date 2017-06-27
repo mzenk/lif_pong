@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 # Load Pong data
 img_shape = (36, 48)
-save = True
+save = False
 fname = 'pong_var_start{}x{}'.format(*img_shape)
 # fname = 'pong_var_overlap2'
 with np.load('datasets/' + fname + '.npz') as d:
@@ -34,7 +34,7 @@ else:
 assert np.prod(img_shape) == n_pxls
 
 training_params = {
-    'n_epochs': 25,
+    'n_epochs': 2,
     'batch_size': 20,
     'lrate': .2,
     'cd_steps': 1,
@@ -112,7 +112,7 @@ if sys.argv[1] == 'dis':
 
 if sys.argv[1] == 'deep':
     # ----- test DBN/DBM -----
-    layers = [n_pxls, 500, 500]
+    layers = [n_pxls, 10, 20]
     fn = 'pong_cdbm'
     print('Training DBM {} on Pong...'.format(layers))
 

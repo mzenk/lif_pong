@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 
 # Basic RBM testing
 # ------ Test the sampling -------
-nv = 3
-nh = 2
+nv = 5
+nh = 4
 dim = nv + nh
-w_small = np.random.rand(nv, nh)
+w_small = .1*np.random.randn(nv, nh)
 myrbm = RBM(nv, nh, w=w_small, vbias=np.zeros(nv), hbias=np.zeros(nh))
 w = np.concatenate((np.concatenate((np.zeros((nv, nv)), w_small), axis=1),
                    np.concatenate((w_small.T, np.zeros((nh, nh))), axis=1)),

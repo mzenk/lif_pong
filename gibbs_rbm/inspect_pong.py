@@ -4,15 +4,15 @@ import numpy as np
 import cPickle
 from util import tile_raster_images, to_1_of_c
 from rbm import RBM, CRBM
-import matplotlib
+import matplotlib as mpl
 # matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
-
+mpl.rcParams['font.size'] = 12
 # Load Pong data
 img_shape = (36, 48)
-data_name = 'gauss_var_start{}x{}'.format(*img_shape)
-data_name = 'pong_var_overlap'
+data_name = 'pong_var_start{}x{}'.format(*img_shape)
+# data_name = 'pong_var_overlap'
 with np.load('datasets/' + data_name + '.npz') as d:
     train_set, _, test_set = d[d.keys()[0]]
 
@@ -42,49 +42,56 @@ print('Number of samples: {}, {}'.format(train_set[0].shape[0],
 # plt.plot(img_diff, [400]*20, 'ro')
 # plt.savefig('testl2.png')
 
-# # inspect data
-# samples = tile_raster_images(train_set[0][:1600:100],
-#                              img_shape=img_shape,
-#                              tile_shape=(4, 4),
-#                              tile_spacing=(1, 1),
-#                              scale_rows_to_unit_interval=True,
-#                              output_pixel_vals=False)
+# inspect data
+samples = tile_raster_images(train_set[0][:1600:100],
+                             img_shape=img_shape,
+                             tile_shape=(4, 4),
+                             tile_spacing=(1, 1),
+                             scale_rows_to_unit_interval=True,
+                             output_pixel_vals=False)
 
-# plt.figure()
-# plt.imshow(samples, interpolation='Nearest', cmap='gray', origin='lower')
-# plt.savefig('figures/' + data_name + '_trainsamples.png')
+plt.figure()
+plt.imshow(samples, interpolation='Nearest', cmap='gray', origin='lower')
+plt.gca().get_xaxis().set_visible(False)
+plt.gca().get_yaxis().set_visible(False)
+plt.tight_layout()
+plt.savefig('figures/' + data_name + '_trainsamples.png')
 
-# # Load rbm
-# discriminative = True
-# if discriminative:
-#     rbm_name = data_name + '_crbm.pkl'
-# else:
-#     rbm_name = data_name + '_rbm.pkl'
-# with open('saved_rbms/' + rbm_name, 'rb') as f:
-#     testrbm = cPickle.load(f)
+# Load rbm
+discriminative = True
+if discriminative:
+    rbm_name = data_name + '_crbm.pkl'
+else:
+    rbm_name = data_name + '_rbm.pkl'
+with open('saved_rbms/' + rbm_name, 'rb') as f:
+    testrbm = cPickle.load(f)
 
-# # filters
-# rand_ind = np.random.randint(testrbm.n_hidden, size=25)
-# tiled_filters = tile_raster_images(X=testrbm.w.T[rand_ind, :testrbm.n_inputs],
-#                                    img_shape=img_shape,
-#                                    tile_shape=(5, 5),
-#                                    tile_spacing=(1, 1),
-#                                    scale_rows_to_unit_interval=False,
-#                                    output_pixel_vals=False)
-# plt.figure()
-# plt.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
-# plt.colorbar()
-# plt.savefig('figures/' + data_name + '_filters.png')
+print(testrbm.n_hidden)
 
-# # weight histogram
-# plt.figure(figsize=(14, 7))
-# plt.subplot(121)
-# plt.hist(testrbm.w[:testrbm.n_inputs].flatten(), 50)
-# plt.title('Visible weights')
-# plt.subplot(122)
-# plt.hist(testrbm.w[testrbm.n_inputs:].flatten(), 50)
-# plt.title('Label weights')
-# plt.savefig('figures/' + data_name + 'weights_histo.png')
+# filters
+rand_ind = np.random.randint(testrbm.n_hidden, size=25)
+tiled_filters = tile_raster_images(X=testrbm.w.T[rand_ind, :testrbm.n_inputs],
+                                   img_shape=img_shape,
+                                   tile_shape=(5, 5),
+                                   tile_spacing=(1, 1),
+                                   scale_rows_to_unit_interval=False,
+                                   output_pixel_vals=False)
+plt.figure()
+plt.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
+plt.colorbar()
+plt.tight_layout()
+plt.savefig('figures/' + data_name + '_filters.png')
+
+# weight histogram
+plt.figure(figsize=(14, 7))
+plt.subplot(121)
+plt.hist(testrbm.w[:testrbm.n_inputs].flatten(), 50)
+plt.title('Visible weights')
+plt.subplot(122)
+plt.hist(testrbm.w[testrbm.n_inputs:].flatten(), 50)
+plt.title('Label weights')
+plt.tight_layout()
+plt.savefig('figures/' + data_name + 'weights_histo.pdf')
 
 # # inspect label placement
 # imgs = train_set[0].reshape((train_set[0].shape[0], img_shape[0], img_shape[1]))

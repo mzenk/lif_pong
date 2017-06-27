@@ -84,9 +84,9 @@ if sys.argv[1] == 'dis':
     test_performance = np.average(prediction == test_set[1])
     print("Correct classifications on test set: " + str(test_performance))
 
-    # Save crbm for later inspection
-    with open('saved_rbms/mnist_disc_rbm.pkl', 'wb') as output:
-        cPickle.dump(crbm, output, cPickle.HIGHEST_PROTOCOL)
+    # # Save crbm for later inspection
+    # with open('saved_rbms/mnist_disc_rbm.pkl', 'wb') as output:
+    #     cPickle.dump(crbm, output, cPickle.HIGHEST_PROTOCOL)
 
 if sys.argv[1] == 'deep':
     # ----- test (C)DBM -----

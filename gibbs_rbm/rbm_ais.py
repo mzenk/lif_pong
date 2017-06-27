@@ -96,18 +96,34 @@ def run_ais(rbm, test_data, train_data=None, n_runs=100, exact=False):
         print('Est. average loglik (train): {:.2f}'.format(avg_ll_est_train))
 
 if __name__ == '__main__':
+    # # load test set
+    # f = gzip.open('datasets/mnist.pkl.gz', 'rb')
+    # train_set, _, test_set = cPickle.load(f)
+    # f.close()
+
+    data_name = 'pong_var_start36x48'
+    with np.load('datasets/' + data_name + '.npz') as d:
+        train_set, _, test_set = d[d.keys()[0]]
+
     # load RBM
-    with open('saved_rbms/mnist_gen500_rbm.pkl', 'rb') as f:
+    # with open('saved_rbms/mnist_disc_rbm.pkl', 'rb') as f:
+    #     rbm = cPickle.load(f)
+
+    with open('saved_rbms/' + data_name + '_crbm.pkl', 'rb') as f:
         rbm = cPickle.load(f)
 
-    # load test set
-    f = gzip.open('datasets/mnist.pkl.gz', 'rb')
-    train_set, _, test_set = cPickle.load(f)
-    f.close()
     test_data = test_set[0]
     train_data = train_set[0]
-    if type(rbm) is CRBM:
-        test_data = np.hstack((test_data, to_1_of_c(test_set[1], 10)))
-        train_data = np.hstack((train_data, to_1_of_c(train_set[1], 10)))
 
-    run_ais(rbm, train_data, test_data)
+    if len(train_set[1].shape) == 1:
+        train_label = to_1_of_c(train_set[1], rbm.n_labels)
+        test_label = to_1_of_c(test_set[1], rbm.n_labels)
+    else:
+        train_label = train_set[1]
+        test_label = test_set[1]
+
+    if isinstance(rbm, CRBM):
+        test_data = np.hstack((test_data, test_label))
+        train_data = np.hstack((train_data, train_label))
+
+    run_ais(rbm, test_data)

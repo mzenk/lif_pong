@@ -132,7 +132,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
 
 if __name__ == '__main__':
     # generate_data([48, 36], pot_str='pong', fixed_start=True, save=True)
-    generate_data([48, 36], pot_str='pong', fixed_start=False, save=True)
+    # generate_data([48, 36], pot_str='pong', fixed_start=False, save=True)
     # generate_data([48, 36], pot_str='gauss', fixed_start=True, save=False)
     # generate_data([48, 36], pot_str='gauss', fixed_start=False, save=True)
 
@@ -165,31 +165,26 @@ if __name__ == '__main__':
     #         np.sum(initial_histo, axis=0), width=1)
     # plt.savefig('angle_histo.png')
 
-    # # testing
-    # grid = np.array([48, 36])
-    # h = 1./grid[0]
-    # field = grid * h
-    # v0 = .5
+    # testing
+    grid = np.array([48, 36])
+    h = 1./grid[0]
+    field = grid * h
+    v0 = .5
 
-    # start_pos = np.array([0, field[1]/2])
-    # ang = 0.
-    # # coul_ampl = 1.
-    # # coul_args = (coul_ampl, [field[0]/3, field[1]/2], 2*coul_ampl/v0**2)
-    # # const_args = ([0., 1.],)
-    # # amplitude = .4
-    # # mu = field * [.5, .5]
-    # # cov_mat = np.diag([.1, .05] * field)
-    # # test = Gaussian_trajectory(grid, h, start_pos, ang, v0, amplitude, mu, cov_mat)
-    # gradx = 1
-    # grady = 0
-    # test = Const_trajectory(grid, h, start_pos, ang, v0, np.array([gradx, grady]))
-    # test.integrate(write_pixels=False)
-    # test.draw_trajectory(potential=True)
-    # # imshow has the origin at the top left
-    # # plt.imshow(test.pixels, interpolation='Nearest', cmap='Blues',
-    # #            origin='lower', extent=(0, field[0], 0, field[1]), alpha=0.5)
-    # plt.savefig('test_trajectory.png')
-    # plt.figure()
-    # plt.plot(np.linspace(0, 1, test.trace.shape[0]), test.trace[:, 0])
-    # plt.plot([0, 1], [v0**2/gradx/2]*2, 'r-')
-    # plt.savefig('testtrace.png')
+    start_pos = np.array([0, field[1]/2])
+    ang = 30.
+    # coul_ampl = 1.
+    # coul_args = (coul_ampl, [field[0]/3, field[1]/2], 2*coul_ampl/v0**2)
+    # const_args = ([0., 1.],)
+    # amplitude = .4
+    # mu = field * [.5, .5]
+    # cov_mat = np.diag([.1, .05] * field)
+    # test = Gaussian_trajectory(grid, h, start_pos, ang, v0, amplitude, mu, cov_mat)
+    test = Const_trajectory(grid, h, start_pos, ang, v0, np.array([0, 0]))
+    test.integrate(write_pixels=True)
+    fig = plt.figure()
+    test.draw_trajectory(fig, potential=True)
+    # imshow has the origin at the top left
+    plt.imshow(test.pixels, interpolation='Nearest', cmap='Blues',
+               origin='lower', extent=(0, field[0], 0, field[1]), alpha=0.5)
+    plt.savefig('test_trajectory.png')

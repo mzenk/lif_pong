@@ -93,8 +93,8 @@ with open('saved_rbms/' + rbm_name, 'rb') as f:
 
 # Test the "classification performance", i.e. how much of the picture does
 # the RBM need to predict the correct outcome
-imgs = test_set[0][:100]
-labels = np.argmax(test_set[1][:100], axis=1)
+imgs = test_set[0]
+labels = np.argmax(test_set[1], axis=1)
 # fractions = np.arange(0, img_shape[1] + 1, 3)
 fractions = np.linspace(0., 1., 20)
 win_size = 100
@@ -115,14 +115,16 @@ for i, fraction in enumerate(fractions):
                                  fractional=True, window_size=win_size)
 
     # due to memory requirements not all instances can be put into an array
-    n_chunks = np.ceil(8*(n_sampl+burnIn)*imgs.shape[0]*n_pxls / 3e9)
-    for j, chunk in enumerate(np.array_split(imgs, int(n_chunks))):
+    n_chunks = int(np.ceil(8*(n_sampl+burnIn)*imgs.shape[0]*n_pxls / 3e9))
+    n_each, remainder = imgs.shape[0] // n_chunks, imgs.shape[0] % n_chunks
+    chunk_sizes = np.array([0] + [n_each] * n_chunks)
+    chunk_sizes[1:(remainder + 1)] += 1
+    chunk_ind = np.cumsum(chunk_sizes)
+    for j, chunk in enumerate(np.array_split(imgs, n_chunks)):
         if v_init is None:
             chunk_init = None
         else:
-            chunk_size = int(np.ceil(imgs.shape[0]/n_chunks))
-            chunk_init = v_init[j*chunk_size: min(v_init.shape[0],
-                                                  (j + 1)*chunk_size)]
+            chunk_init = v_init[chunk_ind[j]:chunk_ind[j+1]]
         samples = \
             rbm.sample_with_clamped_units(burnIn + n_sampl,
                                           clamped_ind=clamped_ind,
@@ -156,10 +158,10 @@ for i, fraction in enumerate(fractions):
         img_diff[i] = np.mean(l2_diff / unclamped.size)
         img_diff_std[i] = np.std(l2_diff / unclamped.size)
 
-# # save data
-# np.savez_compressed('figures/' + data_name[:4] + '_uncover{}w{}s'.format(win_size, n_sampl),
-#                     (correct_predictions, distances, dist_std,
-#                      img_diff, img_diff_std))
+# save data
+np.savez_compressed('figures/' + data_name[:4] + '_uncover{}w{}s'.format(win_size, n_sampl),
+                    (correct_predictions, distances, dist_std,
+                     img_diff, img_diff_std))
 
 # plotting...
 if win_size < img_shape[1]:
@@ -185,7 +187,7 @@ plt.errorbar(fractions, img_diff, fmt='ro', yerr=img_diff_std)
 plt.ylabel('L2 image dissimilarity')
 plt.xlabel(xlabel)
 plt.tight_layout()
-plt.savefig('figures/pong_uncover{}w{}s.png'.format(win_size, n_sampl))
+plt.savefig('figures/pong_uncover{}w{}s.pdf'.format(win_size, n_sampl))
 
 # # Dreaming
 # samples = rbm.draw_samples(int(1e5), ast=True)
@@ -199,7 +201,7 @@ plt.savefig('figures/pong_uncover{}w{}s.png'.format(win_size, n_sampl))
 
 # plt.figure()
 # plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-# plt.savefig('figures/samples.png', bbox_inches='tight')
+# plt.savefig('figures/samples.pdf', bbox_inches='tight')
 
 # # whole set performance
 # my_set = test_set

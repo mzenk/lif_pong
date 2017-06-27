@@ -88,7 +88,7 @@ def get_frames(rbm, image, winsize):
             paddle_pos = img_shape[0] - 1
         else:
             paddle_pxls[int(paddle_pos) - paddle_length//2:
-                        int(paddle_pos) + np.round(paddle_length/2), 1] = 1
+                        int(paddle_pos + np.round(paddle_length/2)), 1] = 1
 
         pixels = np.hstack((inferred_img, np.expand_dims(paddle_pxls, 1)))
 
@@ -101,11 +101,15 @@ def get_frames(rbm, image, winsize):
         # plotting
         width = .7
         ax1 = fig.add_axes([.05, .2, width, width*3/4])
+        ax1.xaxis.set_visible(False)
+        ax1.yaxis.set_visible(False)
         ax2 = fig.add_axes([width - .02, .2, .2, width*3/4])
         ax2.set_ylim([-.5, pixels.shape[0] - .5])
+        ax2.set_xlim([0, 1])
         ax2.xaxis.set_ticks([0., 0.5, 1.])
         ax2.tick_params(left='off', right='off',
                         labelleft='off', labelright='off')
+        ax2.set_xlabel('P(last column)')
         # barh doesnt work because apparently BarContainer has no 'set_visible'
         f1 = ax1.imshow(pixels, interpolation='Nearest', cmap='gray',
                         origin='lower')
@@ -130,9 +134,9 @@ with open('saved_rbms/' + rbm_name, 'rb') as f:
 
 # pick random examples and infer trajectories
 np.random.seed(125575)
-example_id = np.random.choice(test_set[0].shape[0], size=1, replace=False)
+example_id = np.random.choice(test_set[0].shape[0], size=10, replace=False)
 for i, example in enumerate(test_set[0][example_id]):
-    fig, frames = get_frames(rbm, example, 100)
+    fig, frames = get_frames(rbm, example, winsize=100)
 
     # Set up formatting for the movie files --- whatever this is
     Writer = animation.writers['ffmpeg']
@@ -141,5 +145,3 @@ for i, example in enumerate(test_set[0][example_id]):
     traj_anim = animation.ArtistAnimation(fig, frames, interval=200,
                                           repeat_delay=3000, blit=True)
     traj_anim.save('figures/animation_' + data_name + str(i) + '.mp4')
-    # plt.show()
-    # plt.close()

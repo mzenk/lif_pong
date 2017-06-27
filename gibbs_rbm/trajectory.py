@@ -9,6 +9,11 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 
+def gauss1d(x, mu, sigma):
+        mu = np.repeat(np.expand_dims(mu, 1), x.shape[0], axis=1)
+        return np.exp(-.5 * (x - mu)**2 / sigma**2)/np.sqrt(2)/sigma
+
+
 # abstract class for trajectory generation
 class Trajectory:
     __metaclass__ = ABCMeta
@@ -68,54 +73,16 @@ class Trajectory:
                 r.set_initial_value(r.y*np.array([1, 1, 1, -1]), r.t)
             i += 1
 
-        # # ------------
-        # # other, simpler ode-solvers
-        # # use ode solver for integration
-        # t1 = 10*(size[0] + size[1])/2/self.v0
-        # # time scale: somehow related to field size and velocity; maybe adjust
-        # # program would be better/faster if dt larger, but dt needs to be
-        # # small enough to work with reflecting boundaries
-        # dt = .001*(size[0] + size[1])/2/self.v0
-        # curr_pos = np.zeros((1 + int(t1 / dt), 2))
-        # i = 0
-        # t = 0
-        # y = np.array([self.pos[0], self.pos[1], vx, vy], dtype=np.float64)
-        # self.add_to_image(self.pos)
-        # while True:
-        #     # Euler -> fast but inaccurate (still sufficient?)
-        #     # y += self.force_fct(t, y)*dt
-        #     # # Leapfrog -> too slow
-        #     # x = y[:2]
-        #     # v = y[2:]
-        #     # x += v*dt
-        #     # v += self.force_fct(t, np.concatenate((x, v)))[2:]*dt
-
-        #     # stop if particle leaves field -> maybe add epsilon term to avoid
-        #     # overshoot
-        #     if y[0] > size[0] or y[0] < 0:
-        #         break
-        #     if write_pixels:
-        #         self.add_to_image(y[:2])
-
-        #     # reflect if particle hits top or bottom
-        #     if y[1] > size[1] or y[1] < 0:
-        #         y *= [1, 1, 1, -1]
-        #     i += 1
-        #     t += dt
-        #     curr_pos[i] = y[:2]
-        # # ------------
-
         self.trace = curr_pos[~np.all(curr_pos == 0, axis=1), :]
         # normalize pixels
         self.pixels /= np.max(self.pixels)
         return 0
 
-    def draw_trajectory(self, potential=False):
+    def draw_trajectory(self, fig, potential=False):
         if self.trace.shape == (1,):
             print("integrate first!")
             return
 
-        fig = plt.figure()
         ax = fig.add_subplot(111)
         if potential:
             # overlay potential heatmap
@@ -133,7 +100,6 @@ class Trajectory:
                                                   fill=False))
         ax.set_xlim(0 - self.field_size[0]*.1, self.field_size[0]*1.1)
         ax.set_ylim(0 - self.field_size[1]*.1, self.field_size[1]*1.1)
-        fig.savefig("trajectory.png")
 
     def add_to_image(self, point):
         # image coordinates are swapped natural coordinates
@@ -154,6 +120,25 @@ class Trajectory:
         self.pixels[lower[0], upper[1]] += lower_frac[0] * upper_frac[1]
         self.pixels[upper[0], lower[1]] += lower_frac[1] * upper_frac[0]
         self.pixels[upper[0], upper[1]] += upper_frac[0] * upper_frac[1]
+
+        # # alternative: gauss; most general solution would be a convolution
+        # of a delta peak at the point with an arbitrary kernel
+        # # points is a (nx2) array
+        # points = np.array(point)
+        # if len(points.shape) == 1:
+        #     points = np.expand_dims(points, 0)
+        # # switch coordinates for image
+
+        # # create gauss array
+        # x = np.arange(0, self.field_size[0], self.grid_spacing) \
+        #     + .5*self.grid_spacing
+        # y = np.arange(0, self.field_size[1], self.grid_spacing) \
+        #     + .5*self.grid_spacing
+        # gx = gauss1d(x, points[:, 0], self.grid_spacing)
+        # gy = gauss1d(y, points[:, 1], self.grid_spacing)
+
+        # # combine them to grid
+        # self.pixels += gy.T.dot(gx)
 
 
 # class for r^-1 potential
