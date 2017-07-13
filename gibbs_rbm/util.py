@@ -46,6 +46,7 @@ def to_1_of_c(labels, c):
 
 def get_windowed_image_index(img_shape, end_index,
                              window_size=-1, fractional=False):
+    assert end_index <= img_shape[1]
     mask = np.zeros(img_shape)
     if fractional:
         end_index = int(end_index * img_shape[1])

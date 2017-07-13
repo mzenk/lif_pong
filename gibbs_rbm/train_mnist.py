@@ -13,7 +13,7 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 # Load MNIST
-f = gzip.open('datasets/mnist.pkl.gz', 'rb')
+f = gzip.open('../datasets/mnist.pkl.gz', 'rb')
 train_set, valid_set, test_set = cPickle.load(f)
 f.close()
 n_pixels = train_set[0].shape[1]
@@ -26,7 +26,7 @@ training_params = {
     'persistent': True,
     'momentum': 0.5,
     'weight_cost': .001,
-    'cast': False,
+    'cast': True,
 }
 
 mf_params = {
