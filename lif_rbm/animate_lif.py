@@ -8,6 +8,8 @@ import sys
 sys.path.insert(0, '../gibbs_rbm')
 from rbm import RBM, CRBM
 
+sampling_interval = 10.
+
 
 class Pong_updater(object):
     def __init__(self, image, points, img_shape, rbm, winsize,
@@ -26,7 +28,7 @@ class Pong_updater(object):
             # maximum distance traveled in one update step. For now: double the
             # horizontal ball speed
             v_horiz_ball = 1. / self.clamp_duration        # 1 pxl each 100ms
-            self.max_step = 2*v_horiz_ball * 10.             # 10ms sampling
+            self.max_step = 2*v_horiz_ball * sampling_interval  # 10ms sampling
 
     def update_paddle(self, prediction):
         # timestep=1; paddle center should be aligned with label index => +.5
@@ -60,7 +62,7 @@ class Pong_updater(object):
             pixels = np.tile(np.expand_dims(pixels, 2), (1, 1, 3))
             labels = vis_state[np.prod(self.img_shape):]
             # overlay clamping window (update interval is 10ms)
-            self.clamp_position += 10. / self.clamp_duration
+            self.clamp_position += sampling_interval / self.clamp_duration
             self.clamp_position = self.clamp_position % (self.img_shape[1] + 1)
             clamped_window = np.zeros(img_shape + (3,))
             end = int(self.clamp_position)
@@ -106,15 +108,17 @@ rbm_name = data_name + '_crbm.pkl'
 with open('../gibbs_rbm/saved_rbms/' + rbm_name, 'rb') as f:
     rbm = cPickle.load(f)
 # file with sampled states from sbs simulation
-sample_file = 'pong_clamped_samples.npy'
-samples = np.load(sample_file)
+sample_file = 'pong_window_samples'
+with np.load('Data/' + sample_file + '.npz') as d:
+    samples = d[d.files[0]]
+
 vis_samples = samples[:, :rbm.n_visible]
 pixel_samples = samples[:, :n_pixels]
 hid_samples = samples[:, rbm.n_visible:]
 # marginal visible probabilities can be calculated from hidden states
 vis_probs = rbm.sample_v_given_h(hid_samples)[0]
 
-winsize = img_shape[1]
+winsize = img_shape[1]//2
 
 # set sup figure
 fig = plt.figure()
@@ -150,5 +154,5 @@ for i, example in enumerate(test_set[0][example_id]):
     ani = animation.FuncAnimation(fig, upd, frames=vis_samples,
                                   # fargs=(rbm, img_shape, winsize),
                                   interval=50., blit=True, repeat_delay=2000)
-    ani.save('figures/animation_' + data_name + str(i) + '.mp4')
+    ani.save('Figures/animation_' + data_name + str(i) + '.mp4')
     # plt.show()

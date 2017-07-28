@@ -16,7 +16,7 @@ n_pxls = np.prod(img_shape)
 data_name = 'pong_var_start{}x{}'.format(*img_shape)
 # data_name = 'label1_fixed'
 discriminative = True
-with np.load('datasets/' + data_name + '.npz') as d:
+with np.load('../datasets/' + data_name + '.npz') as d:
     train_set, _, test_set = d[d.keys()[0]]
 
 if discriminative:
@@ -93,11 +93,15 @@ with open('saved_rbms/' + rbm_name, 'rb') as f:
 
 # Test the "classification performance", i.e. how much of the picture does
 # the RBM need to predict the correct outcome
+test_set[0] = test_set[0][:10]
+test_set[1] = test_set[1][:10]
 imgs = test_set[0]
 labels = np.argmax(test_set[1], axis=1)
+targets = np.average(np.tile(np.arange(rbm.n_labels), (len(imgs), 1)),
+                     weights=test_set[1], axis=1)
 # fractions = np.arange(0, img_shape[1] + 1, 3)
 fractions = np.linspace(0., 1., 20)
-win_size = 100
+win_size = 48
 burnIn = 20
 n_sampl = 100
 v_init = np.random.randint(2, size=(imgs.shape[0], rbm.n_visible))
@@ -150,8 +154,8 @@ for i, fraction in enumerate(fractions):
     unclamped = np.setdiff1d(np.arange(rbm.n_inputs), clamped_ind)
 
     correct_predictions[i] = np.mean(pred_labels == labels)
-    distances[i] = np.mean(np.abs(pred_pos - labels))
-    dist_std[i] = np.std(np.abs(pred_pos - labels))
+    distances[i] = np.mean(np.abs(pred_pos - targets))
+    dist_std[i] = np.std(np.abs(pred_pos - targets))
     if unclamped.size != 0:
         # this is the L2 norm of the difference image normalized to one pixel
         l2_diff = np.sqrt(np.sum((imgs[:, unclamped] - vis_samples)**2, axis=1))
@@ -159,9 +163,9 @@ for i, fraction in enumerate(fractions):
         img_diff_std[i] = np.std(l2_diff / unclamped.size)
 
 # save data
-np.savez_compressed('figures/' + data_name[:4] + '_uncover{}w{}s'.format(win_size, n_sampl),
-                    (correct_predictions, distances, dist_std,
-                     img_diff, img_diff_std))
+np.savez_compressed(
+    'figures/' + data_name[:4] + '_uncover{}w{}s'.format(win_size, n_sampl),
+    (correct_predictions, distances, dist_std, img_diff, img_diff_std))
 
 # plotting...
 if win_size < img_shape[1]:

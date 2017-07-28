@@ -58,7 +58,7 @@ tiled_samples = tile_raster_images(vis_probs[::vis_samples.shape[0]//20],
 
 plt.figure()
 plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-plt.savefig('figures/samples.png', bbox_inches='tight')
+plt.savefig('Figures/samples.png', bbox_inches='tight')
 
 # test_img = np.ones(img_shape)
 # test_img = test_img.flatten()

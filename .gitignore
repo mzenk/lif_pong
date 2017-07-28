@@ -3,6 +3,7 @@
 *.jpg
 figures/
 *.txt
+*.mp4
 
 # slurm outputs
 *.out
@@ -14,6 +15,7 @@ saved_rbms/
 *.npz
 *.npy
 *.gz
+*.json
 
 # Python bytecode
 *.pyc

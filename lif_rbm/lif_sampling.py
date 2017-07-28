@@ -187,22 +187,7 @@ def vmem_dist(config_file, mean_as_x=False):
     plt.savefig('figures/calibration.png')
 
 
-def sample_network(duration, config_file, dt=.1, weights=None, biases=None,
-                   tso_params=None, seed=42, burn_in=500., clamp_fct=None,
-                   load=None, save=None):
-
-    """
-        How to setup and evaluate a Boltzmann machine. Please note that in
-        order to instantiate BMs all needed neuron parameters need to be in the
-        database and calibrated.
-
-        Does the same thing as sbs.tools.sample_network(...).
-    """
-    # np.random.seed(seed)
-    sim_setup_kwargs = {
-        'rng_seeds_seed': seed
-    }
-
+def initialise_network(config_file, weights, biases, load=None):
     if load is not None:
         bm = sbs.network.ThoroughBM.load(load)
     else:
@@ -221,42 +206,57 @@ def sample_network(duration, config_file, dt=.1, weights=None, biases=None,
                                     sampler_config=sampler_config)
         bm.weights_theo = weights
         bm.biases_theo = biases
-
         # NOTE: By setting the theoretical weights and biases, the biological
         # ones automatically get calculated on-demand by accessing
         # bm.weights_bio and bm.biases_bio
+    return bm
 
-        if tso_params is None:
-            bm.saturating_synapses_enabled = False
-        else:
-            bm.saturating_synapses_enabled = True
-            # bm.tso_params = tso_params
-        bm.use_proper_tso = True
 
-        if bm.sim_name == "pyNN.neuron":
-            bm.saturating_synapses_enabled = False
+def sample_network(network, duration, dt=.1, burn_in=500., tso_params=None,
+                   clamp_fct=None, seed=42, save=None):
 
-        if clamp_fct is None:
-            bm.gather_spikes(duration=duration, dt=dt, burn_in_time=burn_in,
-                             sim_setup_kwargs=sim_setup_kwargs)
-        else:
-            bm.spike_data = gather_network_spikes_clamped(
-                bm, duration, dt=dt, burn_in_time=500., clamp_fct=clamp_fct,
-                sim_setup_kwargs=sim_setup_kwargs)
+    """
+        How to setup and evaluate a Boltzmann machine. Please note that in
+        order to instantiate BMs all needed neuron parameters need to be in the
+        database and calibrated.
 
-        # # saving somehow not compatible with clamping...
-        # if save is not None:
-        #     bm.save(save)
+        Does the same thing as sbs.tools.sample_network(...).
+    """
+    # np.random.seed(seed)
+    sim_setup_kwargs = {
+        'rng_seeds_seed': seed
+    }
 
-        if len(biases) < 7:
-            log.info("DKL joint: {}".format(sbs.utils.dkl(
-                bm.dist_joint_theo.flatten(), bm.dist_joint_sim.flatten())))
+    if tso_params is None:
+        bm.saturating_synapses_enabled = False
+    else:
+        bm.saturating_synapses_enabled = True
+        # bm.tso_params = tso_params
+    bm.use_proper_tso = True
 
-        samples = bm.get_sample_states(                            # 1.)
-            sampler_config.to_dict()['neuron_parameters']['tau_refrac'])
-        np.save(save, samples)
+    if bm.sim_name == "pyNN.neuron":
+        bm.saturating_synapses_enabled = False
 
-        return samples
+    if clamp_fct is None:
+        bm.gather_spikes(duration=duration, dt=dt, burn_in_time=burn_in,
+                         sim_setup_kwargs=sim_setup_kwargs)
+    else:
+        bm.spike_data = gather_network_spikes_clamped(
+            bm, duration, dt=dt, burn_in_time=500., clamp_fct=clamp_fct,
+            sim_setup_kwargs=sim_setup_kwargs)
+
+    # # saving somehow not compatible with clamping...
+    # if save is not None:
+    #     bm.save(save)
+
+    if len(bm.biases_theo) < 7:
+        log.info("DKL joint: {}".format(sbs.utils.dkl(
+            bm.dist_joint_theo.flatten(), bm.dist_joint_sim.flatten())))
+
+    samples = bm.get_sample_states(10.)    # == tau_refrac
+    np.savez_compressed(save, samples)
+
+    return samples
 
 
 # Custom clamping methods
@@ -308,7 +308,6 @@ def sigma_fct(x, x0, alpha):
 
 if __name__ == '__main__':
     import cPickle
-    import gzip
 
     # calibrate first if necessary
     # calibration(tutorial_params, tutorial_noise, 'tutorial_calib')
@@ -337,6 +336,7 @@ if __name__ == '__main__':
 
     # -- OR --
     # # MNIST
+    # import gzip
     # img_shape = (28, 28)
     # n_pixels = np.prod(img_shape)
     # with open('../gibbs_rbm/saved_rbms/mnist_disc_rbm.pkl', 'rb') as f:
@@ -346,30 +346,10 @@ if __name__ == '__main__':
     # f.close()
     # save_file = 'mnist_samples'
 
-    # # -- OR --
-    # Pong
-    img_shape = (36, 48)
-    n_pixels = np.prod(img_shape)
-    data_name = 'pong_var_start{}x{}'.format(*img_shape)
-    with np.load('../datasets/' + data_name + '.npz') as d:
-        train_set, _, test_set = d[d.keys()[0]]
-    with open('../gibbs_rbm/saved_rbms/' + data_name + '_crbm.pkl', 'rb') as f:
-        rbm = cPickle.load(f)
-    save_file = 'pong_clamped_samples'
-    # # --
-    w_rbm = rbm.w
-    b = np.concatenate((rbm.vbias, rbm.hbias))
-    nv, nh = rbm.n_visible, rbm.n_hidden
-
-    # Bring weights and biases into right form
-    w = np.concatenate((np.concatenate((np.zeros((nv, nv)), w_rbm), axis=1),
-                       np.concatenate((w_rbm.T, np.zeros((nh, nh))), axis=1)),
-                       axis=0)
-
-    # clamping
-    test_img = test_set[0][41]
-    # test_img = np.ones(n_pixels)
-    pxls_x = img_shape[1]
+    # # clamping
+    # test_img = test_set[0][41]
+    # # test_img = np.ones(n_pixels)
+    # pxls_x = img_shape[1]
 
     # # fixed clamped image part
     # clamped_mask = np.zeros(img_shape)
@@ -389,15 +369,47 @@ if __name__ == '__main__':
     #     clamped_val[i][i] = 1
     # clamp_fct = clamp_anything
 
-    # windowed mode
-    win_size = pxls_x
-    clamp_img = test_img.reshape(img_shape)
-    clamp_duration = 100.
-    clamp_fct = Clamp_window(clamp_duration, clamp_img, win_size)
+    # # -- OR --
+    # Pong
+    img_shape = (36, 48)
+    n_pixels = np.prod(img_shape)
+    data_name = 'pong_var_start{}x{}'.format(*img_shape)
+    with np.load('../datasets/' + data_name + '.npz') as d:
+        train_set, _, test_set = d[d.keys()[0]]
+    with open('../gibbs_rbm/saved_rbms/' + data_name + '_crbm.pkl', 'rb') as f:
+        rbm = cPickle.load(f)
 
-    # duration = 2e3
-    duration = clamp_duration * (pxls_x + 1)
+    # # --
+    w_rbm = rbm.w
+    b = np.concatenate((rbm.vbias, rbm.hbias))
+    nv, nh = rbm.n_visible, rbm.n_hidden
+
+    # Bring weights and biases into right form
+    w = np.concatenate((np.concatenate((np.zeros((nv, nv)), w_rbm), axis=1),
+                       np.concatenate((w_rbm.T, np.zeros((nh, nh))), axis=1)),
+                       axis=0)
+
     calib_file = 'dodo_calib.json'
-    bm = sample_network(duration, calib_file, dt=.01, weights=w, biases=b,
-                        tso_params=1, clamp_fct=clamp_fct,
-                        save=save_file, seed=7741092)
+    bm = initialise_network(calib_file, w, b)
+
+    assert len(sys.argv) == 3
+    start = int(sys.argv[1])
+    n_runs = int(sys.argv[2])
+    end = min(start + n_runs, len(test_set[0]))
+    # run simulations for the 10 consecutive images for each passed value
+    for i, test_img in enumerate(test_set[0][start: end]):
+        # clamping
+        pxls_x = img_shape[1]
+        win_size = pxls_x
+        clamp_img = test_img.reshape(img_shape)
+        clamp_duration = 100.
+        clamp_fct = Clamp_window(clamp_duration, clamp_img, win_size)
+
+        # run simulation
+        duration = clamp_duration * (pxls_x + 1)
+        # duration = 2e3
+        save_file = 'Data/pong01_window{}_samples{:03d}'.format(
+            win_size, i + start)
+        samples = sample_network(
+            bm, duration, dt=.01, tso_params=1, clamp_fct=clamp_fct,
+            save=save_file, seed=7741092)
