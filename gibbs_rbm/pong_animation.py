@@ -123,20 +123,21 @@ def get_frames(rbm, image, winsize):
 
 img_shape = (36, 48)
 # Load Pong data
-data_name = 'gauss_var_start{}x{}'.format(*img_shape)
-with np.load('datasets/' + data_name + '.npz') as d:
+# data_name = 'pong_var_start{}x{}'.format(*img_shape)
+data_name = 'pong_noisy'
+with np.load('../datasets/' + data_name + '.npz') as d:
     train_set, _, test_set = d[d.keys()[0]]
 # Load rbm
-rbm_name = data_name + '_crbm.pkl'
-# rbm_name = 'pong_cdbm.pkl'
+# rbm_name = data_name + '_crbm.pkl'
+rbm_name = 'pong_var_start36x48_crbm.pkl'
 with open('saved_rbms/' + rbm_name, 'rb') as f:
     rbm = cPickle.load(f)
 
 # pick random examples and infer trajectories
 np.random.seed(125575)
-example_id = np.random.choice(test_set[0].shape[0], size=10, replace=False)
+example_id = np.random.choice(test_set[0].shape[0], size=3, replace=False)
 for i, example in enumerate(test_set[0][example_id]):
-    fig, frames = get_frames(rbm, example, winsize=100)
+    fig, frames = get_frames(rbm, example, winsize=6)
 
     # Set up formatting for the movie files --- whatever this is
     Writer = animation.writers['ffmpeg']
@@ -144,4 +145,4 @@ for i, example in enumerate(test_set[0][example_id]):
 
     traj_anim = animation.ArtistAnimation(fig, frames, interval=200,
                                           repeat_delay=3000, blit=True)
-    traj_anim.save('figures/animation_' + data_name + str(i) + '.mp4')
+    traj_anim.save('figures/animation_{}_no{}.mp4'.format(data_name, i))

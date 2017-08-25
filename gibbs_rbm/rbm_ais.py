@@ -4,21 +4,7 @@ import sys
 import numpy as np
 import cPickle, gzip
 import itertools
-from util import to_1_of_c
-from rbm import CRBM
-
-
-# numerical stability
-def logsum(x, axis=0):
-    alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
-    # alpha = np.max(x, axis=axis)
-    return alpha + np.log(np.sum(np.exp(x - alpha), axis=axis))
-
-
-def logdiff(x, axis=0):
-    alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
-    # alpha = np.max(x, axis=axis)
-    return alpha + np.log(np.diff(np.exp(x - alpha), axis=axis)).squeeze()
+from util import to_1_of_c, logsum, logdiff
 
 
 def compute_partition_sum(rbm):
@@ -88,7 +74,7 @@ def run_ais(rbm, test_data, train_data=None, n_runs=100, exact=False):
 
     # compute the estimated average log likelihood of a test set
     avg_ll_est_test = np.mean(-rbm.free_energy(test_data)) - logZ_est
-    print('Est. partition sum (+- 3*std): {:.2f}, {:.2f}, {:.2f}'
+    print('Est. log partition sum (+- 3*std): {:.2f}, {:.2f}, {:.2f}'
           ''.format(logZ_est, est_up, est_down))
     print('Est. average loglik (test): {:.2f}'.format(avg_ll_est_test))
     if train_data is not None:
@@ -97,33 +83,32 @@ def run_ais(rbm, test_data, train_data=None, n_runs=100, exact=False):
 
 if __name__ == '__main__':
     # # load test set
-    # f = gzip.open('datasets/mnist.pkl.gz', 'rb')
-    # train_set, _, test_set = cPickle.load(f)
-    # f.close()
+    f = gzip.open('../datasets/mnist.pkl.gz', 'rb')
+    train_set, _, test_set = cPickle.load(f)
+    f.close()
 
-    data_name = 'pong_var_start36x48'
-    with np.load('datasets/' + data_name + '.npz') as d:
-        train_set, _, test_set = d[d.keys()[0]]
+    # data_name = 'pong_var_start36x48'
+    # with np.load('../datasets/' + data_name + '.npz') as d:
+    #     train_set, _, test_set = d[d.keys()[0]]
 
     # load RBM
-    # with open('saved_rbms/mnist_disc_rbm.pkl', 'rb') as f:
-    #     rbm = cPickle.load(f)
-
-    with open('saved_rbms/' + data_name + '_crbm.pkl', 'rb') as f:
+    with open('saved_rbms/mnist_gen250_rbm.pkl', 'rb') as f:
         rbm = cPickle.load(f)
+
+    # with open('saved_rbms/' + data_name + '_crbm.pkl', 'rb') as f:
+    #     rbm = cPickle.load(f)
 
     test_data = test_set[0]
     train_data = train_set[0]
 
-    if len(train_set[1].shape) == 1:
-        train_label = to_1_of_c(train_set[1], rbm.n_labels)
-        test_label = to_1_of_c(test_set[1], rbm.n_labels)
-    else:
-        train_label = train_set[1]
-        test_label = test_set[1]
-
-    if isinstance(rbm, CRBM):
-        test_data = np.hstack((test_data, test_label))
+    if hasattr(rbm, 'n_labels'):
+        if len(train_set[1].shape) == 1:
+            train_label = to_1_of_c(train_set[1], rbm.n_labels)
+            test_label = to_1_of_c(test_set[1], rbm.n_labels)
+        else:
+            train_label = train_set[1]
+            test_label = test_set[1]
         train_data = np.hstack((train_data, train_label))
+        test_data = np.hstack((test_data, test_label))
 
     run_ais(rbm, test_data)

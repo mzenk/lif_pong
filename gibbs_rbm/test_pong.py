@@ -13,21 +13,135 @@ import matplotlib.pyplot as plt
 # Load Pong data
 img_shape = (36, 48)
 n_pxls = np.prod(img_shape)
-data_name = 'pong_var_start{}x{}'.format(*img_shape)
-# data_name = 'label1_fixed'
-discriminative = True
+data_name = 'gauss_var_start{}x{}'.format(*img_shape)
+# data_name = 'pong_noisybg'
+rbm_name = data_name + '_crbm.pkl'
+# rbm_name = 'pong_var_start36x48_crbm.pkl'
 with np.load('../datasets/' + data_name + '.npz') as d:
     train_set, _, test_set = d[d.keys()[0]]
-
-if discriminative:
-    rbm_name = data_name + '_crbm.pkl'
-else:
-    rbm_name = data_name + '_rbm.pkl'
-
-# rbm_name = 'pong_mf.pkl'
 # Load rbm
 with open('saved_rbms/' + rbm_name, 'rb') as f:
     rbm = cPickle.load(f)
+
+# Test the "classification performance", i.e. how much of the picture does
+# the RBM need to predict the correct outcome
+imgs = test_set[0]
+tmp = test_set[1]
+tmp[np.all(tmp == 0, axis=1)] = 1.
+# binary values:
+# imgs = np.round(imgs)
+targets = np.average(np.tile(np.arange(rbm.n_labels), (len(imgs), 1)),
+                     weights=tmp, axis=1)
+labels = np.argmax(tmp, axis=1)
+pxls_x = np.arange(0, img_shape[1])
+fractions = pxls_x / img_shape[1]
+# fractions = np.linspace(0., 1., 20)
+win_size = 48
+burnIn = 20
+n_sampl = 100
+v_init = np.random.randint(2, size=(imgs.shape[0], rbm.n_visible))
+save_name = '{}_uncover{}w{}s'.format(data_name[:4], win_size, n_sampl)
+save_name = '{}_pred{}w'.format(data_name[:4], win_size)
+
+predictions = np.zeros((len(fractions), len(imgs)), dtype=float)
+pred_labels = np.zeros((len(fractions), len(imgs)), dtype=float)
+distances = np.zeros((len(fractions), len(imgs)), dtype=float)
+speed = np.zeros((len(fractions), len(imgs)), dtype=float)
+img_diff = np.zeros((len(fractions), len(imgs)), dtype=float)
+
+print('Window size: {}, #samples: {}'.format(win_size, n_sampl))
+for i, fraction in enumerate(fractions):
+    clamped_ind = \
+        get_windowed_image_index(
+            img_shape, fraction, fractional=True, window_size=win_size)
+
+    # due to memory requirements not all instances can be put into an array
+    n_chunks = int(np.ceil(8*(n_sampl+burnIn)*imgs.shape[0]*n_pxls / 3e9))
+    n_each, remainder = imgs.shape[0] // n_chunks, imgs.shape[0] % n_chunks
+    chunk_sizes = np.array([0] + [n_each] * n_chunks)
+    chunk_sizes[1:(remainder + 1)] += 1
+    chunk_ind = np.cumsum(chunk_sizes)
+    for j, chunk in enumerate(np.array_split(imgs, n_chunks)):
+        if v_init is None:
+            chunk_init = None
+        else:
+            chunk_init = v_init[chunk_ind[j]:chunk_ind[j+1]]
+        samples = \
+            rbm.sample_with_clamped_units(burnIn + n_sampl,
+                                          clamped_ind=clamped_ind,
+                                          clamped_val=chunk[:, clamped_ind],
+                                          v_init=chunk_init)
+        # minimal "burn-in"? omit first few samples
+        tmp_vis = np.mean(samples[burnIn:, :, :-rbm.n_labels], axis=0)
+        tmp_lab = np.mean(samples[burnIn:, :, -rbm.n_labels:], axis=0)
+        if j == 0:
+            vis_samples = tmp_vis
+            lab_samples = tmp_lab
+        else:
+            vis_samples = np.vstack((vis_samples, tmp_vis))
+            lab_samples = np.vstack((lab_samples, tmp_lab))
+
+    # if the gibbs chain should be continued
+    unclampedvis = np.setdiff1d(np.arange(rbm.n_visible), clamped_ind)
+    v_init[:, unclampedvis] = np.hstack((vis_samples[-1], lab_samples[-1]))
+
+    pred_pos = np.average(np.tile(np.arange(rbm.n_labels), (len(imgs), 1)),
+                          weights=lab_samples, axis=1)
+    unclamped = np.setdiff1d(np.arange(rbm.n_inputs), clamped_ind)
+
+    # # use last column for prediction
+    # if fraction < 1:
+    #     last_col = vis_samples.reshape((len(imgs), img_shape[0], -1))[..., -1]
+    # else:
+    #     last_col = imgs.reshape((len(imgs), img_shape[0], -1))[..., -1]
+    # pred_pos = np.average(np.tile(np.arange(img_shape[0]), (len(imgs), 1)),
+    #                       weights=last_col, axis=1)
+    # targets *= img_shape[0]/rbm.n_labels
+
+    # correct_predictions[i] = np.mean(pred_labels == labels)
+    predictions[i] = pred_pos
+    pred_labels[i] = np.argmax(lab_samples, axis=1)
+    distances[i] = np.abs(pred_pos - targets)
+    # distances and denominator should be on same scale
+    if fraction < 1:
+        speed[i] = distances[i] * img_shape[0]/rbm.n_labels \
+            / ((1 - fraction)*img_shape[1])
+    else:
+        speed[i] = np.nan
+    # if unclamped.size != 0:
+    #     # this is the L2 norm of the difference image normalized to one pixel
+    #     l2_diff = np.sqrt(np.sum((imgs[:, unclamped] - vis_samples)**2, axis=1))
+    #     img_diff[i] = np.mean(l2_diff / unclamped.size)
+
+# save data
+np.savez_compressed('data/' + save_name, pred=predictions, lab=pred_labels,
+                    dist=distances, speed=speed, idiff=img_diff)
+
+# # plotting...
+# if win_size < img_shape[1]:
+#     xlabel = 'Window position'
+# else:
+#     xlabel = 'Uncovered fraction'
+# plt.figure(figsize=(14, 7))
+# plt.subplot(121)
+# plt.errorbar(fractions, distances, fmt='ro', yerr=dist_std)
+# plt.ylabel('Distance to correct label')
+# # plt.ylim([0, 3])
+# plt.xlabel(xlabel)
+# plt.twinx()
+# plt.plot(fractions, correct_predictions, 'bo')
+# plt.ylabel('Correct predictions')
+# # plt.ylim([0, 1])
+# plt.gca().spines['right'].set_color('blue')
+# plt.gca().spines['left'].set_color('red')
+# plt.title('#samples: {}, window size: {}'.format(n_sampl, win_size))
+
+# plt.subplot(122)
+# plt.errorbar(fractions, img_diff, fmt='ro', yerr=img_diff_std)
+# plt.ylabel('L2 image dissimilarity')
+# plt.xlabel(xlabel)
+# plt.tight_layout()
+# plt.savefig('figures/pong_uncover{}w{}s.pdf'.format(win_size, n_sampl))
 
 # # Produce visual example for a pattern completion
 # v_init = np.zeros(rbm.n_visible)
@@ -90,108 +204,6 @@ with open('saved_rbms/' + rbm_name, 'rb') as f:
 #     ax2.tick_params(left='off', right='off', labelleft='off', labelright='off')
 #     fig.savefig('figures/windowed_traj{:.1f}.png'.format(fraction),
 #                 bbox_inches='tight')
-
-# Test the "classification performance", i.e. how much of the picture does
-# the RBM need to predict the correct outcome
-test_set[0] = test_set[0][:10]
-test_set[1] = test_set[1][:10]
-imgs = test_set[0]
-labels = np.argmax(test_set[1], axis=1)
-targets = np.average(np.tile(np.arange(rbm.n_labels), (len(imgs), 1)),
-                     weights=test_set[1], axis=1)
-# fractions = np.arange(0, img_shape[1] + 1, 3)
-fractions = np.linspace(0., 1., 20)
-win_size = 48
-burnIn = 20
-n_sampl = 100
-v_init = np.random.randint(2, size=(imgs.shape[0], rbm.n_visible))
-
-correct_predictions = np.zeros_like(fractions, dtype=float)
-distances = np.zeros_like(fractions, dtype=float)
-dist_std = np.zeros_like(fractions, dtype=float)
-img_diff = np.zeros_like(fractions, dtype=float)
-img_diff_std = np.zeros_like(fractions, dtype=float)
-
-print('Window size: {}, #samples: {}'.format(win_size, n_sampl))
-for i, fraction in enumerate(fractions):
-    clamped_ind = \
-        get_windowed_image_index(img_shape, fraction,
-                                 fractional=True, window_size=win_size)
-
-    # due to memory requirements not all instances can be put into an array
-    n_chunks = int(np.ceil(8*(n_sampl+burnIn)*imgs.shape[0]*n_pxls / 3e9))
-    n_each, remainder = imgs.shape[0] // n_chunks, imgs.shape[0] % n_chunks
-    chunk_sizes = np.array([0] + [n_each] * n_chunks)
-    chunk_sizes[1:(remainder + 1)] += 1
-    chunk_ind = np.cumsum(chunk_sizes)
-    for j, chunk in enumerate(np.array_split(imgs, n_chunks)):
-        if v_init is None:
-            chunk_init = None
-        else:
-            chunk_init = v_init[chunk_ind[j]:chunk_ind[j+1]]
-        samples = \
-            rbm.sample_with_clamped_units(burnIn + n_sampl,
-                                          clamped_ind=clamped_ind,
-                                          clamped_val=chunk[:, clamped_ind],
-                                          v_init=chunk_init)
-        # minimal "burn-in"? omit first few samples
-        tmp_vis = np.mean(samples[burnIn:, :, :-rbm.n_labels], axis=0)
-        tmp_lab = np.mean(samples[burnIn:, :, -rbm.n_labels:], axis=0)
-        if j == 0:
-            vis_samples = tmp_vis
-            lab_samples = tmp_lab
-        else:
-            vis_samples = np.vstack((vis_samples, tmp_vis))
-            lab_samples = np.vstack((lab_samples, tmp_lab))
-
-    # if the gibbs chain should be continued
-    unclampedvis = np.setdiff1d(np.arange(rbm.n_visible), clamped_ind)
-    v_init[:, unclampedvis] = np.hstack((vis_samples[-1], lab_samples[-1]))
-
-    pred_labels = np.argmax(lab_samples, axis=1)
-    pred_pos = np.average(np.tile(np.arange(rbm.n_labels), (imgs.shape[0], 1)),
-                          weights=lab_samples, axis=1)
-    unclamped = np.setdiff1d(np.arange(rbm.n_inputs), clamped_ind)
-
-    correct_predictions[i] = np.mean(pred_labels == labels)
-    distances[i] = np.mean(np.abs(pred_pos - targets))
-    dist_std[i] = np.std(np.abs(pred_pos - targets))
-    if unclamped.size != 0:
-        # this is the L2 norm of the difference image normalized to one pixel
-        l2_diff = np.sqrt(np.sum((imgs[:, unclamped] - vis_samples)**2, axis=1))
-        img_diff[i] = np.mean(l2_diff / unclamped.size)
-        img_diff_std[i] = np.std(l2_diff / unclamped.size)
-
-# save data
-np.savez_compressed(
-    'figures/' + data_name[:4] + '_uncover{}w{}s'.format(win_size, n_sampl),
-    (correct_predictions, distances, dist_std, img_diff, img_diff_std))
-
-# plotting...
-if win_size < img_shape[1]:
-    xlabel = 'Window position'
-else:
-    xlabel = 'Uncovered fraction'
-plt.figure(figsize=(14, 7))
-plt.subplot(121)
-plt.errorbar(fractions, distances, fmt='ro', yerr=dist_std)
-plt.ylabel('Distance to correct label')
-# plt.ylim([0, 3])
-plt.xlabel(xlabel)
-plt.twinx()
-plt.plot(fractions, correct_predictions, 'bo')
-plt.ylabel('Correct predictions')
-# plt.ylim([0, 1])
-plt.gca().spines['right'].set_color('blue')
-plt.gca().spines['left'].set_color('red')
-plt.title('#samples: {}, window size: {}'.format(n_sampl, win_size))
-
-plt.subplot(122)
-plt.errorbar(fractions, img_diff, fmt='ro', yerr=img_diff_std)
-plt.ylabel('L2 image dissimilarity')
-plt.xlabel(xlabel)
-plt.tight_layout()
-plt.savefig('figures/pong_uncover{}w{}s.pdf'.format(win_size, n_sampl))
 
 # # Dreaming
 # samples = rbm.draw_samples(int(1e5), ast=True)

@@ -8,7 +8,7 @@ import util
 
 
 # Load rbm and data
-with open('saved_rbms/mnist_cast_rbm.pkl', 'rb') as f:
+with open('saved_rbms/mnist_gen500_rbm.pkl', 'rb') as f:
     testrbm = cPickle.load(f)
 f = gzip.open('../datasets/mnist.pkl.gz', 'rb')
 _, _, test_set = np.load(f)
@@ -31,8 +31,8 @@ n_pixels = np.prod(img_shape)
 # plt.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
 # plt.savefig('figures/filters.png')
 
-samples = testrbm.draw_samples(1e5)
-tiled_samples = util.tile_raster_images(samples[500::1000, :n_pixels],
+samples = testrbm.draw_samples(1e3)
+tiled_samples = util.tile_raster_images(samples[::100, :n_pixels],
                                         img_shape=img_shape,
                                         tile_shape=(10, 10),
                                         scale_rows_to_unit_interval=False,

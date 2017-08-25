@@ -392,24 +392,36 @@ if __name__ == '__main__':
     calib_file = 'dodo_calib.json'
     bm = initialise_network(calib_file, w, b)
 
+    # fixed clamped image part
+    clamped_mask = np.zeros(img_shape)
+    clamped_mask[:, :4] = 1
+    clamped_mask = clamped_mask.flatten()
+    clamped_idx = np.nonzero(clamped_mask == 1)[0]
+    refresh_times = np.array([0])
+
     assert len(sys.argv) == 3
     start = int(sys.argv[1])
     n_runs = int(sys.argv[2])
+    duration = 1e4
     end = min(start + n_runs, len(test_set[0]))
     # run simulations for the 10 consecutive images for each passed value
-    for i, test_img in enumerate(test_set[0][start: end]):
-        # clamping
-        pxls_x = img_shape[1]
-        win_size = pxls_x
-        clamp_img = test_img.reshape(img_shape)
-        clamp_duration = 100.
-        clamp_fct = Clamp_window(clamp_duration, clamp_img, win_size)
+    for i, test_img in enumerate(test_set[0][start:end]):
+        # # clamp sliding window
+        # pxls_x = img_shape[1]
+        # win_size = pxls_x
+        # clamp_img = test_img.reshape(img_shape)
+        # clamp_duration = 100.
+        # clamp_fct = Clamp_window(clamp_duration, clamp_img, win_size)
+        # duration = clamp_duration * (pxls_x + 1)
+        # save_file = 'Data/pong01_window{}_samples{:03d}'.format(
+        #     win_size, i + start)
+
+        # clamp fixed set
+        clamped_val = test_img[clamped_idx]
+        clamp_fct = Clamp_anything(refresh_times, clamped_idx, clamped_val)
+        save_file = 'Data/clamp_samples{:03d}'.format(i + start)
 
         # run simulation
-        duration = clamp_duration * (pxls_x + 1)
-        # duration = 2e3
-        save_file = 'Data/pong01_window{}_samples{:03d}'.format(
-            win_size, i + start)
         samples = sample_network(
             bm, duration, dt=.01, tso_params=1, clamp_fct=clamp_fct,
             save=save_file, seed=7741092)

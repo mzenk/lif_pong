@@ -32,7 +32,7 @@ sim.setup(**{"spike_precision": "on_grid", 'quit_on_end': False})
 
 # === Build and instrument the network =======================================
 spike_times = 10. + numpy.sort(numpy.random.rand(10)*90.)
-spike_times = numpy.arange(110., 200., 10)
+spike_times = numpy.arange(10., 250., 20.)
 spike_source = sim.Population(
     1, sim.SpikeSourceArray(spike_times=spike_times))
 
@@ -42,18 +42,18 @@ sim.nest.CopyModel("tsodyks2_synapse", "avoid_pynn_trying_to_be_smart")
 
 connector = sim.AllToAllConnector()
 
-weight = .01
-tau_syn = 1.2
+weight = .5
+tau_syn = 5.
 tau_syn_renew = 10.
 tau_m = .1
 # nest has different weight units (x1000)
 dep_params = {"U": 0.1, "tau_rec": 500.0, "tau_fac": 0.0,
               "weight": 1000 * weight}
-fac_params = {"U": 0.1,"tau_rec": 10.0, "tau_fac": 500.0,
+fac_params = {"U": 0.1, "tau_rec": 10.0, "tau_fac": 500.0,
               "weight": 1000 * weight}
-depfac_params = {"U": 0.1,"tau_rec": 500.0, "tau_fac": 500.0,
+depfac_params = {"U": 0.1, "tau_rec": 500.0, "tau_fac": 500.0,
                  "weight": 1000 * weight}
-renewing_params = {"U": 1.,"tau_rec": tau_syn_renew, "tau_fac": 0.,
+renewing_params = {"U": 1., "tau_rec": tau_syn_renew, "tau_fac": 0.,
                    "weight": 1000 * weight}
 
 synapse_types = {
@@ -110,31 +110,48 @@ for label, p in populations.items():
                                    "pkl", options.simulator)
     p.write_data(filename, annotations={'script_name': __file__})
 
+import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+mpl.rcParams['font.size'] = 14
 
-if options.plot_figure:
-    from pyNN.utility.plotting import Figure, Panel
-    # figure_filename = normalized_filename("Results", "tsodyksmarkram",
-    #                                       "png", options.simulator)
-    figure_filename = 'stp_test.png'
-    panels = []
-    # for variable in ('gsyn_exc', 'v'):
-    for variable in ('v'):
-        for population in populations.values():
-            panels.append(
-                Panel(population.get_data().segments[0].filter(name=variable)[0],
-                      data_labels=[population.label], yticks=True),
-            )
-    # add ylabel to top panel in each group
-    panels[0].options.update(ylabel=u'Synaptic conductance (µS)')
-    panels[3].options.update(ylabel='Membrane potential (mV)')
-    # add xticks and xlabel to final panel
-    panels[-1].options.update(xticks=True, xlabel="Time (ms)")
+figure_filename = 'Figures/stp_example.pdf'
+u = populations['depressing'].get_data().segments[0].filter(name='v')[0]
+t = np.linspace(0, 300., len(u))
 
-    Figure(*panels,
-           title="Example of static, facilitating, depressing and renewing synapses",
-           annotations="Simulated with %s" % options.simulator.upper()
-           ).save(figure_filename)
-    print(figure_filename)
+plt.figure()
+plt.title('Depressing synapse')
+plt.plot(t, u, 'b-')
+plt.xlabel('t [ms]')
+plt.ylabel('u [mV]')
+plt.tight_layout()
+plt.savefig(figure_filename, transparent=True)
+
+# if options.plot_figure:
+#     from pyNN.utility.plotting import Figure, Panel
+#     # figure_filename = normalized_filename("Results", "tsodyksmarkram",
+#     #                                       "png", options.simulator)
+#     figure_filename = 'stp_test.png'
+#     panels = []
+#     # for variable in ('gsyn_exc', 'v'):
+#     for variable in ('v'):
+#         for population in populations.values():
+#             panels.append(
+#                 Panel(population.get_data().segments[0].filter(name=variable)[0],
+#                       data_labels=[population.label], yticks=True),
+#             )
+#     # add ylabel to top panel in each group
+#     panels[0].options.update(ylabel=u'Synaptic conductance (µS)')
+#     panels[3].options.update(ylabel='Membrane potential (mV)')
+#     # add xticks and xlabel to final panel
+#     panels[-1].options.update(xticks=True, xlabel="Time (ms)")
+
+#     Figure(*panels,
+#            title="Example of static, facilitating, depressing and renewing synapses",
+#            annotations="Simulated with %s" % options.simulator.upper()
+#            ).save(figure_filename)
+#     print(figure_filename)
 
 
 # === Clean up and quit =======================================================

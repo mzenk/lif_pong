@@ -27,6 +27,32 @@ def add_traj_noise(img_patch, sigma=3.):
     img_patch[:, -1] = noised_col
     return img_patch.flatten()
 
+
+# # add noise to whole image set -> tbd, use in uncover routine
+# def add_traj_noise_set(img_set, interval, sigma=3.):
+#     # compute com
+#     col = img_patch[:, -1]
+#     noised_com = np.average(np.arange(len(col)), weights=col) + \
+#         sigma * np.random.randn()
+#     fp_ind = noised_com - .5
+#     # cic assignment (cf. trajectory.py::add_to_image; here 1d, h=1 and
+#     # actually boundary conditions not necessary (?))
+#     fp_ind = max(0, fp_ind)
+#     fp_ind = min(len(col) - 1, fp_ind)
+#     w_lower = np.ceil(fp_ind) - fp_ind
+#     w_upper = 1 - w_lower
+#     noised_col = np.zeros_like(col)
+#     noised_col[int(np.ceil(fp_ind))] = w_upper
+#     noised_col[int(np.floor(fp_ind))] = w_lower
+#     img_patch[:, -1] = noised_col
+#     return img_patch.flatten()
+
+
+def add_background_noise(image, sigma=.05):
+    # add Gaussian noise (other distributions possible) and normalize image
+    noisy = image + np.random.randn(*image.shape) * sigma
+    return np.clip(noisy, 0., 1.)
+
 # pong pattern completion
 # Load Pong data
 img_shape = (36, 48)
@@ -50,17 +76,21 @@ with open('saved_rbms/' + rbm_name, 'rb') as f:
 # Produce visual example for a pattern completion
 v_init = np.zeros(rbm.n_visible)
 # np.random.randint(2, size=rbm.n_visible)
-burnIn = int(10)
-image = test_set[0][141]
-for fraction in np.linspace(.1, .9, 9):
+burnIn = int(20)
+winsize = 48
+image = test_set[0][42]
+for fraction in np.arange(1, img_shape[1]):
     # first get the prediction
     clamped = get_windowed_image_index(img_shape, fraction,
-                                       window_size=100, fractional=True)
+                                       window_size=winsize)
     clamped_input = image[clamped]
 
     # add noise to rightmost clamped_column
-    clamped_input = add_traj_noise(clamped_input.reshape(img_shape[0], -1))
+    clamped_input = add_traj_noise(clamped_input.reshape(img_shape[0], -1),
+                                   sigma=.05 * img_shape[0])
     image[clamped] = clamped_input
+    # background noise is reset after each step
+    # clamped_input = add_background_noise(clamped_input, sigma=3e-2)
 
     # RBM
     unclampedinp = np.setdiff1d(np.arange(rbm.n_inputs), clamped)
@@ -99,19 +129,24 @@ for fraction in np.linspace(.1, .9, 9):
 
     inferred_img = inferred_img.reshape((img_shape[0], img_shape[1], 3))
     # plotting - though ugly, this is the best working implementation I found
-    fig = plt.figure()
-    width = .7
-    ax1 = fig.add_axes([.05, .2, width, width*3/4])
-    ax2 = fig.add_axes([width - .02, .2, .2, width*3/4])
-    ax1.imshow(inferred_img, interpolation='Nearest', cmap='gray',
-               origin='lower')
-    ax2.barh(np.arange(inferred_img.shape[0]) - .5, inferred_img[:, -1, 0],
-             height=np.ones(inferred_img.shape[0]), color='r')
-    ax2.set_ylim([-.5, inferred_img.shape[0] - .5])
-    ax2.xaxis.set_ticks([0., 0.5, 1.])
-    ax2.tick_params(left='off', right='off', labelleft='off', labelright='off')
-    fig.savefig('figures/noise{:.1f}.png'.format(fraction),
-                bbox_inches='tight')
+    if fraction % 3 == 0:
+        # fig = plt.figure()
+        # width = .7
+        # ax1 = fig.add_axes([.05, .2, width, width*3/4])
+        # ax2 = fig.add_axes([width - .02, .2, .2, width*3/4])
+        fig, ax1 = plt.subplots()
+        ax1.imshow(inferred_img, interpolation='Nearest', cmap='gray',
+                   origin='lower')
+        ax1.tick_params(left='off', right='off', bottom='off', labelleft='off',
+                        labelright='off', labelbottom='off')
+        # ax2.barh(np.arange(inferred_img.shape[0]) - .5, inferred_img[:, -1, 0],
+        #          height=np.ones(inferred_img.shape[0]), color='r')
+        # ax2.set_ylim([-.5, inferred_img.shape[0] - .5])
+        # ax2.xaxis.set_ticks([0., 0.5, 1.])
+        # ax2.tick_params(left='off', right='off', labelleft='off', labelright='off')
+        fig.savefig('figures/noise{}.png'.format(fraction),
+                    bbox_inches='tight')
+        plt.close(fig)
 
 # # Test the "classification performance", i.e. how much of the picture does
 # # the RBM need to predict the correct outcome
@@ -184,33 +219,7 @@ for fraction in np.linspace(.1, .9, 9):
 #         img_diff[i] = np.mean(l2_diff / unclamped.size)
 #         img_diff_std[i] = np.std(l2_diff / unclamped.size)
 
-# # # save data
-# # np.savez_compressed(
-# #     'figures/' + data_name[:4] + '_uncover{}w{}s'.format(win_size, n_sampl),
-# #     (correct_predictions, distances, dist_std, img_diff, img_diff_std))
-
-# # plotting...
-# if win_size < img_shape[1]:
-#     xlabel = 'Window position'
-# else:
-#     xlabel = 'Uncovered fraction'
-# plt.figure(figsize=(14, 7))
-# plt.subplot(121)
-# plt.errorbar(fractions, distances, fmt='ro', yerr=dist_std)
-# plt.ylabel('Distance to correct label')
-# # plt.ylim([0, 3])
-# plt.xlabel(xlabel)
-# plt.twinx()
-# plt.plot(fractions, correct_predictions, 'bo')
-# plt.ylabel('Correct predictions')
-# # plt.ylim([0, 1])
-# plt.gca().spines['right'].set_color('blue')
-# plt.gca().spines['left'].set_color('red')
-# plt.title('#samples: {}, window size: {}'.format(n_sampl, win_size))
-
-# plt.subplot(122)
-# plt.errorbar(fractions, img_diff, fmt='ro', yerr=img_diff_std)
-# plt.ylabel('L2 image dissimilarity')
-# plt.xlabel(xlabel)
-# plt.tight_layout()
-# plt.savefig('figures/noise.pdf'.format(win_size, n_sampl))
+# # save data
+# np.savez_compressed(
+#     'figures/' + data_name[:4] + '_uncover{}w{}s'.format(win_size, n_sampl),
+#     (correct_predictions, distances, dist_std, img_diff, img_diff_std))

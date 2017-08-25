@@ -2,6 +2,9 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
+from util import logsum, logdiff
+import itertools
+import time
 
 
 class RBM(object):
@@ -40,6 +43,17 @@ class RBM(object):
         return - np.einsum('ik,il,kl->i', v, h, self.w) - \
             v.dot(self.vbias) - h.dot(self.hbias)
 
+    def compute_partition_sum(rbm):
+        # visible units are too many to sum over
+        h_all = np.array(list(itertools.product([0, 1], repeat=rbm.n_hidden)))
+        log_ph = np.zeros(0)
+        n_chunks = np.ceil(h_all.shape[0] * rbm.n_visible // 1e8)
+        for h_chunk in np.array_split(h_all, n_chunks):
+            expW = np.exp(h_chunk.dot(rbm.w.T) + rbm.vbias)
+            tmp = h_chunk.dot(rbm.hbias) + np.sum(np.log(1 + expW), axis=1)
+            log_ph = np.concatenate((log_ph, tmp))
+        return logsum(log_ph)
+
     def free_energy(self, v_data):
         if len(v_data.shape) == 1:
             v_data = np.expand_dims(v_data, 0)
@@ -48,8 +62,8 @@ class RBM(object):
         return - v_data.dot(self.vbias) - hidden_term
 
     # generalized method for sampling quickly from many chains (numpy).
-    # AST still causes problems: for single chain indexing with k, for
-    # multiple chains need to figure out how to store samples (asynchronous)
+    # TODO: For >1 chains there might be a bug with (clamped) sampling.
+    # Also, AST does not work with multiple chains
     def draw_samples(self, n_samples, v_init=None, n_chains=1, binary=False,
                      clamped=None, clamped_val=None, ast=False):
         if ast:
@@ -434,6 +448,10 @@ class RBM(object):
             swap_state = np.zeros((n_fast_chains, self.n_hidden))
         # +++++++++++++
 
+        # time measurement; delete later
+        monitoring_time = 0
+        #
+
         for epoch_index in range(n_epochs):
             print('Epoch {}'.format(epoch_index + 1))
             # if momentum != 0 and epoch_index > 5:
@@ -492,7 +510,7 @@ class RBM(object):
 
                 # Run monitoring four times per epoch
                 if batch_index % (max(1, n_batches // 4)) == 0 and \
-                   valid_set is not None:
+                        valid_set is not None:
                     # # free energy difference between training subset
                     # # and validation set
                     # f_valid = self.free_energy(valid_set)
@@ -517,15 +535,81 @@ class RBM(object):
                     log_file.write('{} {} {}\n'.format(update_step, delta_f,
                                                        pl))
 
+            start_time = time.time()
             self.monitor_progress(train_data, valid_set, log_file)
+            monitoring_time += time.time() - start_time
+        print('Monitoring took {:.1f} min'.format(monitoring_time/60.))
         log_file.close()
         return
 
+    def estimate_partition_sum(self, n_runs, betas):
+        # draw samples from the base model (uniform distr) and initialise logw
+        samples = np.random.randint(2, size=(n_runs, self.n_visible))
+        logw = 0
+
+        # main AIS loop
+        for beta in betas[1:-1]:
+            # compute unnormalized probabilities p_k+1(v_k)
+            expWh = np.exp(beta * (samples.dot(self.w) + self.hbias))
+            logw += beta * samples.dot(self.vbias) + \
+                np.sum(np.log(1 + expWh), axis=1)
+
+            # apply transition operators
+            samples = self.gibbs_vhv(samples, beta=beta)[1]
+
+            # compute unnormalized probabilities p_k+1(v_k+1)
+            expWh = np.exp(beta * (samples.dot(self.w) + self.hbias))
+            logw -= beta * samples.dot(self.vbias) + \
+                np.sum(np.log(1 + expWh), axis=1)
+
+        # add target probability p_K(v_K)
+        expWh = np.exp(samples.dot(self.w) + self.hbias)
+        logw += samples.dot(self.vbias) + np.sum(np.log(1 + expWh), axis=1)
+
+        r_ais = logsum(logw) - np.log(n_runs)
+        # print(r_ais, np.log(np.average(np.exp(logw))))
+        # numerical stability
+        logw_avg = np.mean(logw)
+        logstd_rais = np.log(np.std(np.exp(logw - logw_avg))) + logw_avg -\
+            np.log(n_runs)/2
+        logZ_base = self.n_visible * np.log(2)
+        logZ = r_ais + logZ_base
+        logZ_up = logsum([logstd_rais + np.log(3), r_ais]) + logZ_base
+        logZ_down = logdiff([logstd_rais + np.log(3), r_ais]) + logZ_base
+        return logZ, logstd_rais + logZ_base, logZ_up, logZ_down
+
+    def run_ais(self, test_data, train_data=None, n_runs=100, exact=False):
+        if exact:
+            # compute the true partition sum of the RBM (if possible)
+            logZ_true = self.compute_partition_sum()
+            avg_ll_true = np.mean(-self.free_energy(test_data)) - logZ_true
+            print('True partition sum: {:.2f}'.format(logZ_true))
+            print('True average loglik: {:.2f}'.format(avg_ll_true))
+
+        # Use AIS to estimate the partition sum
+        # betas = np.concatenate((np.linspace(0, .5, 500, endpoint=False),
+        #                         np.linspace(.5, .9, 10000, endpoint=False),
+        #                         np.linspace(.9, 1., 4000)))
+        betas = np.linspace(0, 1, 20000)
+        logZ_est, logstdZ, est_up, est_down = \
+            self.estimate_partition_sum(n_runs, betas)
+
+        # compute the estimated average log likelihood of a test set
+        ll_est_test = np.mean(-self.free_energy(test_data)) - logZ_est
+        print('Est. partition sum (+- 3*std): {:.2f}, {:.2f}, {:.2f}'
+              ''.format(logZ_est, est_up, est_down))
+        print('Est. average loglik (test): {:.2f}'.format(ll_est_test))
+        if train_data is not None:
+            ll_est_train = np.mean(-self.free_energy(train_data)) - logZ_est
+            print('Est. average loglik (train): {:.2f}'.format(ll_est_train))
+
     def monitor_progress(self, train_set, valid_set, output_file):
-        subset_ind = self.np_rng.randint(train_set.shape[0], size=5000)
-        s = 'Log-PL of random training subset: '\
-            '{}'.format(self.compute_logpl(train_set[subset_ind]))
-        print(s)
+        # try ais
+        self.run_ais(valid_set, train_set)
+        # subset_ind = self.np_rng.randint(train_set.shape[0], size=5000)
+        # s = 'Log-PL of random training subset: '\
+        #     '{}'.format(self.compute_logpl(train_set[subset_ind]))
+        # print(s)
 
 
 class CRBM(RBM):
