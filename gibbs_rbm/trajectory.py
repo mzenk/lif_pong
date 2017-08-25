@@ -18,7 +18,8 @@ def gauss1d(x, mu, sigma):
 class Trajectory:
     __metaclass__ = ABCMeta
 
-    def __init__(self, grid_size, grid_spacing, pos, angle, v0):
+    def __init__(self, grid_size, grid_spacing, pos=0., angle=0., v0=1.,
+                 measure_sigma=0., momentum_sigma=0):
         # grid size: (n_pxls_x, n_pxls_y) y|_x
         # pos, angle, v0: starting position, angle, velocity
         self.pos = pos
@@ -31,9 +32,11 @@ class Trajectory:
         self.pixels = np.zeros(grid_size[::-1])
         # list for the entire trace
         self.trace = np.empty(1)
+        self.measure_sigma = measure_sigma * self.field_size[1]
+        self.momentum_sigma = momentum_sigma * self.v0
 
     @abstractmethod
-    def force_fct(self, t, r):
+    def force_fct(self, t, pos):
         pass
 
     @abstractmethod
@@ -45,9 +48,12 @@ class Trajectory:
         vy = self.v0 * np.sin(self.angle)
         size = self.field_size
 
-        # use ode solver for integration
-        r = ode(self.force_fct).set_integrator('vode', method='adams')
-        r.set_initial_value([self.pos[0], self.pos[1], vx, vy], 0.)
+        # use ode solver for integration. Actually, a simple handmade solver
+        # could be more practical for modifications (like noise) and not much
+        # slower/more inaccurate because I have to use a small dt anyway to
+        # avoid missing boundary contacts
+        solver = ode(self.force_fct).set_integrator('vode', method='adams')
+        solver.set_initial_value([self.pos[0], self.pos[1], vx, vy], 0.)
 
         # time scale: somehow related to field size and velocity; maybe adjust
         # program would be better/faster if dt larger, but dt needs to be
@@ -57,26 +63,34 @@ class Trajectory:
         curr_pos = np.zeros((1 + int(t1 / dt), 2))
         i = 0
         self.add_to_image(self.pos)
-        while r.t < t1:
-            r.integrate(r.t+dt)
+        while solver.t < t1:
+            solver.integrate(solver.t+dt)
 
             # stop if particle leaves field -> maybe add epsilon term to avoid
             # overshoot
-            if r.y[0] > size[0] or r.y[0] < 0:
+            if solver.y[0] > size[0] or solver.y[0] < 0:
                 break
-            curr_pos[i] = r.y[:2]
+            curr_pos[i] = solver.y[:2]
             if write_pixels:
-                self.add_to_image(r.y[:2])
+                measure_noise = self.measure_sigma * np.random.randn()
+                self.add_to_image(np.clip(solver.y[:2] + [0, measure_noise],
+                                          0, self.field_size))
 
+            # simplest way of adding noisy force: add gaussian distributed
+            # y-momentum noise at each time step
+            # using set_initial_value is really nasty...
+            if self.momentum_sigma != 0 and i == len(curr_pos)//15:
+                # print('knick')
+                noise = [0, 0, 0, self.momentum_sigma * np.random.randn()]
+                solver.set_initial_value(solver.y + noise, solver.t)
             # reflect if particle hits top or bottom
-            if r.y[1] > size[1] or r.y[1] < 0:
-                r.set_initial_value(r.y*np.array([1, 1, 1, -1]), r.t)
+            if solver.y[1] > size[1] or solver.y[1] < 0:
+                solver.set_initial_value(solver.y * [1, 1, 1, -1], solver.t)
             i += 1
 
         self.trace = curr_pos[~np.all(curr_pos == 0, axis=1), :]
-        # normalize pixels
+        # normalize pixels to [min(pixels), 1], better [0,1]?
         self.pixels /= np.max(self.pixels)
-        return 0
 
     def draw_trajectory(self, fig, potential=False):
         if self.trace.shape == (1,):
@@ -143,12 +157,11 @@ class Trajectory:
 
 # class for r^-1 potential
 class Coulomb_trajectory(Trajectory):
-    def __init__(self, grid_size, grid_spacing, pos, angle, v0,
-                 amplitude, location, epsilon):
-        # force parameters: amplitude, location and epsilon (if no infinite
-        # potential wanted)
-        super(Coulomb_trajectory, self).__init__(grid_size, grid_spacing, pos,
-                                                 angle, v0)
+    def __init__(self, amplitude, location, epsilon, *traj_args):
+        try:
+            super(Coulomb_trajectory, self).__init__(*traj_args)
+        except TypeError:
+            print('Wrong number of arguments supplied.')
         self.loc = np.array(location)
         self.amplitude = amplitude
         self.epsilon = epsilon
@@ -169,10 +182,12 @@ class Coulomb_trajectory(Trajectory):
 
 
 # class for constant force field
-class Const_trajectory(Trajectory):
-    def __init__(self, grid_size, grid_spacing, pos, angle, v0, gradient):
-        super(Const_trajectory, self).__init__(grid_size, grid_spacing, pos,
-                                               angle, v0)
+class Flat_trajectory(Trajectory):
+    def __init__(self, gradient, *traj_args):
+        try:
+            super(Flat_trajectory, self).__init__(*traj_args)
+        except TypeError:
+            print('Wrong number of arguments supplied.')
         self.grad = gradient
 
     def pot_fct(self, x, y):
@@ -184,14 +199,17 @@ class Const_trajectory(Trajectory):
 
 # class for 2d-Gaussian hill
 class Gaussian_trajectory(Trajectory):
-    def __init__(self, grid_size, grid_spacing, pos, angle, v0,
-                 amplitude, mu, cov_mat):
-        super(Gaussian_trajectory, self).__init__(grid_size, grid_spacing, pos,
-                                                  angle, v0)
+    def __init__(self, amplitude, mu, cov_mat, *traj_args):
+        # mu and cov_mat are relative to field size
+        try:
+            super(Gaussian_trajectory, self).__init__(*traj_args)
+        except TypeError:
+            print('Wrong number of arguments supplied.')
         self.amplitude = amplitude
         # store the inverse covariance matrix
-        self.inv_covmat = np.linalg.inv(cov_mat)
-        self.mu = mu
+        self.inv_covmat = np.linalg.inv(cov_mat * np.outer(self.field_size,
+                                                           self.field_size))
+        self.mu = mu * self.field_size
 
     def pot_fct(self, x, y):
         if type(x) is np.ndarray:
