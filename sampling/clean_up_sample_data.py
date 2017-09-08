@@ -2,7 +2,7 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
-from util import get_data_path
+from utils.data_mgmt import get_data_path
 import os
 import sys
 

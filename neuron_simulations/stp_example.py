@@ -16,23 +16,14 @@ optional arguments:
 
 import numpy
 from pyNN.utility import get_simulator, init_logging, normalized_filename
-
+import pyNN.nest as sim
 
 # === Configure the simulator ================================================
-
-sim, options = get_simulator(
-    ("--plot-figure", "Plot the simulation results to a file.",
-     {"action": "store_true"}),
-    ("--debug", "Print debugging information"))
-
-if options.debug:
-    init_logging(None, debug=True)
-
 sim.setup(**{"spike_precision": "on_grid", 'quit_on_end': False})
 
 # === Build and instrument the network =======================================
 spike_times = 10. + numpy.sort(numpy.random.rand(10)*90.)
-spike_times = numpy.arange(10., 250., 20.)
+spike_times = numpy.linspace(10., 260., 25.)
 spike_source = sim.Population(
     1, sim.SpikeSourceArray(spike_times=spike_times))
 
@@ -42,18 +33,27 @@ sim.nest.CopyModel("tsodyks2_synapse", "avoid_pynn_trying_to_be_smart")
 
 connector = sim.AllToAllConnector()
 
-weight = .5
-tau_syn = 5.
-tau_syn_renew = 10.
-tau_m = .1
+weight = .01
 # nest has different weight units (x1000)
-dep_params = {"U": 0.1, "tau_rec": 500.0, "tau_fac": 0.0,
+tau_syn = 10.
+tau_m = 1.
+cm = tau_m/20.  # To keep g_l constant. pyNN-default for LIF: cm=1., tau_m=20.
+
+
+def normalize_weight(syn_params):
+    syn_params['weight'] /= syn_params['U']  # same PSP height of first spike
+
+
+dep_params = {"U": 0.01, "tau_rec": 280.0, "tau_fac": 0.0,
               "weight": 1000 * weight}
-fac_params = {"U": 0.1, "tau_rec": 10.0, "tau_fac": 500.0,
+normalize_weight(dep_params)
+fac_params = {"U": 0.1, "tau_rec": 10.0, "tau_fac": 300.0,
               "weight": 1000 * weight}
+normalize_weight(fac_params)
 depfac_params = {"U": 0.1, "tau_rec": 500.0, "tau_fac": 500.0,
                  "weight": 1000 * weight}
-renewing_params = {"U": 1., "tau_rec": tau_syn_renew, "tau_fac": 0.,
+normalize_weight(depfac_params)
+renewing_params = {"U": 1., "tau_rec": tau_syn, "tau_fac": 0.,
                    "weight": 1000 * weight}
 
 synapse_types = {
@@ -64,7 +64,7 @@ synapse_types = {
     # 'facilitating': sim.TsodyksMarkramSynapse(U=0.04, tau_rec=100.0,
     #                                           tau_facil=1000.0, weight=0.01,
     #                                           delay=0.5),
-    # 'renewing': sim.TsodyksMarkramSynapse(U=1., tau_rec=tau_syn_renew,
+    # 'renewing': sim.TsodyksMarkramSynapse(U=1., tau_rec=tau_syn,
     #                                       tau_facil=0., weight=0.01,
     #                                       delay=0.5),
     # properTSO:
@@ -80,18 +80,15 @@ synapse_types = {
 
 populations = {}
 projections = {}
-for label in 'static', 'depressing', 'facilitating', 'renewing', 'dep/fac':
-    if label == 'renewing':
-        tau = tau_syn_renew
-    else:
-        tau = tau_syn
+for label in 'static', 'depressing', 'renewing', 'facilitating':
 
-    populations[label] = sim.Population(
-        # 1, sim.IF_cond_exp(e_rev_E=0., tau_syn_E=tau, tau_m=.1),
-        1, sim.IF_curr_exp(tau_syn_E=tau, tau_m=tau_m, cm=tau_m/20.),
-        label=label)
-    # populations[label].record(['v', 'gsyn_exc'])
-    populations[label].record('v')
+    coba_lif = sim.IF_cond_exp(tau_m=tau_m, cm=cm, v_thresh=0.,
+                               e_rev_E=0., tau_syn_E=tau_syn,)
+    cuba_lif = sim.IF_curr_exp(tau_syn_E=tau_syn, tau_m=tau_m, cm=cm,
+                               v_thresh=0.,)
+    populations[label] = sim.Population(1, coba_lif, label=label)
+    populations[label].record(['v', 'gsyn_exc'])
+    # populations[label].record('v')
     projections[label] = sim.Projection(spike_source, populations[label],
                                         connector, receptor_type='excitatory',
                                         synapse_type=synapse_types[label])
@@ -107,51 +104,47 @@ sim.run(300.0)
 
 for label, p in populations.items():
     filename = normalized_filename("Results", "tsodyksmarkram_%s" % label,
-                                   "pkl", options.simulator)
+                                   "pkl", "nest")
     p.write_data(filename, annotations={'script_name': __file__})
 
 import numpy as np
+from utils.data_mgmt import make_figure_folder
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 mpl.rcParams['font.size'] = 14
 
-figure_filename = 'Figures/stp_example.pdf'
-u = populations['depressing'].get_data().segments[0].filter(name='v')[0]
-t = np.linspace(0, 300., len(u))
-
+figure_filename = 'stp_example.pdf'
 plt.figure()
-plt.title('Depressing synapse')
-plt.plot(t, u, 'b-')
+for label, alpha in zip(['depressing', 'static', 'renewing'], [1., 0.5, 0.5]):
+    data = populations[label].get_data().segments[0]
+    u = data.filter(name='v')[0]
+    gsyn = data.filter(name='gsyn_exc')[0]
+    t = np.linspace(0, 300., len(u))
+    plt.plot(t, gsyn, alpha=alpha, label=label)
 plt.xlabel('t [ms]')
-plt.ylabel('u [mV]')
+plt.ylabel('gsyn_exc')
 plt.tight_layout()
-plt.savefig(figure_filename, transparent=True)
+plt.legend()
+plt.savefig(make_figure_folder() + figure_filename, transparent=True)
 
-# if options.plot_figure:
-#     from pyNN.utility.plotting import Figure, Panel
-#     # figure_filename = normalized_filename("Results", "tsodyksmarkram",
-#     #                                       "png", options.simulator)
-#     figure_filename = 'stp_test.png'
-#     panels = []
-#     # for variable in ('gsyn_exc', 'v'):
-#     for variable in ('v'):
-#         for population in populations.values():
-#             panels.append(
-#                 Panel(population.get_data().segments[0].filter(name=variable)[0],
-#                       data_labels=[population.label], yticks=True),
-#             )
-#     # add ylabel to top panel in each group
-#     panels[0].options.update(ylabel=u'Synaptic conductance (µS)')
-#     panels[3].options.update(ylabel='Membrane potential (mV)')
-#     # add xticks and xlabel to final panel
-#     panels[-1].options.update(xticks=True, xlabel="Time (ms)")
+# from pyNN.utility.plotting import Figure, Panel
+# # figure_filename = normalized_filename("Results", "tsodyksmarkram",
+# #                                       "png", "nest")
+# panels = []
+# # for variable in ('gsyn_exc', 'v'):
+# for variable in ['gsyn_exc']:
+#     for population in populations.values():
+#         data = population.get_data().segments[0].filter(name=variable)[0]
+#         panels.append(Panel(data, data_labels=[population.label], yticks=True))
+# # add ylabel to top panel in each group
+# panels[0].options.update(ylabel=u'Synaptic conductance (µS)')
+# # panels[3].options.update(ylabel='Membrane potential (mV)')
+# # add xticks and xlabel to final panel
+# panels[-1].options.update(xticks=True, xlabel="Time (ms)")
 
-#     Figure(*panels,
-#            title="Example of static, facilitating, depressing and renewing synapses",
-#            annotations="Simulated with %s" % options.simulator.upper()
-#            ).save(figure_filename)
-#     print(figure_filename)
+# Figure(*panels, title="Example of plastic synapses"
+#        ).save(make_figure_folder() + figure_filename)
 
 
 # === Clean up and quit =======================================================

@@ -6,8 +6,8 @@ from __future__ import print_function
 import numpy as np
 import os
 import sys
-sys.path.insert(0, '../gibbs_rbm')
-from util import get_data_path, average_pool
+from utils.data_mgmt import get_data_path
+from utils import average_pool
 
 if len(sys.argv) != 3:
     print('Please specify the arguments: pong/gauss, win_size')

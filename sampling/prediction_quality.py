@@ -1,33 +1,19 @@
 from __future__ import division
 from __future__ import print_function
-import matplotlib as mpl
+import numpy as np
 from utils.data_mgmt import get_data_path, make_figure_folder, load_images
 from utils import average_helper
+from cycler import cycler
+import matplotlib as mpl
 mpl.use('agg')
 import matplotlib.pyplot as plt
-import numpy as np
+
 
 mpl.rcParams['font.size'] = 14
 # mpl.rcParams['text.usetex'] = True
 
-
-def load_data_old(file_name):
-    lab2pxl = img_shape[0] / n_labels
-    with np.load('data/' + file_name + '.npz') as d:
-        predictions = d['pred']  # predictions is on the label scale
-        pred_lab = d['lab']
-        distances = d['dist'] * lab2pxl
-        speed = d['speed']
-        img_diff = d['idiff']
-        print(distances.shape)
-    # calculate statistical quantities
-    # dist_median = np.mean(distances, axis=1)
-    # dist_std = np.std(distances, axis=1)
-    dist_median = np.percentile(distances, 50, axis=1)
-    dist_quartile_lower = np.percentile(distances, 25, axis=1)
-    dist_quartile_upper = np.percentile(distances, 75, axis=1)
-    fractions = np.linspace(0, 1, len(distances))
-    return fractions, dist_median, dist_quartile_lower, dist_quartile_upper
+img_shape = (36, 48)
+n_labels = 12
 
 
 def load_data(sampling_method, file_name, use_labels=False):
@@ -42,7 +28,7 @@ def load_data(sampling_method, file_name, use_labels=False):
 
     lab2pxl = img_shape[0] / n_labels
     # compare vis_prediction not to label but to actual pixels
-    data_name = 'pong_var_start{}x{}'.format(*img_shape)
+    data_name = file_name.split('_')[0] + '_var_start{}x{}'.format(*img_shape)
     _, _, test_set = load_images(data_name)
     if use_labels:
         targets = average_helper(n_labels, test_set[1]) * lab2pxl
@@ -68,71 +54,71 @@ def load_data(sampling_method, file_name, use_labels=False):
     return fractions, dist_median, dist_quartile_lower, dist_quartile_upper
 
 
-img_shape = (36, 48)
-samp_meth = 'gibbs'
+samp_meth = 'lif'
 pot_str = 'pong'
-n_labels = 12
-win_size1 = 48
-win_size2 = 8
-n_sampl = 100
-fname1 = pot_str + '_win{}_prediction'.format(win_size1)
-fname2 = pot_str + '_win{}_prediction'.format(win_size2)
-fractions1, dist_median1, dist_quartile_lower1, dist_quartile_upper1 = \
-    load_data(samp_meth, fname1, use_labels=False)
-fractions2, dist_median2, dist_quartile_lower2, dist_quartile_upper2 = \
-    load_data(samp_meth, fname2, use_labels=False)
 
+win_sizes = [48]
+
+fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
+for win in win_sizes:
+    fname = pot_str + '_win{}_prediction'.format(win)
+    frac, median, lower_quart, upper_quart = load_data(samp_meth, fname)
+    fractions.append(frac)
+    medians.append(median)
+    lower_quartiles.append(lower_quart)
+    upper_quartiles.append(upper_quart)
 
 # plot prediction error
-fig_name = pot_str + '_prediction_error'
+fig_name = '{}_{}_prediction_error'.format(samp_meth, pot_str)
 fig, ax = plt.subplots()
-ax.plot(fractions1, dist_median1, 'b.-')
-ax.fill_between(fractions1, dist_quartile_lower1, dist_quartile_upper1,
-                alpha=.5, facecolor='blue', label='window: {}'.format(win_size1))
-ax.plot(fractions2, dist_median2, 'r.-')
-ax.fill_between(fractions2, dist_quartile_lower2, dist_quartile_upper2,
-                alpha=.33, facecolor='red', label='window: {}'.format(win_size2))
 ax.set_ylabel('Prediction error d')
 ax.set_ylim([-.5, 16])
 ax.set_xlabel('Ball position / field length')
-plt.legend()
+color_cycle = [plt.cm.rainbow(i) for i in np.linspace(0, 1, len(win_sizes))]
+ax.set_prop_cycle(cycler('color', color_cycle))
 
+for i, win in enumerate(win_sizes):
+    ax.plot(fractions[i], medians[i], '.-')
+    ax.fill_between(fractions[i], lower_quartiles[i], upper_quartiles[i],
+                    alpha=.3, label='window: {}'.format(win_sizes[i]))
+
+plt.legend()
 plt.tight_layout()
 plt.savefig(make_figure_folder() + fig_name + '.pdf', transparent=True)
 plt.close(fig)
 
-# plot agent performance
-fig, ax = plt.subplots()
-ax.set_xlabel('Agent speed / ball speed')
-ax.set_ylabel('Success rate')
-ax.set_ylim([0., 1.])
+# # plot agent performance
+# fig, ax = plt.subplots()
+# ax.set_xlabel('Agent speed / ball speed')
+# ax.set_ylabel('Success rate')
+# ax.set_ylim([0., 1.])
 
-data_file = pot_str + '_win{}_agent_performance'.format(win_size1)
-with np.load(get_data_path('pong_eval_agent') + data_file + '.npz') as d:
-    success1 = d['successes']
-    dist1 = d['distances']
-    speeds1 = d['speeds']
-    print('Asymptotic value (full history): {}'.format(success1.max()))
-ax.plot(speeds1, success1, '-r', label='window: {}'.format(win_size1))
+# data_file = pot_str + '_win{}_agent_performance'.format(win_size1)
+# with np.load(get_data_path('pong_eval_agent') + data_file + '.npz') as d:
+#     success1 = d['successes']
+#     dist1 = d['distances']
+#     speeds1 = d['speeds']
+#     print('Asymptotic value (full history): {}'.format(success1.max()))
+# ax.plot(speeds1, success1, '-r', label='window: {}'.format(win_size1))
 
-data_file = pot_str + '_win{}_agent_performance'.format(win_size2)
-with np.load(get_data_path('pong_eval_agent') + data_file + '.npz') as d:
-    success2 = d['successes']
-    dist2 = d['distances']
-    speeds2 = d['speeds']
-    print('Asymptotic value (full history): {}'.format(success2.max()))
-ax.plot(speeds2, success2, '-b', label='window: {}'.format(win_size2))
+# data_file = pot_str + '_win{}_agent_performance'.format(win_size2)
+# with np.load(get_data_path('pong_eval_agent') + data_file + '.npz') as d:
+#     success2 = d['successes']
+#     dist2 = d['distances']
+#     speeds2 = d['speeds']
+#     print('Asymptotic value (full history): {}'.format(success2.max()))
+# ax.plot(speeds2, success2, '-b', label='window: {}'.format(win_size2))
 
-data_file = 'baseline_agent_performance'
-with np.load(get_data_path('pong_eval_agent') + data_file + '.npz') as d:
-    success_base = d['successes']
-    dist_base = d['distances']
-    speeds_base = d['speeds']
-    print('Asymptotic value (comparison): {}'.format(success_base.max()))
-ax.plot(speeds_base, success_base, '-k', label='baseline')
+# data_file = 'baseline_agent_performance'
+# with np.load(get_data_path('pong_eval_agent') + data_file + '.npz') as d:
+#     success_base = d['successes']
+#     dist_base = d['distances']
+#     speeds_base = d['speeds']
+#     print('Asymptotic value (comparison): {}'.format(success_base.max()))
+# ax.plot(speeds_base, success_base, '-k', label='baseline')
 
-plt.legend()
-plt.savefig(make_figure_folder() + pot_str + '_agent_performance.pdf')
+# plt.legend()
+# plt.savefig(make_figure_folder() + pot_str + '_agent_performance.pdf')
 
 # image dissimilarity
 # plt.errorbar(fractions, img_diff, fmt='ro', yerr=img_diff_std)

@@ -97,12 +97,12 @@ class Clamp_window(object):
 # pong pattern completion
 if len(sys.argv) != 5:
     print('Please specify the arguments:'
-          ' pong/gauss, win_size, start_idx, chunk_size')
+          ' pong/gauss, start_idx, chunk_size, win_size')
     sys.exit()
 pot_str = sys.argv[1]
-win_size = int(sys.argv[2])
-start = int(sys.argv[3])
-chunk_size = int(sys.argv[4])
+start = int(sys.argv[2])
+chunk_size = int(sys.argv[3])
+win_size = int(sys.argv[4])
 
 img_shape = (36, 48)
 n_pxls = np.prod(img_shape)
@@ -134,7 +134,6 @@ vis_samples = average_pool(np.swapaxes(vis_samples, 0, 1), n_samples,
                            stride=n_samples + burnin, offset=burnin)
 
 # save averaged(!) samples
-save_name = 'test'
 np.savez_compressed(make_data_folder() + save_name,
                     vis=vis_samples, win_size=win_size, data_idx=idx)
 

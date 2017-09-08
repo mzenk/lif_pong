@@ -180,9 +180,9 @@ def sample_network():
         # to the documentation for all the different ways this is possible.
 
         sampler_config = sbs.db.SamplerConfiguration.load(
-                "tutorial_calibration.json")
+                "calibrations/tutorial_calib.json")
 
-        bm = sbs.network.ThoroughBM(num_samplers=5,
+        bm = sbs.network.ThoroughBM(num_samplers=2000,
                 sim_name=sim_name, sampler_config=sampler_config)
 
         # Set random symmetric weights.
