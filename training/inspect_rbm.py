@@ -13,7 +13,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 mpl.rcParams['font.size'] = 12
 
 
-def plot_data(data, show_idx, img_shape, tile_shape=(5, 5)):
+def plot_data(data, show_idx, img_shape, tile_shape=(5, 5), name='data'):
     samples = tile_raster_images(train_set[0][idx],
                                  img_shape=img_shape,
                                  tile_shape=(4, 4),
@@ -22,15 +22,16 @@ def plot_data(data, show_idx, img_shape, tile_shape=(5, 5)):
                                  output_pixel_vals=False)
 
     plt.figure()
-    plt.imshow(samples, interpolation='Nearest', cmap='gray', origin='lower')
+    plt.imshow(samples, interpolation='Nearest', cmap='gray')
     plt.gca().get_xaxis().set_visible(False)
     plt.gca().get_yaxis().set_visible(False)
     plt.tight_layout()
-    plt.savefig(make_figure_folder() + data_name + '_samples.png')
+    plt.savefig(make_figure_folder() + name + '.png')
 
 
-def plot_receptive_fields(rbm, hidden_idx, img_shape, tile_shape=(4, 4)):
-    tiled_filters = tile_raster_images(X=rbm.w[:rbm.n_inputs, hidden_idx],
+def plot_receptive_fields(rbm, hidden_idx, img_shape, tile_shape=(4, 4),
+                          name='filters', title='Receptive fields'):
+    tiled_filters = tile_raster_images(X=rbm.w.T[hidden_idx, :rbm.n_inputs],
                                        img_shape=img_shape,
                                        tile_shape=tile_shape,
                                        tile_spacing=(1, 1),
@@ -41,47 +42,49 @@ def plot_receptive_fields(rbm, hidden_idx, img_shape, tile_shape=(4, 4)):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)
     plt.colorbar(im, cax=cax)
-    ax.set_title('Gaussian hill')
+    ax.set_title(title)
     ax.tick_params(left='off', right='off', bottom='off',
                    labelleft='off', labelright='off', labelbottom='off')
     fig.tight_layout()
-    plt.savefig(make_figure_folder() + data_name + '_filters.png')
+    plt.savefig(make_figure_folder() + name + '.png')
 
 
-def plot_histograms(rbm):
+def plot_histograms(rbm, name='histo'):
     # weight histogram
     plt.figure(figsize=(14, 7))
     plt.subplot(121)
-    plt.hist(rbm.w[:rbm.n_inputs].flatten(), 100)
+    plt.hist(testrbm.w[:testrbm.n_inputs].flatten(), bins='auto')
     plt.title('Visible weights')
     plt.subplot(122)
-    plt.hist(rbm.w[rbm.n_inputs:].flatten(), 50)
+    plt.hist(testrbm.w[testrbm.n_inputs:].flatten(), bins='auto')
     plt.title('Label weights')
     plt.tight_layout()
-    plt.savefig(make_figure_folder() + data_name + 'weights_histo.pdf')
+    plt.savefig(make_figure_folder() + name + '_weights.pdf')
 
     # bias histogram
     plt.figure(figsize=(14, 7))
     plt.subplot(121)
-    plt.hist(rbm.ibias, 30, alpha=.7)
-    plt.hist(rbm.lbias, 5, alpha=.7)
-    plt.title('Visible weights')
+    plt.hist(testrbm.ibias, bins='auto', alpha=.7)
+    plt.hist(testrbm.lbias, bins='auto', alpha=.7)
+    plt.title('Visible biases')
     plt.subplot(122)
-    plt.hist(rbm.hbias, 15)
+    plt.hist(testrbm.hbias, bins='auto')
     plt.title('Hidden biases')
     plt.tight_layout()
-    plt.savefig(make_figure_folder() + data_name + 'bias_histo.pdf')
+    plt.savefig(make_figure_folder() + name + '_biases.pdf')
 
 
-# Load data -- Pong
-img_shape = (36, 48)
-data_name = 'pong_var_start{}x{}'.format(*img_shape)
-train_set, _, test_set = load_images(data_name)
-# # Load data -- MNIST
-# import gzip
-# img_shape = (28, 28)
-# with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
-#     train_set, _, test_set = np.load(f)
+# # Load data -- Pong
+# img_shape = (36, 48)
+# data_name = 'pong_var_start{}x{}'.format(*img_shape)
+# train_set, _, test_set = load_images(data_name)
+# testrbm = load_rbm(data_name + '_crbm')
+# Load data -- MNIST
+import gzip
+img_shape = (28, 28)
+with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
+    train_set, _, test_set = np.load(f)
+testrbm = load_rbm('mnist_disc500_rbm')
 
 assert np.prod(img_shape) == train_set[0].shape[1]
 
@@ -91,11 +94,11 @@ print('Number of samples: {}, {}'.format(train_set[0].shape[0],
 # inspect data
 np.random.seed(42)
 idx = np.random.choice(np.arange(len(train_set[0])), size=25, replace=False)
+idx = np.arange(25)
 plot_data(train_set, idx, img_shape)
-print(train_set[0].shape)
-# # RBM-specific plots
-# testrbm = load_rbm(data_name + '_crbm')
-# rand_ind = np.random.randint(testrbm.n_hidden, size=16)
+
+# RBM-specific plots
+rand_ind = np.random.randint(testrbm.n_hidden, size=16)
 # plot_receptive_fields(testrbm, rand_ind, img_shape)
 # plot_histograms(testrbm)
 

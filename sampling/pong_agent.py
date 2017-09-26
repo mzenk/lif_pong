@@ -4,7 +4,7 @@ from __future__ import division
 from __future__ import print_function
 import numpy as np
 import sys
-from utils.data_mgmt import get_data_path, make_data_folder
+from utils.data_mgmt import get_data_path, make_data_folder, load_images
 from utils import average_helper
 
 
@@ -50,13 +50,20 @@ class Pong_agent(object):
         return success, dist, paddle_trace
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print('No arguments given. Using default.')
-        pot_str = 'pong'
-        win_size = 48
+    if len(sys.argv) != 4:
+        print('Wrong no. of arguments given.')
+        sys.exit()
     else:
-        pot_str = sys.argv[1]
-        win_size = sys.argv[2]
+        method = sys.argv[1]
+        if method == 'lif':
+            script_name = 'lif_clamp_window'
+        elif method == 'gibbs':
+            script_name = 'gibbs_sampling'
+        else:
+            print('Sampling method not recognized. Possible: lif, gibbs')
+            sys.exit()
+        pot_str = sys.argv[2]
+        win_size = sys.argv[3]
         # can give 'baseline' as second argument
 
     img_shape = (36, 48)
@@ -67,16 +74,17 @@ if __name__ == '__main__':
 
     # load targets and prediction data
     data_file = pot_str + '_var_start{}x{}'.format(*img_shape)
+    pred_path = get_data_path(script_name)
     pred_file = pot_str + '_win{}_prediction'.format(win_size)
-    save_file = pot_str + '_win{}_agent_performance'.format(win_size)
+    save_file = '{}_{}_win{}_agent_performance'.format(
+        method, pot_str, win_size)
 
-    with np.load('../datasets/' + data_file + '.npz') as d:
-        _, _, test_set = d[d.keys()[0]]
-        tmp = test_set[1]
-        tmp[np.all(tmp == 0, axis=1)] = 1.
-        targets = np.average(np.tile(np.arange(n_labels), (len(tmp), 1)),
-                             weights=tmp, axis=1)
-    with np.load(get_data_path('gibbs_sampling') + pred_file + '.npz') as d:
+    _, _, test_set = load_images(data_file)
+    tmp = test_set[1]
+    tmp[np.all(tmp == 0, axis=1)] = 1.
+    targets = np.average(np.tile(np.arange(n_labels), (len(tmp), 1)),
+                         weights=tmp, axis=1)
+    with np.load(pred_path + pred_file + '.npz') as d:
         avg_lab = d['label']
         avg_vis = d['last_col']
         if 'data_idx' in d.keys():
@@ -109,13 +117,14 @@ if __name__ == '__main__':
         # print((np.abs(baseline_preds[-1] - targets) < .5 * lab_width).mean())
         predictions = baseline_preds
 
+    print(len(targets), predictions.shape)
     # exclude fully clamped prediction because it is always correct?
     predictions = predictions[:-1]
     # sensible max_step range: one paddle length per one ball x-step => v=1.
     speed_range = np.linspace(0, 1.2 * v_ball, 100)
     success_rates = np.zeros_like(speed_range)
     distances = np.zeros((len(speed_range), len(targets)))
-    n_recorded = 1000
+    n_recorded = len(targets)//100
     traces = np.zeros((speed_range.shape[0], predictions.shape[0], n_recorded))
     for i, speed in enumerate(speed_range):
         print('sweep agent speed ({} of {})...'
@@ -127,7 +136,7 @@ if __name__ == '__main__':
         traces[i] = tmp[:, :n_recorded]
 
     # save data - speed normalized to ball speed:
-    np.savez_compressed(make_data_folder(__file__) + save_file,
+    np.savez_compressed(make_data_folder() + save_file,
                         successes=success_rates, distances=distances,
                         traces=traces, speeds=speed_range/v_ball)
 

@@ -39,6 +39,14 @@ class RBM(object):
         # a simple solution
         self.dbm_factor = dbm_factor
 
+    def bm_params(self):
+        w = np.vstack(
+            (np.hstack((np.zeros(2*(self.n_visible,)), self.w)),
+             np.hstack((self.w.T, np.zeros(2*(self.n_hidden,)))))
+            )
+        b = np.concatenate((self.vbias, self.hbias))
+        return w, b
+
     def energy(self, v, h):
         return - np.einsum('ik,il,kl->i', v, h, self.w) - \
             v.dot(self.vbias) - h.dot(self.hbias)
@@ -604,12 +612,12 @@ class RBM(object):
             print('Est. average loglik (train): {:.2f}'.format(ll_est_train))
 
     def monitor_progress(self, train_set, valid_set, output_file):
-        # try ais
-        self.run_ais(valid_set, train_set)
-        # subset_ind = self.np_rng.randint(train_set.shape[0], size=5000)
-        # s = 'Log-PL of random training subset: '\
-        #     '{}'.format(self.compute_logpl(train_set[subset_ind]))
-        # print(s)
+        # # try ais
+        # self.run_ais(valid_set, train_set)
+        subset_ind = self.np_rng.randint(train_set.shape[0], size=5000)
+        s = 'Log-PL of random training subset: '\
+            '{}'.format(self.compute_logpl(train_set[subset_ind]))
+        print(s)
 
 
 class CRBM(RBM):

@@ -35,27 +35,26 @@ with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
 rbm = load_rbm('mnist_disc_rbm')
 save_file = 'mnist_samples'
 
-w_rbm = rbm.w
-b = np.concatenate((rbm.vbias, rbm.hbias))
 nv, nh = rbm.n_visible, rbm.n_hidden
 
 # ------
 
 # Bring weights and biases into right form
-w = np.concatenate((np.concatenate((np.zeros((nv, nv)), w_rbm), axis=1),
-                   np.concatenate((w_rbm.T, np.zeros((nh, nh))), axis=1)),
-                   axis=0)
-
-bm = lifsamp.initialise_network(calib_file, w, b)
+w, b = rbm.bm_params()
 
 duration = n_samples * sampling_interval
 burnin_time = burnin * sampling_interval
 samples = np.zeros((1, n_samples, nv + nh)).astype(bool)
 
-samples[0] = lifsamp.sample_network(
-    bm, duration, dt=.1, burn_in=burnin_time, tso_params='default',
-    seed=7741092)
-
+# setup simulation with seed
+seed = 7741092
+sim_setup_kwargs = {
+    'rng_seeds_seed': seed
+}
+samples[0] = lifsamp.sample_network(calib_file, w, b, duration, dt=.1,
+                                    tso_params=mixing_tso_params,
+                                    burn_in_time=burnin_time,
+                                    sim_setup_kwargs=sim_setup_kwargs)
 np.savez_compressed(make_data_folder() + save_file,
                     samples=samples,
                     data_idx=np.arange(1),

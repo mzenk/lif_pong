@@ -11,8 +11,8 @@ n_labels = 12
 pot_str = 'pong'
 
 # file with sampled states
-sample_file = pot_str + '_win48_all_chunk000'
-with np.load(get_data_path('lif_sampling') + sample_file + '.npz') as d:
+sample_file = pot_str + '_win48_all_chunk010'
+with np.load(get_data_path('lif_clamp_window') + sample_file + '.npz') as d:
     vis_samples = d['samples'][:, :np.prod(img_shape)]
     hid_samples = d['samples'][:, np.prod(img_shape) + n_labels:]
     # could compute activations of visible units here
@@ -52,4 +52,4 @@ for i in range(n):
     print('Making animation {} of {}'.format(i + 1, n))
     make_animation(make_figure_folder() + fig_name + str(i),
                    img_shape, win_size, vis_samples[i], paddle_len=0,
-                   clamp_interval=clamp_interval, anim_interval=100./clamp_interval)
+                   clamp_interval=clamp_interval, anim_interval=300./clamp_interval)

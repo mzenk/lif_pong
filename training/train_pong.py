@@ -3,11 +3,10 @@ from __future__ import print_function
 import numpy as np
 from rbm import RBM, CRBM
 from dbm import DBM, CDBM
+import sys
 import time
 import cPickle
-import sys
-sys.path.append('/wang/users/mzenk/cluster_home/Projects/Pong')
-from utils.data_mgmt import make_data_folder
+from utils.data_mgmt import make_data_folder, load_images
 from utils import to_1_of_c
 import matplotlib
 matplotlib.use('agg')
@@ -15,12 +14,10 @@ import matplotlib.pyplot as plt
 
 
 # Load Pong data
-img_shape = (36, 48)
-save = False
-fname = 'pong_var_start{}x{}'.format(*img_shape)
-# fname = 'pong_var_overlap2'
-with np.load('datasets/' + fname + '.npz') as d:
-    train_set, valid_set, test_set = d[d.keys()[0]]
+img_shape = (18, 24)
+save = True
+fname = 'pong_fixed_start{}x{}'.format(*img_shape)
+train_set, valid_set, test_set = load_images(fname)
 
 n_pxls = train_set[0].shape[1]
 if len(train_set[1].shape) == 1:
@@ -36,13 +33,13 @@ else:
 assert np.prod(img_shape) == n_pxls
 
 training_params = {
-    'n_epochs': 2,
+    'n_epochs': 20,
     'batch_size': 20,
     'lrate': .2,
-    'cd_steps': 1,
+    'cd_steps': 5,
     'persistent': True,
     'momentum': 0.5,
-    'weight_cost': .0001
+    'weight_cost': 1e-4
 }
 
 mf_params = {
@@ -101,7 +98,7 @@ if sys.argv[1] == 'dis':
                   vbias=bias_init)
 
     start = time.time()
-    my_rbm.train(train_wlabel, valid_set=None,
+    my_rbm.train(train_wlabel, valid_set=valid_wlabel,
                  filename='log/pong_dis_log.txt', **training_params)
 
     print('Training took {:.1f} min'.format((time.time() - start)/60))

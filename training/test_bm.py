@@ -3,29 +3,29 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 from rbm import RBM, CRBM
-from util import boltzmann, bin_to_dec, dec_to_bin, compute_dkl
+from utils import boltzmann, bin_to_dec, dec_to_bin, compute_dkl
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
-# Basic RBM testing
-# ------ Test the sampling -------
-nv = 5
-nh = 4
-dim = nv + nh
-w_small = .1*np.random.randn(nv, nh)
-myrbm = RBM(nv, nh, w=w_small, vbias=np.zeros(nv), hbias=np.zeros(nh))
-w = np.concatenate((np.concatenate((np.zeros((nv, nv)), w_small), axis=1),
-                   np.concatenate((w_small.T, np.zeros((nh, nh))), axis=1)),
-                   axis=0)
+# # Basic RBM testing
+# # ------ Test the sampling -------
+# nv = 5
+# nh = 4
+# dim = nv + nh
+# w_small = .1*np.random.randn(nv, nh)
+# myrbm = RBM(nv, nh, w=w_small, vbias=np.zeros(nv), hbias=np.zeros(nh))
+# w = np.concatenate((np.concatenate((np.zeros((nv, nv)), w_small), axis=1),
+#                    np.concatenate((w_small.T, np.zeros((nh, nh))), axis=1)),
+#                    axis=0)
 
-b = np.zeros(dim)
-# evaluate target distribution
-target = np.zeros(2**dim)
-nbits = np.floor(np.log2(2**dim - 1)) + 1
-for i in range(2**dim):
-    target[i] = boltzmann(dec_to_bin(i, nbits), w, b)
-p_target = target/np.sum(target)
+# b = np.zeros(dim)
+# # evaluate target distribution
+# target = np.zeros(2**dim)
+# nbits = np.floor(np.log2(2**dim - 1)) + 1
+# for i in range(2**dim):
+#     target[i] = boltzmann(dec_to_bin(i, nbits), w, b)
+# p_target = target/np.sum(target)
 
 # # compare dkls of gibbs and AST
 # n_samples = 1e5
@@ -62,39 +62,39 @@ p_target = target/np.sum(target)
 #            header='target_values sample_counts')
 
 # ----- test training by learning a known (simple) distribution -----
-# nv = 3
-# nh = 2
-# w_small = 2*(np.random.beta(1.5, 1.5, (nv,nh)) - .5)
-# myrbm = RBM(nv, nh)
+nv = 3
+nh = 2
+w_small = 2*(np.random.beta(1.5, 1.5, (nv, nh)) - .5)
+myrbm = RBM(nv, nh)
 
-# # generate samples from true distribution and train bm
-# train = RBM(nv, nh, w_small, np.zeros(nv), np.zeros(nh))
-# train_samples = train.draw_samples(int(1e4))
-# v_train_samples = train_samples[1000:,:nv]
+# generate samples from true distribution and train bm
+train = RBM(nv, nh, w_small, np.zeros(nv), np.zeros(nh))
+train_samples = train.draw_samples(int(2e3), binary=True)
+v_train_samples = train_samples[1000:, :nv]
 
-# valid = train.draw_samples(2000)[1500:,:nv]
-# myrbm.train(v_train_samples, valid_set=valid, cast=True)
+valid = train.draw_samples(2000, binary=True)[1500:, :nv]
+myrbm.train(v_train_samples, valid_set=valid, cast=False)
 
-# # run bm and compare histograms
-# samples = myrbm.draw_samples(int(1e5))
+# run bm and compare histograms
+samples = myrbm.draw_samples(int(1e5), binary=True)
 
-# decimals = bin_to_dec(samples[:, :nv])
-# decimals_train = bin_to_dec(v_train_samples)
-# plt.figure()
-# h1 = plt.hist(decimals, bins=np.arange(0, 2**nv + 1, 1), normed=True,
-#               alpha=0.5, label='sampled', color='g', align='mid',
-#               rwidth=0.5, log=True)
-# h2 = plt.hist(decimals_train, bins=np.arange(0, 2**nv + 1, 1), normed=True,
-#               alpha=0.5, label='sampled', color='b', align='mid',
-#               rwidth=0.5, log=True)
-# plt.legend(loc='upper left')
-# plt.savefig('test.png')
-# plt.close()
+decimals = bin_to_dec(samples[:, :nv])
+decimals_train = bin_to_dec(v_train_samples)
+plt.figure()
+h1 = plt.hist(decimals, bins=np.arange(0, 2**nv + 1, 1), normed=True,
+              alpha=0.5, label='Trained', color='g', align='mid',
+              rwidth=0.5, log=True)
+h2 = plt.hist(decimals_train, bins=np.arange(0, 2**nv + 1, 1), normed=True,
+              alpha=0.5, label='groundtruth', color='b', align='mid',
+              rwidth=0.5, log=True)
+plt.legend(loc='upper left')
+plt.savefig('test.png')
+plt.close()
 
-# p_target = np.histogram(decimals_train, bins=np.arange(0, 2**nv + 1, 1),
-#                         normed=True)[0]
+p_target = np.histogram(decimals_train, bins=np.arange(0, 2**nv + 1, 1),
+                        normed=True)[0]
 
-# print "DKL = " + str(compute_dkl(samples[:,:nv], p_target))
+print("DKL = " + str(compute_dkl(samples[:, :nv], p_target)))
 
-with open('saved_rbms/minimal_rbm.pkl', 'wb') as output:
+with open('../shared_data/saved_rbms/minimal_rbm.pkl', 'wb') as output:
         cPickle.dump(myrbm, output, cPickle.HIGHEST_PROTOCOL)

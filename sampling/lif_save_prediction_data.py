@@ -6,26 +6,31 @@ from __future__ import print_function
 import numpy as np
 import os
 import sys
-from utils.data_mgmt import get_data_path
+from utils.data_mgmt import get_data_path, make_data_folder
 from utils import average_pool
 
-if len(sys.argv) != 3:
-    print('Please specify the arguments: pong/gauss, win_size')
+if len(sys.argv) < 3:
+    print('Required arguments: pong/gauss, win_size, [name_modifier]')
     sys.exit()
 
 pot_str = sys.argv[1]
 win_size = int(sys.argv[2])
-n_labels = 12
+if len(sys.argv) == 4:
+    modifier = str(sys.argv[3])
+else:
+    modifier = ''
 img_shape = (36, 48)
+n_labels = img_shape[0]//3
 n_pxls = np.prod(img_shape)
 data_name = pot_str + '_win{}_all_chunk'.format(win_size)
 
 lab, last_col, data_idx = 0, 0, 0
-data_path = get_data_path('lif_sampling')
-save_name = data_path + '_'.join(data_name.split('_')[:2]) + '_prediction'
+sample_data_path = get_data_path('lif_clamp_window')
+save_name = sample_data_path + '_'.join(data_name.split('_')[:2]) + \
+    '_prediction' + modifier
 
 for i in np.arange(100):
-    path = data_path + data_name + '{:03d}.npz'.format(i)
+    path = sample_data_path + data_name + '{:03d}.npz'.format(i)
     if not os.path.exists(path):
         continue
 

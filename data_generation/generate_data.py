@@ -3,12 +3,10 @@ from __future__ import print_function
 import numpy as np
 from trajectory import Gaussian_trajectory, Const_trajectory
 from scipy.ndimage import convolve1d
+from utils.data_mgmt import make_data_folder
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-import sys
-sys.path.append('/wang/users/mzenk/cluster_home/Projects/Pong')
-from utils.data_mgmt import make_data_folder
 
 
 def pool_vector(vec, width, stride, mode='default'):
@@ -117,8 +115,8 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
     # data = data[:, :, -n_col:].reshape((nstarts * nangles, grid[1] * n_col))
     # # ----
     if save:
-        size_train = data.shape[0]//2
-        size_test = data.shape[0]//4
+        size_train = data.shape[0]//4
+        size_test = data.shape[0]//2
         train_set = data[:size_train]
         train_labels = labels[:size_train]
         valid_set = data[size_train: -size_test]
@@ -134,7 +132,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
 
 
 if __name__ == '__main__':
-    # generate_data([48, 36], pot_str='pong', fixed_start=True, save=True)
+    generate_data([24, 18], pot_str='pong', fixed_start=True, save=True)
     # generate_data([48, 36], pot_str='pong', fixed_start=False, save=True)
     # generate_data([48, 36], pot_str='gauss', fixed_start=True, save=False)
     # generate_data([48, 36], pot_str='gauss', fixed_start=False, save=True)
@@ -168,26 +166,26 @@ if __name__ == '__main__':
     #         np.sum(initial_histo, axis=0), width=1)
     # plt.savefig('angle_histo.png')
 
-    # testing
-    grid = np.array([48, 36])
-    h = 1./grid[0]
-    field = grid * h
-    v0 = .5
+    # # testing
+    # grid = np.array([48, 36])
+    # h = 1./grid[0]
+    # field = grid * h
+    # v0 = .5
 
-    start_pos = np.array([0, field[1]/2])
-    ang = 30.
-    # coul_ampl = 1.
-    # coul_args = (coul_ampl, [field[0]/3, field[1]/2], 2*coul_ampl/v0**2)
-    # const_args = ([0., 1.],)
-    # amplitude = .4
-    # mu = field * [.5, .5]
-    # cov_mat = np.diag([.1, .05] * field)
-    # test = Gaussian_trajectory(grid, h, start_pos, ang, v0, amplitude, mu, cov_mat)
-    test = Const_trajectory(grid, h, start_pos, ang, v0, np.array([0, 0]))
-    test.integrate(write_pixels=True)
-    fig = plt.figure()
-    test.draw_trajectory(fig, potential=True)
-    # imshow has the origin at the top left
-    plt.imshow(test.pixels, interpolation='Nearest', cmap='Blues',
-               origin='lower', extent=(0, field[0], 0, field[1]), alpha=0.5)
-    plt.savefig('test_trajectory.png')
+    # start_pos = np.array([0, field[1]/2])
+    # ang = 30.
+    # # coul_ampl = 1.
+    # # coul_args = (coul_ampl, [field[0]/3, field[1]/2], 2*coul_ampl/v0**2)
+    # # const_args = ([0., 1.],)
+    # # amplitude = .4
+    # # mu = field * [.5, .5]
+    # # cov_mat = np.diag([.1, .05] * field)
+    # # test = Gaussian_trajectory(grid, h, start_pos, ang, v0, amplitude, mu, cov_mat)
+    # test = Const_trajectory(grid, h, start_pos, ang, v0, np.array([0, 0]))
+    # test.integrate(write_pixels=True)
+    # fig = plt.figure()
+    # test.draw_trajectory(fig, potential=True)
+    # # imshow has the origin at the top left
+    # plt.imshow(test.pixels, interpolation='Nearest', cmap='Blues',
+    #            origin='lower', extent=(0, field[0], 0, field[1]), alpha=0.5)
+    # plt.savefig('test_trajectory.png')

@@ -4,43 +4,30 @@ import cPickle, gzip
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-import util
+from utils import tile_raster_images
+from utils.data_mgmt import load_rbm
+
+
+def plot_samples(rbm, n_samples, img_shape):
+    samples = testrbm.draw_samples(n_samples)
+    tiled_samples = tile_raster_images(samples[::100, :np.prod(img_shape)],
+                                       img_shape=img_shape,
+                                       tile_shape=(10, 10),
+                                       scale_rows_to_unit_interval=False,
+                                       output_pixel_vals=False)
+
+    plt.figure()
+    plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
+    plt.savefig('./figures/samples.png')
 
 
 # Load rbm and data
-with open('saved_rbms/mnist_gen500_rbm.pkl', 'rb') as f:
-    testrbm = cPickle.load(f)
-f = gzip.open('../datasets/mnist.pkl.gz', 'rb')
-_, _, test_set = np.load(f)
-f.close()
+testrbm = load_rbm('mnist_disc_rbm')
+with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
+    _, _, test_set = np.load(f)
 img_shape = (28, 28)
 n_pixels = np.prod(img_shape)
 
-# # weight histogram
-# plt.figure()
-# plt.hist(testrbm.w.flatten(), 50)
-# plt.savefig('./figures/weight_histo.png')
-
-# # For visual inspection of filters and samples
-# tiled_filters = util.tile_raster_images(X=testrbm.w.T[:25, :n_pixels],
-#                                         img_shape=img_shape,
-#                                         tile_shape=(5, 5),
-#                                         scale_rows_to_unit_interval=False,
-#                                         output_pixel_vals=False)
-# plt.figure()
-# plt.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
-# plt.savefig('figures/filters.png')
-
-samples = testrbm.draw_samples(1e3)
-tiled_samples = util.tile_raster_images(samples[::100, :n_pixels],
-                                        img_shape=img_shape,
-                                        tile_shape=(10, 10),
-                                        scale_rows_to_unit_interval=False,
-                                        output_pixel_vals=False)
-
-plt.figure()
-plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-plt.savefig('./figures/samples.png')
 
 # # samples with partially clamped inputs
 # pxls_x = int(np.sqrt(testrbm.n_visible))
@@ -71,7 +58,7 @@ plt.savefig('./figures/samples.png')
 # inferred_imgs[:, np.setdiff1d(np.arange(testrbm.n_visible),
 #                               clamped_ind)] = clamped_samples
 
-# tiled_clamped = util.tile_raster_images(inferred_imgs,
+# tiled_clamped = tile_raster_images(inferred_imgs,
 #                                         img_shape=(pxls_x, pxls_x),
 #                                         tile_shape=(5, 5),
 #                                         scale_rows_to_unit_interval=False,
@@ -100,7 +87,7 @@ plt.savefig('./figures/samples.png')
 #     new_samples = testrbm.sample_from_label(i, 1000)
 #     clamped_samples = np.concatenate((clamped_samples, new_samples), axis=0)
 
-# tiled_clamped = util.tile_raster_images(clamped_samples[100::200],
+# tiled_clamped = tile_raster_images(clamped_samples[100::200],
 #                                         img_shape=(pxls_x, pxls_x),
 #                                         tile_shape=(5, 10),
 #                                         scale_rows_to_unit_interval=False,
@@ -110,9 +97,9 @@ plt.savefig('./figures/samples.png')
 # plt.imshow(tiled_clamped, interpolation='Nearest', cmap='gray')
 # plt.savefig('./figures/clamped_labels.png')
 
-# # classification performance
-# test_data = test_set[0]
-# test_targets = test_set[1]
-# prediction = testrbm.classify(test_data)
-# crate = 100 * np.average(prediction == test_targets)
-# print('Correct predictions: {:.2f} %'.format(crate))
+# classification performance
+test_data = test_set[0]
+test_targets = test_set[1]
+prediction = testrbm.classify(test_data)
+crate = 100 * np.average(prediction == test_targets)
+print('Correct predictions: {:.2f} %'.format(crate))

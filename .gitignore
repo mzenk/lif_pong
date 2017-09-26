@@ -4,6 +4,7 @@
 figures/
 *.txt
 *.mp4
+*.log
 
 # slurm outputs
 *.out

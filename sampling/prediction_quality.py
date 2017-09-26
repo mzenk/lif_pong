@@ -4,6 +4,7 @@ import numpy as np
 from utils.data_mgmt import get_data_path, make_figure_folder, load_images
 from utils import average_helper
 from cycler import cycler
+import os
 import matplotlib as mpl
 mpl.use('agg')
 import matplotlib.pyplot as plt
@@ -12,13 +13,12 @@ import matplotlib.pyplot as plt
 mpl.rcParams['font.size'] = 14
 # mpl.rcParams['text.usetex'] = True
 
-img_shape = (36, 48)
-n_labels = 12
+img_shape = (18, 24)
+n_labels = img_shape[0]//3
 
 
-def load_data(sampling_method, file_name, use_labels=False):
-    with np.load(get_data_path(sampling_method + '_sampling') +
-                 file_name + '.npz') as d:
+def load_prediction_data(file_name, use_labels=False):
+    with np.load(file_name) as d:
         avg_lab = d['label']
         avg_vis = d['last_col']
         if 'data_idx' in d.keys():
@@ -28,7 +28,8 @@ def load_data(sampling_method, file_name, use_labels=False):
 
     lab2pxl = img_shape[0] / n_labels
     # compare vis_prediction not to label but to actual pixels
-    data_name = file_name.split('_')[0] + '_var_start{}x{}'.format(*img_shape)
+    data_name = os.path.basename(file_name).split('_')[0] + \
+        '_fixed_start{}x{}'.format(*img_shape)
     _, _, test_set = load_images(data_name)
     if use_labels:
         targets = average_helper(n_labels, test_set[1]) * lab2pxl
@@ -54,72 +55,120 @@ def load_data(sampling_method, file_name, use_labels=False):
     return fractions, dist_median, dist_quartile_lower, dist_quartile_upper
 
 
-samp_meth = 'lif'
-pot_str = 'pong'
+def load_agent_data(file_name):
+    with np.load(get_data_path('pong_agent') + file_name + '.npz') as d:
+        success = d['successes']
+        dist = d['distances']
+        speeds = d['speeds']
+    print('Asymptotic value (full history): {}'.format(success.max()))
+    return success, dist, speeds
 
-win_sizes = [48]
 
-fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
-for win in win_sizes:
-    fname = pot_str + '_win{}_prediction'.format(win)
-    frac, median, lower_quart, upper_quart = load_data(samp_meth, fname)
-    fractions.append(frac)
-    medians.append(median)
-    lower_quartiles.append(lower_quart)
-    upper_quartiles.append(upper_quart)
+def plot_prediction_error():
+    # # compare different window sizes
+    # samp_meth = 'lif'
+    # pot_str = 'pong'
+    # data_path = get_data_path('lif_clamp_window')
+    # win_sizes = [48]
+    # fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
+    # for win in win_sizes:
+    #     fname = data_path + pot_str + '_win{}_prediction.npz'.format(win)
+    #     frac, median, lower_quart, upper_quart = load_prediction_data(fname)
+    #     fractions.append(frac)
+    #     medians.append(median)
+    #     lower_quartiles.append(lower_quart)
+    #     upper_quartiles.append(upper_quart)
+    # fig_name = '{}_{}_prediction_error'.format(samp_meth, pot_str)
+    # labels = ['window size: {}'.format(win) for win in win_sizes]
 
-# plot prediction error
-fig_name = '{}_{}_prediction_error'.format(samp_meth, pot_str)
-fig, ax = plt.subplots()
-ax.set_ylabel('Prediction error d')
-ax.set_ylim([-.5, 16])
-ax.set_xlabel('Ball position / field length')
-color_cycle = [plt.cm.rainbow(i) for i in np.linspace(0, 1, len(win_sizes))]
-ax.set_prop_cycle(cycler('color', color_cycle))
+    # # compare LIF and Gibbs
+    # pot_str = 'gauss'
+    # win_size = 48
+    # data_paths = [get_data_path('gibbs_sampling'),
+    #               get_data_path('lif_clamp_window')]
+    # fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
+    # for path in data_paths:
+    #     fname = path + pot_str + '_win{}_prediction.npz'.format(win_size)
+    #     frac, median, lower_quart, upper_quart = load_prediction_data(fname)
+    #     fractions.append(frac)
+    #     medians.append(median)
+    #     lower_quartiles.append(lower_quart)
+    #     upper_quartiles.append(upper_quart)
+    # fig_name = pot_str + '_compare_lif_gibbs_win{}'.format(win_size)
+    # labels = ['Gibbs', 'LIF']
 
-for i, win in enumerate(win_sizes):
-    ax.plot(fractions[i], medians[i], '.-')
-    ax.fill_between(fractions[i], lower_quartiles[i], upper_quartiles[i],
-                    alpha=.3, label='window: {}'.format(win_sizes[i]))
+    # compare LIF (e.g. TSO)
+    pot_str = 'pong'
+    win_size = 24
+    options = ['gibbs', '', '_static', '_renewing']
+    options = ['', '_smooth6']
+    fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
+    for s in options:
+        if s == 'gibbs':
+            path = get_data_path('gibbs_sampling')
+            s = ''
+        else:
+            path = get_data_path('lif_clamp_window')
+        fname = path + pot_str + '_win{}_prediction{}.npz'.format(win_size, s)
+        frac, median, lower_quart, upper_quart = load_prediction_data(fname)
+        fractions.append(frac)
+        medians.append(median)
+        lower_quartiles.append(lower_quart)
+        upper_quartiles.append(upper_quart)
+    fig_name = pot_str + '_compare_tso_win{}'.format(win_size)
+    # labels = ['Gibbs', 'Mixing', 'Static', 'Renewing']
+    labels = ['Binary clamping', 'Smooth clamping']
 
-plt.legend()
-plt.tight_layout()
-plt.savefig(make_figure_folder() + fig_name + '.pdf', transparent=True)
-plt.close(fig)
+    # plot prediction error
+    fig, ax = plt.subplots()
+    ax.set_ylabel('Prediction error d')
+    ax.set_ylim([-.5, 8])
+    ax.set_xlabel('Ball position / field length')
+    color_cycle = [plt.cm.rainbow(i) for i in np.linspace(0, 1, len(medians))]
+    ax.set_prop_cycle(cycler('color', color_cycle))
 
-# # plot agent performance
-# fig, ax = plt.subplots()
-# ax.set_xlabel('Agent speed / ball speed')
-# ax.set_ylabel('Success rate')
-# ax.set_ylim([0., 1.])
+    for i, med in enumerate(medians):
+        ax.plot(fractions[i], med, '.-')
+        ax.fill_between(fractions[i], lower_quartiles[i], upper_quartiles[i],
+                        alpha=.3, label=labels[i])
 
-# data_file = pot_str + '_win{}_agent_performance'.format(win_size1)
-# with np.load(get_data_path('pong_eval_agent') + data_file + '.npz') as d:
-#     success1 = d['successes']
-#     dist1 = d['distances']
-#     speeds1 = d['speeds']
-#     print('Asymptotic value (full history): {}'.format(success1.max()))
-# ax.plot(speeds1, success1, '-r', label='window: {}'.format(win_size1))
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(make_figure_folder() + fig_name + '.pdf', transparent=True)
+    plt.close(fig)
 
-# data_file = pot_str + '_win{}_agent_performance'.format(win_size2)
-# with np.load(get_data_path('pong_eval_agent') + data_file + '.npz') as d:
-#     success2 = d['successes']
-#     dist2 = d['distances']
-#     speeds2 = d['speeds']
-#     print('Asymptotic value (full history): {}'.format(success2.max()))
-# ax.plot(speeds2, success2, '-b', label='window: {}'.format(win_size2))
 
-# data_file = 'baseline_agent_performance'
-# with np.load(get_data_path('pong_eval_agent') + data_file + '.npz') as d:
-#     success_base = d['successes']
-#     dist_base = d['distances']
-#     speeds_base = d['speeds']
-#     print('Asymptotic value (comparison): {}'.format(success_base.max()))
-# ax.plot(speeds_base, success_base, '-k', label='baseline')
+def plot_agent_performance():
+    # plot agent performance
+    pot_str = 'pong'
+    win_size = 48
+    base_name = pot_str + '_win{}_agent_performance'.format(win_size)
+    labels = ['lif', 'gibbs']
+    file_names = [s + '_' + base_name for s in labels]
 
-# plt.legend()
-# plt.savefig(make_figure_folder() + pot_str + '_agent_performance.pdf')
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Agent speed / ball speed')
+    ax.set_ylabel('Success rate')
+    ax.set_ylim([0., 1.])
 
+    successes, distances, speeds = [], [], []
+    for fn in file_names:
+        suc, dis, spe = load_agent_data(fn)
+        successes.append(suc)
+        distances.append(dis)
+        speeds.append(spe)
+
+    for i, fn in enumerate(file_names):
+        ax.plot(speeds[i], successes[i], label=fn)
+
+    plt.legend()
+    plt.savefig(make_figure_folder() + pot_str + '_agent_performance.pdf')
+
+if __name__ == '__main__':
+    plot_prediction_error()
+    # plot_agent_performance()
+
+# === other plots, not functional ===
 # image dissimilarity
 # plt.errorbar(fractions, img_diff, fmt='ro', yerr=img_diff_std)
 # plt.ylabel('L2 image dissimilarity')

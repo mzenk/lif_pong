@@ -109,9 +109,9 @@ def make_animation(fig_name, img_shape, win_size, vis_samples, paddle_len=0,
     ax2.tick_params(left='off', right='off',
                     labelleft='off', labelright='off')
     ax2.set_xlabel('P(last column)')
-    # if a homogeneous picture is used here it does not work -> wtf
-    image = ax1.imshow(np.random.rand(*img_shape), interpolation='Nearest',
-                       cmap='gray', origin='lower', animated=True)
+    image = ax1.imshow(np.zeros(img_shape), vmin=0., vmax=1.,
+                       interpolation='Nearest', cmap='gray', origin='lower',
+                       animated=True)
     # barh doesnt work because apparently BarContainer has no 'set_visible'
     points, = ax2.plot([], [], 'bo')
     # ex. for adding dynamic text; must be inside bounding box to be updated
