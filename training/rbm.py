@@ -51,14 +51,14 @@ class RBM(object):
         return - np.einsum('ik,il,kl->i', v, h, self.w) - \
             v.dot(self.vbias) - h.dot(self.hbias)
 
-    def compute_partition_sum(rbm):
+    def compute_partition_sum(self):
         # visible units are too many to sum over
-        h_all = np.array(list(itertools.product([0, 1], repeat=rbm.n_hidden)))
+        h_all = np.array(list(itertools.product([0, 1], repeat=self.n_hidden)))
         log_ph = np.zeros(0)
-        n_chunks = np.ceil(h_all.shape[0] * rbm.n_visible // 1e8)
+        n_chunks = np.ceil(h_all.shape[0] * self.n_visible / 1e8)
         for h_chunk in np.array_split(h_all, n_chunks):
-            expW = np.exp(h_chunk.dot(rbm.w.T) + rbm.vbias)
-            tmp = h_chunk.dot(rbm.hbias) + np.sum(np.log(1 + expW), axis=1)
+            expW = np.exp(h_chunk.dot(self.w.T) + self.vbias)
+            tmp = h_chunk.dot(self.hbias) + np.sum(np.log(1 + expW), axis=1)
             log_ph = np.concatenate((log_ph, tmp))
         return logsum(log_ph)
 
@@ -535,13 +535,19 @@ class RBM(object):
 
                     # pseudo-likelihood
                     pl = self.compute_logpl(valid_set[subset_ind, :])
+                    # import compute_isl as isl
+                    # model = isl.ISL_density_model()
+                    # vis_samples = \
+                    #     self.draw_samples(1e4, binary=True)[:, :self.n_visible]
+                    # model.fit(vis_samples, quick=True)
+                    # isl_ll = model.avg_loglik((valid_set > .5)*1.)
 
                     # # make a histogram of the weights and relative increments
                     # w_histo = np.histogram(...)
                     # incr_histo = np.histogram(...)
 
-                    log_file.write('{} {} {}\n'.format(update_step, delta_f,
-                                                       pl))
+                    log_file.write('{} {} {}\n'.format(
+                        update_step, delta_f, pl))
 
             start_time = time.time()
             self.monitor_progress(train_data, valid_set, log_file)

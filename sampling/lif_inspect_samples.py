@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import sys
-# sys.path.insert(0, '../')
+sys.path.insert(0, '../')
 from training.rbm import RBM, CRBM
 from utils import tile_raster_images
 from utils.data_mgmt import make_figure_folder, load_images, load_rbm, get_data_path
@@ -22,25 +22,16 @@ show_label = False
 # rbm = load_rbm('mnist_disc_rbm')
 # nv = rbm.n_visible
 # nl = rbm.n_labels
-# sample_file = get_data_path('lif_dreaming') + \
-#     'mnist_samples.npz'
+# sample_file = get_data_path('lif_classification') + \
+#     'mnist_classif_15samples.npz'
 # Pong
 img_shape = (36, 48)
+n_pixels = np.prod(img_shape)
+n_labels = img_shape[0] // 3
 data_name = 'pong_var_start{}x{}'.format(*img_shape)
 _, _, test_set = load_images(data_name)
-rbm = load_rbm(data_name + '_crbm')
-nv = rbm.n_visible
-nl = rbm.n_labels
-sample_file = get_data_path('lif_clamp_window') + \
-    'pong_smooth8_win48_all_chunk002.npz'
-
-# # tests
-# sample_file = get_data_path('playground') + 'clamp_test_samples.npz'
-# img_shape = (3, 4)
-# nv = np.prod(img_shape)
-
-n_pixels = np.prod(img_shape)
-
+sample_file = get_data_path('lif_dreaming') + \
+    'pong_samples_pre.npz'
 
 with np.load(sample_file) as d:
     # samples.shape: ([n_instances], n_samples, n_units)
@@ -48,14 +39,18 @@ with np.load(sample_file) as d:
     if len(samples.shape) == 2:
         samples = np.expand_dims(samples, 0)
     data_idx = d['data_idx']
+    n_samples = samples.shape[1]
+    n_imgs = samples.shape[0]
     print('Loaded sample array with shape {}'.format(samples.shape))
-    test_data = test_set[0][data_idx]
-    test_targets = test_set[1][data_idx]
+
 
 vis_samples = samples[..., :n_pixels]
-hid_samples = samples[..., nv:]
+hid_samples = samples[..., n_pixels + n_labels:]
 if show_label:
-    lab_samples = samples[..., nv - nl:nv]
+    test_targets = test_set[1][data_idx]
+    if len(test_targets.shape) == 2:
+        test_targets = np.argmax(test_targets, axis=1)
+    lab_samples = samples[..., n_pixels:n_pixels + n_labels]
     # Compute classification performance
     labels = np.argmax(lab_samples.sum(axis=1), axis=1)
     print('Correct predictions: {}'.format((labels == test_targets).mean()))
@@ -86,8 +81,10 @@ def update_fig(i):
     idx = i % sample_imgs.shape[0]
     if show_label:
         lab_text.set_text('Active label: {}'.format(active_lab[idx]))
+    time_text.set_text('{:4d}/{} (img {})'.format(i % n_samples, n_samples,
+                                                  (i // n_samples) % n_imgs))
     im.set_data(sample_imgs[idx])
-    return im,  lab_text
+    return im, time_text, lab_text
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
@@ -95,9 +92,11 @@ im = ax.imshow(np.zeros(img_shape), vmin=0, vmax=1., interpolation='Nearest',
                cmap='gray', animated=True)
 lab_text = ax.text(0.95, 0.01, '', va='bottom', ha='right',
                    transform=ax.transAxes, color='green')
+time_text = ax.text(0.05, 0.01, '', va='bottom', ha='left',
+                    transform=ax.transAxes, color='white', fontsize=12)
 
 ani = animation.FuncAnimation(fig, update_fig, interval=20., blit=True,
                               repeat_delay=2000)
 
-# ani.save('figures/sampling.mp4')
+# ani.save(make_figure_folder() + 'sampling.mp4')
 plt.show()

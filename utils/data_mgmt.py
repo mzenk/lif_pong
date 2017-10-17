@@ -1,5 +1,6 @@
 import os
 from inspect import stack
+import socket
 import numpy as np
 import cPickle
 
@@ -51,14 +52,20 @@ def get_data_path(source_script_name):
 
 
 def load_images(data_name):
-    path = os.path.expanduser('~') + '/Projects/Pong/shared_data/datasets/'
+    if socket.gethostname() == 'asdf':
+        path = os.path.expanduser('~') + '/mnt/hel_mnt/shared_data/datasets/'
+    else:
+        path = os.path.expanduser('~') + '/Projects/Pong/shared_data/datasets/'
     with np.load(path + data_name + '.npz') as d:
         train_set, valid_set, test_set = d[d.keys()[0]]
     return train_set, valid_set, test_set
 
 
 def load_rbm(data_name):
-    path = os.path.expanduser('~') + '/Projects/Pong/shared_data/saved_rbms/'
+    if socket.gethostname() == 'asdf':
+        path = os.path.expanduser('~') + '/mnt/hel_mnt/shared_data/saved_rbms/'
+    else:
+        path = os.path.expanduser('~') + '/Projects/Pong/shared_data/saved_rbms/'
     with open(path + data_name + '.pkl', 'rb') as f:
         rbm = cPickle.load(f)
     return rbm

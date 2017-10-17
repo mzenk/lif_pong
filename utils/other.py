@@ -38,14 +38,14 @@ def make_chunks(data, n_chunks):
 
 # numerical stability
 def logsum(x, axis=0):
-    alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
-    # alpha = np.max(x, axis=axis)
+    # alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
+    alpha = np.max(x, axis=axis)
     return alpha + np.log(np.sum(np.exp(x - alpha), axis=axis))
 
 
 def logdiff(x, axis=0):
-    alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
-    # alpha = np.max(x, axis=axis)
+    # alpha = np.max(x, axis=axis) - np.log(sys.float_info.max)/2
+    alpha = np.max(x, axis=axis)
     return alpha + np.log(np.diff(np.exp(x - alpha), axis=axis)).squeeze()
 
 

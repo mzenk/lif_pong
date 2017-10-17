@@ -74,8 +74,8 @@ def plot_histograms(rbm):
 
 
 # Load data -- Pong
-img_shape = (36, 48)
-data_name = 'pong_var_start{}x{}'.format(*img_shape)
+img_shape = (18, 24)
+data_name = 'pong_fixed_start{}x{}'.format(*img_shape)
 train_set, _, test_set = load_images(data_name)
 # # Load data -- MNIST
 # import gzip
@@ -90,7 +90,8 @@ print('Number of samples: {}, {}'.format(train_set[0].shape[0],
 
 # inspect data
 np.random.seed(42)
-idx = np.random.choice(np.arange(len(train_set[0])), size=25, replace=False)
+# idx = np.random.choice(np.arange(len(train_set[0])), size=25, replace=False)
+idx = np.arange(3)
 plot_data(train_set, idx, img_shape)
 print(train_set[0].shape)
 # # RBM-specific plots

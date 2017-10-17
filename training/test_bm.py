@@ -69,7 +69,7 @@ myrbm = RBM(nv, nh)
 
 # generate samples from true distribution and train bm
 train = RBM(nv, nh, w_small, np.zeros(nv), np.zeros(nh))
-train_samples = train.draw_samples(int(2e3), binary=True)
+train_samples = train.draw_samples(int(1e4), binary=True)
 v_train_samples = train_samples[1000:, :nv]
 
 valid = train.draw_samples(2000, binary=True)[1500:, :nv]

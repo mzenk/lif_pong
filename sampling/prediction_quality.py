@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 mpl.rcParams['font.size'] = 14
 # mpl.rcParams['text.usetex'] = True
 
-img_shape = (18, 24)
+img_shape = (36, 48)
 n_labels = img_shape[0]//3
 
 
@@ -25,11 +25,15 @@ def load_prediction_data(file_name, use_labels=False):
             data_idx = d['data_idx']
         else:
             data_idx = np.arange(len(avg_vis))
+        if 'winpos' in d.keys():
+            winpos = d['winpos']
+        else:
+            winpos = np.arange(avg_vis.shape[1])
 
     lab2pxl = img_shape[0] / n_labels
     # compare vis_prediction not to label but to actual pixels
     data_name = os.path.basename(file_name).split('_')[0] + \
-        '_fixed_start{}x{}'.format(*img_shape)
+        '_var_start{}x{}'.format(*img_shape)
     _, _, test_set = load_images(data_name)
     if use_labels:
         targets = average_helper(n_labels, test_set[1]) * lab2pxl
@@ -51,7 +55,7 @@ def load_prediction_data(file_name, use_labels=False):
     dist_median = np.percentile(dist, 50, axis=0)
     dist_quartile_lower = np.percentile(dist, 25, axis=0)
     dist_quartile_upper = np.percentile(dist, 75, axis=0)
-    fractions = np.linspace(0, 1, avg_lab.shape[1])
+    fractions = winpos / img_shape[1]
     return fractions, dist_median, dist_quartile_lower, dist_quartile_upper
 
 
@@ -82,7 +86,7 @@ def plot_prediction_error():
     # labels = ['window size: {}'.format(win) for win in win_sizes]
 
     # # compare LIF and Gibbs
-    # pot_str = 'gauss'
+    # pot_str = 'pong'
     # win_size = 48
     # data_paths = [get_data_path('gibbs_sampling'),
     #               get_data_path('lif_clamp_window')]
@@ -99,13 +103,16 @@ def plot_prediction_error():
 
     # compare LIF (e.g. TSO)
     pot_str = 'pong'
-    win_size = 24
-    options = ['gibbs', '', '_static', '_renewing']
-    options = ['', '_smooth6']
+    win_size = 48
+    # options = ['gibbs', '', '_static', '_renewing']
+    options = ['gibbs', 'fast', '']
     fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
     for s in options:
         if s == 'gibbs':
             path = get_data_path('gibbs_sampling')
+            s = '_test'
+        elif s == 'fast':
+            path = get_data_path('lif_performance')
             s = ''
         else:
             path = get_data_path('lif_clamp_window')
@@ -117,12 +124,12 @@ def plot_prediction_error():
         upper_quartiles.append(upper_quart)
     fig_name = pot_str + '_compare_tso_win{}'.format(win_size)
     # labels = ['Gibbs', 'Mixing', 'Static', 'Renewing']
-    labels = ['Binary clamping', 'Smooth clamping']
+    labels = ['Gibbs', 'Fast', 'Smooth clamping']
 
     # plot prediction error
     fig, ax = plt.subplots()
     ax.set_ylabel('Prediction error d')
-    ax.set_ylim([-.5, 8])
+    ax.set_ylim([-.5, 16])
     ax.set_xlabel('Ball position / field length')
     color_cycle = [plt.cm.rainbow(i) for i in np.linspace(0, 1, len(medians))]
     ax.set_prop_cycle(cycler('color', color_cycle))

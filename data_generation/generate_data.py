@@ -50,13 +50,12 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
         starts = np.array([[field[1]*.5]])
         fname = pot_str + '_fixed_start{1}x{0}'.format(grid[0], grid[1])
     else:
-        nangles = 400
-        nstarts = 100
+        nangles = 100  # 400
+        nstarts = 40   # 100
         starts = field[1]*np.random.beta(1.5, 1.5, nstarts)
         fname = pot_str + '_var_start{1}x{0}'.format(grid[0], grid[1])
     # draw for each start position nangles angles
     angles = max_angle * 2*(np.random.rand(nstarts, nangles) - .5)
-    # fname = 'testdata'
 
     data = np.zeros((angles.size, np.prod(grid)))
     impact_points = np.zeros(angles.size)
@@ -123,7 +122,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
         valid_labels = labels[size_train: -size_test]
         test_set = data[-size_test:]
         test_labels = labels[-size_test:]
-        # fname = 'pong_var_overlap2'
+
         np.savez_compressed(make_data_folder('datasets', True) + fname,
                             ((train_set, train_labels),
                              (valid_set, valid_labels),
@@ -132,10 +131,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
 
 
 if __name__ == '__main__':
-    generate_data([24, 18], pot_str='pong', fixed_start=True, save=True)
-    # generate_data([48, 36], pot_str='pong', fixed_start=False, save=True)
-    # generate_data([48, 36], pot_str='gauss', fixed_start=True, save=False)
-    # generate_data([48, 36], pot_str='gauss', fixed_start=False, save=True)
+    generate_data([24, 18], pot_str='pong', fixed_start=False, save=True)
 
     # # check balancing of dataset
     # plt.figure()

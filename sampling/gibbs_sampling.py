@@ -95,22 +95,30 @@ class Clamp_window(object):
 
 
 # pong pattern completion
-if len(sys.argv) != 5:
+if len(sys.argv) < 5:
     print('Please specify the arguments:'
-          ' pong/gauss, start_idx, chunk_size, win_size')
+          ' pong/gauss, start_idx, chunk_size, win_size, [name_modifier]')
     sys.exit()
 pot_str = sys.argv[1]
 start = int(sys.argv[2])
 chunk_size = int(sys.argv[3])
 win_size = int(sys.argv[4])
+if len(sys.argv) == 6:
+    modifier = str(sys.argv[5])
+else:
+    modifier = ''
+
+save_name = pot_str + '_win{}{}_avg_chunk{:03d}'.format(win_size, modifier,
+                                                        start // chunk_size)
 
 img_shape = (36, 48)
 n_pxls = np.prod(img_shape)
 data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
 np.random.seed(5116838)
 # settings for sampling/clamping
-n_samples = 100
-burnin = 20
+n_samples = 20
+burnin = 0
+# no burnin once actual simulation has started
 duration = (img_shape[1] + 1) * (n_samples + burnin)
 clamp = Clamp_window(img_shape, n_samples + burnin, win_size)
 # clamp = Clamp_anything([0.], get_windowed_image_index(
@@ -124,8 +132,6 @@ end = min(start + chunk_size, len(test_set[0]))
 idx = np.arange(start, end)
 chunk = test_set[0][idx]
 targets = test_set[1][idx]
-save_name = pot_str + '_win{}_avg_chunk{:03d}'.format(win_size,
-                                                      start // chunk_size)
 
 print('Running gibbs simulation for instances {} to {}'.format(start, end))
 vis_samples, _ = \

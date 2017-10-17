@@ -81,8 +81,7 @@ def vmean(v_rest, neuron_params, noise_params):
             g_exc*neuron_params['e_rev_E']) / (g_l + g_inh + g_exc)
 
 
-def vmem_dist(config_file, mean_as_x=False):
-    global sample_params, noise_params
+def vmem_dist(config_file):
     sampler_config = sbs.db.SamplerConfiguration.load(config_file)
 
     sampler = sbs.samplers.LIFsampler(sampler_config, sim_name=sim_name)
@@ -98,10 +97,17 @@ def vmem_dist(config_file, mean_as_x=False):
     plt.ylabel('P')
     plt.savefig('free_vmem_dist.png')
 
+
+def plot_calibration(config_file, mean_as_x=False, neuron_params=None,
+                     noise_params=None):
+    sampler_config = sbs.db.SamplerConfiguration.load(config_file)
+    sampler = sbs.samplers.LIFsampler(sampler_config, sim_name=sim_name)
+
     samples_vrest = sampler.calibration.get_samples_v_rest()
     x_data = samples_vrest
     if mean_as_x:
-        x_data = vmean(samples_vrest, sample_params, noise_params)
+        assert neuron_params is not None and noise_params is not None
+        x_data = vmean(samples_vrest, neuron_params, noise_params)
     samples_pon = sampler.calibration.samples_p_on
 
     p0 = [(x_data.max() + x_data.min())/2,
@@ -184,9 +190,12 @@ dodo_noise = {
     'w_inh'    : -.0035
 }
 
+if __name__ == '__main__':
+    # calibrate first if necessary
+    # calibration(dodo_params, dodo_noise, 'calibrations/dodo_calib')
 
-# calibrate first if necessary
-calibration(dodo_params, dodo_noise, 'calibrations/dodo_calib')
+    # # check HCS
+    # vmem_dist('calibrations/dodo_calib.json')
 
-# # check HCS
-# vmem_dist('mihai_calib.json')
+    # re-plot activation function
+    plot_calibration('calibrations/tutorial_calib.json')

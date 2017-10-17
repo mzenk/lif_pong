@@ -5,11 +5,82 @@ import numpy as np
 import lif_clamped_sampling as lifsampl
 from utils.data_mgmt import make_data_folder, load_images, load_rbm
 from rbm import RBM, CRBM
-import multiprocessing as mp
-from functools import partial
+
+# ==========
+# das hier kommt in lif_clamped_sampling.py
+
+def setup_and_create(
+        network, duration, dt=0.1, burn_in_time=0., create_kwargs=None,
+        sim_setup_kwargs=None, initial_vmem=None):
+    if sim_setup_kwargs is None:
+        sim_setup_kwargs = {}
+
+    sim.setup(timestep=dt, **sim_setup_kwargs)
+
+    if create_kwargs is None:
+        create_kwargs = {}
+    network.create(duration=duration + burn_in_time, **create_kwargs)
+
+    network.population.record("spikes")
+    if initial_vmem is not None:
+        network.population.initialize(v=initial_vmem)
 
 
-def lif_classify(test_imgs, rbm, calib_file, sbs_kwargs, n_samples=50):
+def run_simulation(network, duration, dt=0.1, burn_in_time=0., clamp_fct=None):
+    """
+        clamp_fct: method handle that returns clamped indices and values;
+        is called by the ClampCallback object, which then adjusts the biases
+        accordingly
+    """
+    sim.reset()
+    population = network.population
+    log.info("Gathering spike data...")
+
+    callbacks = get_callbacks(sim, {
+            "duration": duration,
+            "offset": burn_in_time,
+            })
+
+    t_start = time.time()
+    if burn_in_time > 0.:
+        log.info("Burning in samplers for {} ms".format(burn_in_time))
+        sim.run(burn_in_time)
+        eta_from_burnin(t_start, burn_in_time, duration)
+
+    # add clamping functionality
+    callbacks.append(
+        ClampCallback(network, clamp_fct, duration, offset=burn_in_time))
+    log.info("Starting data gathering run.")
+    sim.run(duration, callbacks=callbacks)
+
+    if isinstance(population, sim.common.BasePopulation):
+        spiketrains = population.get_data("spikes").segments[0].spiketrains
+    else:
+        spiketrains = np.vstack(
+                [pop.get_data("spikes").segments[0].spiketrains[0]
+                 for pop in population])
+
+    # we need to ignore the burn in time
+    clean_spiketrains = []
+    for st in spiketrains:
+        clean_spiketrains.append(np.array(st[st > burn_in_time])-burn_in_time)
+
+    return_data = {
+            "spiketrains": clean_spiketrains,
+            "duration": duration,
+            "dt": dt,
+            }
+
+    return return_data
+
+
+def end():
+    sim.end()
+
+# ==========
+
+
+def lif_classify_fast(test_imgs, rbm, calib_file, sbs_kwargs, n_samples=50):
     # Bring weights and biases into right form
     w, b = rbm.bm_params()
     sampling_interval = sbs_kwargs['sampling_interval']
@@ -21,48 +92,25 @@ def lif_classify(test_imgs, rbm, calib_file, sbs_kwargs, n_samples=50):
 
     duration = n_samples * sampling_interval
 
-    pool = mp.Pool(processes=8)
-    sample_clamped = partial(lifsampl.sample_network_clamped,
-                             calib_file, w, b, duration, **sbs_kwargs)
-    results = []
-    for img in test_imgs:
-        clamp_fct = lifsampl.Clamp_anything(refresh_times, clamped_idx, img)
-        results.append(pool.apply_async(
-            sample_clamped, kwds={'clamp_fct': clamp_fct}))
-    pool.close()
-    pool.join()
-    samples = np.array([r.get() for r in results])
-
-    lab_samples = samples[..., rbm.n_visible - rbm.n_labels:rbm.n_visible]
-    # return mean activities of label layer
-    return lab_samples.sum(axis=1), samples
-
-
-def lif_classify_serial(test_imgs, rbm, calib_file, sbs_kwargs, n_samples=50):
-    # Bring weights and biases into right form
-    w, b = rbm.bm_params()
-    sampling_interval = sbs_kwargs['sampling_interval']
-    # clamp all but labels
-    clamped_mask = np.ones(img_shape)
-    clamped_mask = clamped_mask.flatten()
-    clamped_idx = np.nonzero(clamped_mask == 1)[0]
-    refresh_times = np.array([0])
-
-    duration = n_samples * sampling_interval
     bm = lifsampl.initialise_network(
         calib_file, w, b, tso_params=sbs_kwargs['tso_params'])
-    samples = []
     kwargs = {k: sbs_kwargs[k] for k in ('dt', 'sim_setup_kwargs',
                                          'burn_in_time')}
+    lifsampl.setup_and_create(bm, duration, **kwargs)
+
+    samples = []
+    del kwargs['sim_setup_kwargs']
     for img in test_imgs:
         clamp_fct = lifsampl.Clamp_anything(refresh_times, clamped_idx, img)
-        bm.spike_data = lifsampl.gather_network_spikes_clamped(
+        bm.spike_data = lifsampl.run_simulation(
             bm, duration, clamp_fct=clamp_fct, **kwargs)
         samples.append(bm.get_sample_states(sampling_interval))
+    lifsampl.end()
     samples = np.array(samples)
     lab_samples = samples[..., rbm.n_visible - rbm.n_labels:rbm.n_visible]
     # return mean activities of label layer
     return lab_samples.sum(axis=1), samples
+
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:
@@ -114,7 +162,7 @@ if __name__ == '__main__':
 
     n_pixels = np.prod(img_shape)
 
-    label_mean, samples = lif_classify_serial(
+    label_mean, samples = lif_classify_fast(
         test_set[0][start:end], rbm, 'calibrations/' + calib_file, sbs_kwargs,
         n_samples)
 
@@ -125,23 +173,3 @@ if __name__ == '__main__':
                         )
     labels = np.argmax(label_mean, axis=1)
     print('Correct predictions: {}'.format((labels == test_targets).mean()))
-
-    # # I would like to use the reset mechanism so that I don't have to setup the
-    # # network over and over again but somehow it doesn't work (clamping is not changed)
-    # # lifsampl.setup_simulation(sim_dt, sim_setup_kwargs)
-    # # # connect pyNN neurons
-    # # lifsampl.make_network_connections(bm, duration, burn_in_time=burn_in)
-    # # lifsampl.simulate_network(bm, duration, dt=sim_dt, reset=(i != 0),
-    # #                               burn_in_time=burn_in_time, clamp_fct=clamp_fct)
-    # #     samples[i] = bm.get_sample_states(sampling_interval)
-    # # lifsampl.end_simulation()
-
-    # np.savez_compressed(make_data_folder() + save_file,
-    #                     samples=samples,
-    #                     data_idx=np.arange(start, end),
-    #                     n_samples=n_samples
-    #                     )
-
-    # # compute classification rate
-    # labels = np.argmax(samples.sum(axis=1), axis=1)
-    # print('Correct predictions: {}'.format((labels == test_targets).mean()))

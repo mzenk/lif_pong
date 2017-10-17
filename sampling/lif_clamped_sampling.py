@@ -97,8 +97,9 @@ def gather_network_spikes_clamped(
         eta_from_burnin(t_start, burn_in_time, duration)
 
     # add clamping functionality
-    callbacks.append(
-        ClampCallback(network, clamp_fct, duration, offset=burn_in_time))
+    if clamp_fct is not None:
+        callbacks.append(
+            ClampCallback(network, clamp_fct, duration, offset=burn_in_time))
     log.info("Starting data gathering run.")
     sim.run(duration, callbacks=callbacks)
 
@@ -205,6 +206,18 @@ class ClampCallback(object):
         biases[soft] = inv_sigma(clamped_val[soft])
         return biases
 
+    def smooth_biases_new(self, clamped_val, off_thresh=.2, on_thresh=.8):
+        def inv_sigma(p):
+            return np.log(p / (1 - p))
+        hard_on = clamped_val > on_thresh
+        hard_off = clamped_val < off_thresh
+        soft = np.logical_not(np.logical_or(hard_on, hard_off))
+        biases = np.ones_like(clamped_val)
+        biases[hard_off] = -self.on_bias
+        biases[hard_on] = self.on_bias
+        biases[soft] = inv_sigma(clamped_val[soft])
+        return biases
+
 
 # Custom clamping methods -> functors that are called from ClampCallback
 class Clamp_anything(object):
@@ -214,6 +227,7 @@ class Clamp_anything(object):
             self.clamped_idx = np.expand_dims(clamped_idx, 0)
             self.clamped_val = np.expand_dims(clamped_val, 0)
         else:
+            assert len(refresh_times) == len(clamped_idx) == len(clamped_val)
             self.clamped_idx = clamped_idx
             self.clamped_val = clamped_val
         self.refresh_times = refresh_times

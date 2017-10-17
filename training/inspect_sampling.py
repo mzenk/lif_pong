@@ -5,11 +5,11 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from utils import tile_raster_images
-from utils.data_mgmt import load_rbm
+from utils.data_mgmt import load_rbm, load_images, make_figure_folder
 
 
 def plot_samples(rbm, n_samples, img_shape):
-    samples = testrbm.draw_samples(n_samples)
+    samples = testrbm.draw_samples(n_samples*100)
     tiled_samples = tile_raster_images(samples[::100, :np.prod(img_shape)],
                                        img_shape=img_shape,
                                        tile_shape=(10, 10),
@@ -18,15 +18,22 @@ def plot_samples(rbm, n_samples, img_shape):
 
     plt.figure()
     plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-    plt.savefig('./figures/samples.png')
+    plt.savefig(make_figure_folder() + 'samples.png')
 
 
 # Load rbm and data
-testrbm = load_rbm('mnist_disc_rbm')
-with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
-    _, _, test_set = np.load(f)
-img_shape = (28, 28)
+# testrbm = load_rbm('mnist_disc_rbm')
+# with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
+#     _, _, test_set = np.load(f)
+# img_shape = (28, 28)
+
+img_shape = (18, 24)
+data_name = 'pong_var_start{}x{}'.format(*img_shape)
+testrbm = load_rbm(data_name + '_crbm')
+_, _, test_set = load_images(data_name)
 n_pixels = np.prod(img_shape)
+
+plot_samples(testrbm, 100, img_shape)
 
 
 # # samples with partially clamped inputs
@@ -99,7 +106,10 @@ n_pixels = np.prod(img_shape)
 
 # classification performance
 test_data = test_set[0]
-test_targets = test_set[1]
+if len(test_set[1].shape) == 2:
+    test_targets = np.argmax(test_set[1], axis=1)
+else:
+    test_targets = test_set[1]
 prediction = testrbm.classify(test_data)
 crate = 100 * np.average(prediction == test_targets)
 print('Correct predictions: {:.2f} %'.format(crate))

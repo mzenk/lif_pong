@@ -6,20 +6,25 @@ from utils.data_mgmt import get_data_path
 import os
 import sys
 
-if len(sys.argv) != 3:
-    print('Please specify the arguments: pong/gauss, win_size')
+if len(sys.argv) < 3:
+    print('Please specify the arguments: pong/gauss, win_size, [name_modifier]')
     sys.exit()
 
 pot_str = sys.argv[1]
 win_size = int(sys.argv[2])
+if len(sys.argv) == 4:
+    modifier = str(sys.argv[3])
+else:
+    modifier = ''
 
-n_labels = 12
 img_shape = (36, 48)
-data_name = pot_str + '_win{}_avg_chunk'.format(win_size)
+n_labels = img_shape[0]//3
+data_name = pot_str + '_win{}{}_avg_chunk'.format(win_size, modifier)
 
 lab, last_col, data_idx = 0, 0, 0
 data_path = get_data_path('gibbs_sampling')
-save_name = data_path + '_'.join(data_name.split('_')[:2]) + '_prediction'
+save_name = data_path + '_'.join(data_name.split('_')[:2]) + '_prediction' + \
+    modifier
 
 data_counter = 0
 for i in np.arange(150):
@@ -41,7 +46,7 @@ for i in np.arange(150):
     last_col = tmp_col if i == 0 else np.vstack((last_col, tmp_col))
     data_idx = chunk_idx if i == 0 else np.concatenate((data_idx, chunk_idx))
 
-if data_counter < 10000:
+if data_counter < 1000:
     save_name += '_incomplete'
 # save data (averaged samples for label units and last column)
 np.savez_compressed(save_name, label=lab, last_col=last_col, data_idx=data_idx)

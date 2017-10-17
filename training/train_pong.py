@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 
 
 # Load Pong data
-img_shape = (18, 24)
+img_shape = (36, 48)
 save = True
-fname = 'pong_fixed_start{}x{}'.format(*img_shape)
+fname = 'pong_var_start{}x{}'.format(*img_shape)
 train_set, valid_set, test_set = load_images(fname)
 
 n_pxls = train_set[0].shape[1]
@@ -33,13 +33,14 @@ else:
 assert np.prod(img_shape) == n_pxls
 
 training_params = {
-    'n_epochs': 20,
+    'n_epochs': 30,
     'batch_size': 20,
-    'lrate': .2,
+    'lrate': .1,
     'cd_steps': 5,
     'persistent': True,
+    'cast': True,
     'momentum': 0.5,
-    'weight_cost': 1e-4
+    'weight_cost': 5e-4
 }
 
 mf_params = {
@@ -87,7 +88,7 @@ if sys.argv[1] == 'dis':
     pj[pj == 0] = 1e-5
     pj[pj == 1] = 1 - 1e-5
     bias_init = np.log(pj / (1 - pj))
-    n_hidden = 400
+    n_hidden = 200
     # for r in [.001, .01, .1]:
     #     training_params['lrate'] = r
     #     print(r)
@@ -106,7 +107,7 @@ if sys.argv[1] == 'dis':
     if save:
         # Save crbm for later inspection, the training parameters should be
         # recorded elsewhere!
-        with open(make_data_folder('saved_rbms', True) + fname + '_crbm.pkl', 'wb') as output:
+        with open(make_data_folder('saved_rbms', True) + fname + '_crbm_cast.pkl', 'wb') as output:
             cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
 
 if sys.argv[1] == 'deep':

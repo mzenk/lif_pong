@@ -13,8 +13,7 @@ dt = .1
 sim.setup(timestep=dt, **{"spike_precision": "on_grid", 'quit_on_end': False})
 
 # === Build and instrument the network =======================================
-spike_times = 10. + numpy.sort(numpy.random.rand(10)*90.)
-spike_times = numpy.linspace(10., 260., 25.)
+spike_times = range(100, 1100, 20)
 spike_source = sim.Population(
     1, sim.SpikeSourceArray(spike_times=spike_times))
 
@@ -39,47 +38,45 @@ dodo_params = {
         "tau_refrac" : 10.,
         "i_offset"   : 0.,
     }
-n_biases = 10
-v_rest_arr = dodo_params['v_thresh'] + \
-    (dodo_params['v_thresh'] - dodo_params['v_rest'])*np.logspace(0, 3, n_biases)
-populations = {}
-projections = {}
+
+weights = np.arange(.01, .2, .01)
 coba_lif = sim.IF_cond_exp(**dodo_params)
-population = sim.Population(n_biases, coba_lif)
-population.set(v_rest=v_rest_arr)
-population.record('v')
-# projection = sim.Projection(spike_source, population,
-#                             connector, receptor_type='excitatory',
-#                             synapse_type=sim.StaticSynapse(weight=weight))
+populations = []
+projections = []
+for i, w in enumerate(weights):
+    populations.append(sim.Population(1, coba_lif))
+    populations[i].record(['v', 'spikes'])
+    projections.append(sim.Projection(
+        spike_source, populations[i], connector, receptor_type='excitatory',
+        synapse_type=sim.StaticSynapse(weight=w)))
 
 spike_source.record('spikes')
 
 # === Run the simulation =====================================================
-duration = 2000.
+duration = 1100.
 sim.run(duration)
 
 # === Save the results, optionally plot a figure =============================
 
-figure_filename = 'high_bias.pdf'
+figure_filename = 'test.pdf'
 plt.figure()
-vmems = population.get_data().segments[0].filter(name='v')[0].T
-p_on = np.zeros_like(v_rest_arr)
-for i, v in enumerate(vmems):
-    t = np.linspace(0, duration, len(v))
-    t_on = (v.magnitude == dodo_params['v_reset']).sum() * dt
-    p_on[i] = t_on/duration
-    plt.plot(t, v, '.', label='E_l: {}'.format(v_rest_arr[i]))
-plt.xlabel('t [ms]')
-plt.ylabel('membrane potential')
-plt.tight_layout()
-plt.legend()
-plt.savefig(make_figure_folder() + figure_filename, transparent=True)
 
-plt.figure()
-plt.semilogx(v_rest_arr - dodo_params['v_thresh'], p_on, '.')
-plt.xlabel('v_rest')
-plt.ylabel('p_on')
-plt.savefig(make_figure_folder() + 'activity.png')
+vmem = []
+p_on = []
+for i, pop in enumerate(populations):
+    vmem.append(pop.get_data().segments[0].filter(name='v')[0])
+    spiketrain = pop.get_data().segments[0].spiketrains[0]
+    p_on.append(len(spiketrain)*10./(duration - 100.))
+    t = np.linspace(0, duration, len(vmem[0]))
+#     plt.plot(t, vmem[i], '-', label='Weight: {:.2f}'.format(weights[i]))
+# plt.xlabel('t [ms]')
+# plt.ylabel('membrane potential')
+# plt.tight_layout()
+# plt.legend()
+# plt.savefig(make_figure_folder() + figure_filename)
+
+plt.plot(weights, p_on, '.')
+plt.savefig(make_figure_folder() + 'scan.pdf')
 
 # === Clean up and quit =======================================================
 
