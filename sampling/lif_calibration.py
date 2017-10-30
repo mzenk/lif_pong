@@ -123,6 +123,9 @@ def plot_calibration(config_file, mean_as_x=False, neuron_params=None,
     plt.ylabel('P(on)')
     plt.legend()
     plt.savefig('calibration.png')
+    print('SBS-fit parameters: u0 = {}, alpha = {}'.format(*sbs_popt))
+    print('My fit parameters: u0 = {2:.4f} +- {0:.4f},'
+          ' alpha = {3:.4f} +- {1:.4f}'.format(pcov[0, 0], pcov[1, 1], *popt))
 
 
 # some example neuron parameters
@@ -198,4 +201,4 @@ if __name__ == '__main__':
     # vmem_dist('calibrations/dodo_calib.json')
 
     # re-plot activation function
-    plot_calibration('calibrations/tutorial_calib.json')
+    plot_calibration('calibrations/dodo_calib.json')

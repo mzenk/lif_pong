@@ -48,13 +48,21 @@ def lif_window_expt_serial(win_size, test_imgs, rbm, calib_file, sbs_kwargs,
         calib_file, w, b, tso_params=sbs_kwargs['tso_params'])
     kwargs = {k: sbs_kwargs[k] for k in ('dt', 'sim_setup_kwargs',
                                          'burn_in_time')}
+    tso_clamp = {
+        "U": 1.,
+        "tau_rec": 10.,
+        "tau_fac": 0.
+    }
     results = []
     for img in test_imgs:
         clamp_fct = lifsampl.Clamp_window(
             clamp_duration, img.reshape(img_shape), win_size)
         # results.append(sample_clamped(clamp_fct=clamp_fct))
-        bm.spike_data = lifsampl.gather_network_spikes_clamped(
-            bm, duration, clamp_fct=clamp_fct, **kwargs)
+        # bm.spike_data = lifsampl.gather_network_spikes_clamped(
+        #     bm, duration, clamp_fct=clamp_fct, **kwargs)
+        bm.spike_data = lifsampl.gather_network_spikes_clamped_bn(
+            bm, duration, rbm.n_inputs, clamp_fct=clamp_fct,
+            clamp_tso_params=tso_clamp, **kwargs)
         results.append(bm.get_sample_states(sampling_interval))
     return np.array(results)
 

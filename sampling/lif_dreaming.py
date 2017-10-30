@@ -28,6 +28,7 @@ def dreaming_expt(rbm_name, n_samples, calib_file, burn_in_time=500.,
     np.savez_compressed(save_name, samples=samples,
                         tso_params=(tso_params['U'], tso_params['tau_rec'],
                                     tso_params['tau_fac']))
+    return samples
 
 
 if __name__ == '__main__':
@@ -39,7 +40,7 @@ if __name__ == '__main__':
         kwargs = config[1]
         dreaming_expt(*args, **kwargs)
     else:
-        n_samples = int(2e3)
+        n_samples = int(1e4)
         burn_in_time = 500.
         sampling_interval = 10.  # == tau_refrac [ms]
 

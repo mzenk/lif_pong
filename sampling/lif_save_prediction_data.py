@@ -18,7 +18,7 @@ pot_str = sys.argv[1]
 win_size = int(sys.argv[2])
 script_name = sys.argv[3]
 if len(sys.argv) == 5:
-    modifier = str(sys.argv[4])
+    modifier = '_' + str(sys.argv[4])
 else:
     modifier = ''
 img_shape = (36, 48)
@@ -29,7 +29,7 @@ data_name = pot_str + '_win{}{}_chunk'.format(win_size, modifier)
 lab, last_col, data_idx = 0, 0, 0
 sample_data_path = get_data_path(script_name)
 save_name = sample_data_path + '_'.join(data_name.split('_')[:2]) + \
-    '_prediction' + modifier
+    modifier + '_prediction'
 
 for i in np.arange(100):
     path = sample_data_path + data_name + '{:03d}.npz'.format(i)

@@ -113,20 +113,23 @@ save_name = pot_str + '_win{}{}_avg_chunk{:03d}'.format(win_size, modifier,
 
 img_shape = (36, 48)
 n_pxls = np.prod(img_shape)
-data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
 np.random.seed(5116838)
 # settings for sampling/clamping
 n_samples = 20
-burnin = 0
+between_burnin = 0
 # no burnin once actual simulation has started
-duration = (img_shape[1] + 1) * (n_samples + burnin)
-clamp = Clamp_window(img_shape, n_samples + burnin, win_size)
+duration = (img_shape[1] + 1) * (n_samples + between_burnin)
+clamp = Clamp_window(img_shape, n_samples + between_burnin, win_size)
 # clamp = Clamp_anything([0.], get_windowed_image_index(
 #             img_shape, (4 + img_shape[1])//2, img_shape[1]))
 
 # Load Pong data and rbm
+data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
+rbm_name = data_name + '_crbm'
+if pot_str == 'knick':
+    rbm_name = 'pong_var_start{}x{}_crbm'.format(*img_shape)
 _, _, test_set = load_images(data_name)
-rbm = load_rbm(data_name + '_crbm')
+rbm = load_rbm(rbm_name)
 
 end = min(start + chunk_size, len(test_set[0]))
 idx = np.arange(start, end)
@@ -137,7 +140,8 @@ print('Running gibbs simulation for instances {} to {}'.format(start, end))
 vis_samples, _ = \
     run_simulation(rbm, duration, chunk, burnin=100, clamp_fct=clamp)
 vis_samples = average_pool(np.swapaxes(vis_samples, 0, 1), n_samples,
-                           stride=n_samples + burnin, offset=burnin)
+                           stride=n_samples + between_burnin,
+                           offset=between_burnin)
 
 # save averaged(!) samples
 np.savez_compressed(make_data_folder() + save_name,

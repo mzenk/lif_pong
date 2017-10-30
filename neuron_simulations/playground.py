@@ -13,7 +13,8 @@ dt = .1
 sim.setup(timestep=dt, **{"spike_precision": "on_grid", 'quit_on_end': False})
 
 # === Build and instrument the network =======================================
-spike_times = range(100, 1100, 20)
+rates = np.linspace(.1, 1, 20) * .1
+spike_times = range(100, 1100, 10)
 spike_source = sim.Population(
     1, sim.SpikeSourceArray(spike_times=spike_times))
 
@@ -39,7 +40,7 @@ dodo_params = {
         "i_offset"   : 0.,
     }
 
-weights = np.arange(.01, .2, .01)
+weights = np.arange(.01, .05, .5e-3)
 coba_lif = sim.IF_cond_exp(**dodo_params)
 populations = []
 projections = []

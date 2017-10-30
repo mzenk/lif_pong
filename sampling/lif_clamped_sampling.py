@@ -8,7 +8,8 @@ import sys
 import numpy as np
 import pyNN.nest as sim
 
-
+# from sbs.logcfg import set_loglevel
+# set_loglevel(log, 3)
 sbs.gather_data.set_subprocess_silent(True)
 
 
@@ -55,6 +56,33 @@ def sample_network_clamped(
     samples = network.get_sample_states(sampling_interval)
 
     return samples
+
+
+def initialise_network(config_file, weights, biases, tso_params=None):
+    if weights is None or biases is None:
+        print('Please provide weights and biases.')
+        sys.exit()
+
+    sampler_config = sbs.db.SamplerConfiguration.load(config_file)
+
+    assert len(biases) == weights.shape[0] == weights.shape[1]
+    bm = sbs.network.ThoroughBM(num_samplers=len(biases),
+                                sampler_config=sampler_config)
+    bm.weights_theo = weights
+    bm.biases_theo = biases
+    # NOTE: By setting the theoretical weights and biases, the biological
+    # ones automatically get calculated on-demand by accessing
+    # bm.weights_bio and bm.biases_bio
+
+    if tso_params is None:
+        bm.saturating_synapses_enabled = False
+    else:
+        bm.saturating_synapses_enabled = True
+        if tso_params != 'renewing':
+            bm.tso_params = tso_params
+            bm.weights_bio /= tso_params['U']
+        bm.use_proper_tso = True
+    return bm
 
 
 def gather_network_spikes_clamped(
@@ -125,31 +153,193 @@ def gather_network_spikes_clamped(
     return return_data
 
 
-def initialise_network(config_file, weights, biases, tso_params=None):
-    if weights is None or biases is None:
-        print('Please provide weights and biases.')
-        sys.exit()
+def gather_network_spikes_clamped_bn(
+        network, duration, nv, dt=0.1, burn_in_time=0., create_kwargs=None,
+        sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None,
+        clamp_tso_params=None):
+    """
+        create_kwargs: Extra parameters for the networks creation routine.
 
-    sampler_config = sbs.db.SamplerConfiguration.load(config_file)
+        sim_setup_kwargs: Extra parameters for the setup command (random seeds
+        etc.).
 
-    assert len(biases) == weights.shape[0] == weights.shape[1]
-    bm = sbs.network.ThoroughBM(num_samplers=len(biases),
-                                sampler_config=sampler_config)
-    bm.weights_theo = weights
-    bm.biases_theo = biases
-    # NOTE: By setting the theoretical weights and biases, the biological
-    # ones automatically get calculated on-demand by accessing
-    # bm.weights_bio and bm.biases_bio
+        clamp_fct: method handle that returns clamped indices and values;
+        is called by the ClampCallback object, which then adjusts the biases
+        accordingly
+    """
+    log.info("Gathering spike data...")
+    if sim_setup_kwargs is None:
+        sim_setup_kwargs = {}
 
-    if tso_params is None:
-        bm.saturating_synapses_enabled = False
+    sim.setup(timestep=dt, **sim_setup_kwargs)
+
+    if create_kwargs is None:
+        create_kwargs = {}
+    population, projections = network.create(duration=duration + burn_in_time,
+                                             **create_kwargs)
+    # set up second population and connect
+    spike_interval = 10.   # ms
+    cont_firing_train = burn_in_time + np.arange(dt, duration, spike_interval)
+    spikesource = sim.SpikeSourceArray(spike_times=cont_firing_train)
+    bias_neurons = sim.Population(nv, spikesource)
+    bn_connector = sim.OneToOneConnector()
+    if clamp_tso_params is None:
+        bn_synapse = sim.StaticSynapse(weight=0.)
     else:
-        bm.saturating_synapses_enabled = True
-        if tso_params != 'renewing':
-            bm.tso_params = tso_params
-            bm.weights_bio /= tso_params['U']
-        bm.use_proper_tso = True
-    return bm
+        sim.nest.CopyModel("tsodyks2_synapse", "avoid_pynn_trying_to_be_smart")
+        bn_synapse = sim.native_synapse_type("avoid_pynn_trying_to_be_smart")(
+            **clamp_tso_params)
+
+    # make excitatory AND inhibitory connections
+    exc_bn_proj = sim.Projection(bias_neurons, population[:nv],
+                                 connector=bn_connector,
+                                 receptor_type='excitatory',
+                                 synapse_type=bn_synapse)
+
+    inh_bn_proj = sim.Projection(bias_neurons, population[:nv],
+                                 connector=bn_connector,
+                                 receptor_type='inhibitory',
+                                 synapse_type=bn_synapse)
+
+    bn_projections = {'exc': exc_bn_proj, 'inh': inh_bn_proj}
+
+    population.record("spikes")
+    if initial_vmem is not None:
+        population.initialize(v=initial_vmem)
+
+    callbacks = get_callbacks(sim, {
+            "duration": duration,
+            "offset": burn_in_time,
+            })
+
+    t_start = time.time()
+    if burn_in_time > 0.:
+        log.info("Burning in samplers for {} ms".format(burn_in_time))
+        sim.run(burn_in_time)
+        eta_from_burnin(t_start, burn_in_time, duration)
+
+    # add clamping functionality
+    if clamp_fct is not None:
+        callbacks.append(
+            ClampCallbackBN(bn_projections, network, network.biases_theo[:nv],
+                            clamp_fct, duration, offset=burn_in_time))
+    log.info("Starting data gathering run.")
+    sim.run(duration, callbacks=callbacks)
+
+    if isinstance(population, sim.common.BasePopulation):
+        spiketrains = population.get_data("spikes").segments[0].spiketrains
+    else:
+        spiketrains = np.vstack(
+                [pop.get_data("spikes").segments[0].spiketrains[0]
+                 for pop in population])
+
+    # we need to ignore the burn in time
+    clean_spiketrains = []
+    for st in spiketrains:
+        clean_spiketrains.append(np.array(st[st > burn_in_time])-burn_in_time)
+
+    return_data = {
+            "spiketrains": clean_spiketrains,
+            "duration": duration,
+            "dt": dt,
+            }
+    sim.end()
+
+    return return_data
+
+
+# Under construction
+def gather_network_spikes_clamped_sf(
+        network, duration, nv, dt=0.1, burn_in_time=0., create_kwargs=None,
+        sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None):
+    """
+        create_kwargs: Extra parameters for the networks creation routine.
+
+        sim_setup_kwargs: Extra parameters for the setup command (random seeds
+        etc.).
+
+        clamp_fct: method handle that returns clamped indices and values;
+        is called by the ClampCallback object, which then adjusts the biases
+        accordingly
+    """
+    log.info("Gathering spike data...")
+    if sim_setup_kwargs is None:
+        sim_setup_kwargs = {}
+
+    sim.setup(timestep=dt, **sim_setup_kwargs)
+
+    if create_kwargs is None:
+        create_kwargs = {}
+    population, projections = network.create(duration=duration + burn_in_time,
+                                             **create_kwargs)
+
+    # Create spike sources for whole simulation
+    # ...
+    min_spike_interval = 10.   # ms
+    spikesource = None
+    exc_bias_neurons = sim.Population(nv, spikesource)
+    inh_bias_neurons = sim.Population(nv, spikesource)
+
+    bn_connector = sim.OneToOneConnector()
+    # set weight such that for x==1 the neuron is barely hard on?
+    bn_synapse = sim.StaticSynapse(weight=0.)
+    # renewing_params = {"U": 1.,
+    #                    "tau_rec": 10.0,
+    #                    "tau_fac": 0.0,
+    #                    "weight": 1000 * 0}   # nest uses larger unit
+    # sim.nest.CopyModel("tsodyks2_synapse", "avoid_pynn_trying_to_be_smart")
+    # bn_synapse = sim.native_synapse_type("avoid_pynn_trying_to_be_smart")(
+    #     **renewing_params)
+
+    # make excitatory AND inhibitory connections
+    exc_bn_proj = sim.Projection(exc_bias_neurons, population[:nv],
+                                 connector=bn_connector,
+                                 receptor_type='excitatory',
+                                 synapse_type=bn_synapse)
+
+    inh_bn_proj = sim.Projection(inh_bias_neurons, population[:nv],
+                                 connector=bn_connector,
+                                 receptor_type='inhibitory',
+                                 synapse_type=bn_synapse)
+
+    population.record("spikes")
+    if initial_vmem is not None:
+        population.initialize(v=initial_vmem)
+
+    callbacks = get_callbacks(sim, {
+            "duration": duration,
+            "offset": burn_in_time,
+            })
+
+    t_start = time.time()
+    if burn_in_time > 0.:
+        log.info("Burning in samplers for {} ms".format(burn_in_time))
+        sim.run(burn_in_time)
+        eta_from_burnin(t_start, burn_in_time, duration)
+
+    log.info("Starting data gathering run.")
+    sim.run(duration, callbacks=callbacks)
+
+    if isinstance(population, sim.common.BasePopulation):
+        spiketrains = population.get_data("spikes").segments[0].spiketrains
+    else:
+        spiketrains = np.vstack(
+                [pop.get_data("spikes").segments[0].spiketrains[0]
+                 for pop in population])
+
+    # we need to ignore the burn in time
+    clean_spiketrains = []
+    for st in spiketrains:
+        clean_spiketrains.append(np.array(st[st > burn_in_time])-burn_in_time)
+
+    return_data = {
+            "spiketrains": clean_spiketrains,
+            "duration": duration,
+            "dt": dt,
+            }
+    sim.end()
+
+    return return_data
 
 
 class ClampCallback(object):
@@ -162,7 +352,7 @@ class ClampCallback(object):
         self.clamp_fct = clamp_fct
         self.clamped_idx = []
         self.clamped_val = []
-        self.on_bias = 1000.
+        self.on_bias = 100.
 
     def __call__(self, t):
         if np.isclose(t, self.duration + self.offset):
@@ -180,7 +370,10 @@ class ClampCallback(object):
         released = np.setdiff1d(self.clamped_idx, curr_idx).astype(int)
         tmp_bias[released] = self.initial_biases[released]
         if len(curr_idx) != 0:
-            tmp_bias[curr_idx] = self.smooth_biases(curr_val)
+            tmp_bias[curr_idx] = self.smooth_biases(curr_val, .5, .5)
+            # # if I don't want to add negative biases to the initial bias (cf. notes)
+            # tmp_bias[curr_idx] = np.minimum(self.initial_biases[curr_idx],
+            #                                 tmp_bias[curr_idx])
         self.network.biases_theo = tmp_bias
         self.clamped_idx = curr_idx
         self.clamped_val = curr_val
@@ -192,13 +385,11 @@ class ClampCallback(object):
         binary_val = 1.*(clamped_val > thresh)
         return 2 * (binary_val - .5) * self.on_bias
 
-    def smooth_biases(self, clamped_val, width=.6):
+    def smooth_biases(self, clamped_val, off_thresh=.2, on_thresh=.8):
         def inv_sigma(p):
             return np.log(p / (1 - p))
-        on_limit = .5*(1 + width)
-        off_limit = .5*(1 - width)
-        hard_on = clamped_val > on_limit
-        hard_off = clamped_val < off_limit
+        hard_on = clamped_val >= on_thresh
+        hard_off = clamped_val <= off_thresh
         soft = np.logical_not(np.logical_or(hard_on, hard_off))
         biases = np.ones_like(clamped_val)
         biases[hard_off] = -self.on_bias
@@ -206,30 +397,90 @@ class ClampCallback(object):
         biases[soft] = inv_sigma(clamped_val[soft])
         return biases
 
-    def smooth_biases_new(self, clamped_val, off_thresh=.2, on_thresh=.8):
+
+class ClampCallbackBN(object):
+    def __init__(self, bn_projections, network, bv_theo, clamp_fct, duration,
+                 offset=0.):
+        self.bn_projections = bn_projections
+        self.network = network
+        self.bv_theo = bv_theo.copy()
+        self.duration = duration
+        self.offset = offset
+        self.clamp_fct = clamp_fct
+        self.on_weight = 100.
+
+    def __call__(self, t):
+        if np.isclose(t, self.duration + self.offset):
+            # clean up for later experiments
+            log.info('Unclamp all neurons...')
+            for rt in ['exc', 'inh']:
+                self.bn_projections[rt].set(weight=0)
+            return float('inf')
+
+        dt, curr_idx, curr_val = self.clamp_fct(t - self.offset)
+        # assert np.all(np.in1d(curr_val, [0, 1]))
+        # # assuming binary clamped values
+
+        w_theo = np.zeros_like(self.bv_theo)
+        if len(curr_idx) != 0:
+            w_theo[curr_idx] = self.smooth_weights(curr_val, .5, .5)
+            soft_on = np.abs(w_theo) != self.on_weight
+            w_theo[soft_on] -= self.bv_theo[soft_on]
+
+        # convert to biol. domain using calibration (same for all samplers)
+        w_bio = \
+            self.network.samplers[0].convert_weights_theo_to_bio(w_theo)
+
+        if self.bn_projections['exc'].synapse_type.nest_name == \
+                'avoid_pynn_trying_to_be_smart':
+            # weight has to be increased so that U<1 is compensated
+            u_tso = self.bn_projections['exc'].get('U', format='array')
+            # using native nest model with different weight units
+            w_bio *= 1000. / np.diag(u_tso)
+        for rt in ['exc', 'inh']:
+            weight_matrix = \
+                self.bn_projections[rt].get('weight', format='array')
+            # take only pos/neg weights for exc/inh
+            sign_w = -1 if rt == 'inh' else 1
+            weight_matrix[np.diag_indices(len(weight_matrix))] = \
+                np.clip(sign_w * w_bio, 0, np.inf)
+            self.bn_projections[rt].set(weight=weight_matrix)
+
+        return min(t + dt, self.duration + self.offset)
+
+    def smooth_weights(self, clamped_val, off_thresh=.2, on_thresh=.8):
         def inv_sigma(p):
             return np.log(p / (1 - p))
-        hard_on = clamped_val > on_thresh
-        hard_off = clamped_val < off_thresh
+        hard_on = clamped_val >= on_thresh
+        hard_off = clamped_val <= off_thresh
         soft = np.logical_not(np.logical_or(hard_on, hard_off))
         biases = np.ones_like(clamped_val)
-        biases[hard_off] = -self.on_bias
-        biases[hard_on] = self.on_bias
+        biases[hard_off] = -self.on_weight
+        biases[hard_on] = self.on_weight
         biases[soft] = inv_sigma(clamped_val[soft])
         return biases
 
 
 # Custom clamping methods -> functors that are called from ClampCallback
 class Clamp_anything(object):
-    # refresh times must be a list
     def __init__(self, refresh_times, clamped_idx, clamped_val):
+        # please pass lists (special case below)
         if len(refresh_times) == 1 and len(refresh_times) != len(clamped_idx):
-            self.clamped_idx = np.expand_dims(clamped_idx, 0)
-            self.clamped_val = np.expand_dims(clamped_val, 0)
+            # it is possible to pass a one-element list refresh-times and
+            # 1d-arrays for idx and val to the method; for compability with
+            # __call__ the latter two have to be expanded then
+            self.clamped_idx = [clamped_idx]
+            self.clamped_val = [clamped_val]
         else:
             assert len(refresh_times) == len(clamped_idx) == len(clamped_val)
             self.clamped_idx = clamped_idx
             self.clamped_val = clamped_val
+
+        # method is always called with t==0, so we need to add this if necess.
+        if refresh_times[0] != 0:
+            refresh_times.insert(0, 0.)
+            self.clamped_idx.insert(0, [])
+            self.clamped_val.insert(0, [])
         self.refresh_times = refresh_times
 
     def set_clamped_val(self, clamped_val):
@@ -248,7 +499,8 @@ class Clamp_anything(object):
         try:
             i = np.where(np.isclose(self.refresh_times, t))[0][0]
         except IndexError:
-            print('No matching clamping time stamp; this should not happen.')
+            log.warning('No matching clamping time stamp: t={}, '
+                        'clamp_times={}'.format(t, self.refresh_times))
             return float('inf'), [], []
 
         # binary_val = np.round(self.clamped_val[i])

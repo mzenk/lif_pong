@@ -19,7 +19,7 @@ def lif_window_quick(test_imgs, rbm, calib_file, sbs_kwargs, winsize=-1,
     # winpos = range(2, img_shape[1]//2, 2) + \
     #     range(img_shape[1]//2, img_shape[1], 4)
     # alternatively, very small region
-    winpos = (np.linspace(.2, .35, 5) * img_shape[1]).astype(int)
+    winpos = (np.linspace(.2, .3, 5) * img_shape[1]).astype(int)
     refresh_times = sampling_interval*n_samples * np.arange(len(winpos))
     clamped_idx = [get_windowed_image_index(img_shape, p) for p in winpos]
     duration = len(refresh_times) * sampling_interval*n_samples

@@ -13,9 +13,6 @@ import matplotlib.pyplot as plt
 mpl.rcParams['font.size'] = 14
 # mpl.rcParams['text.usetex'] = True
 
-img_shape = (36, 48)
-n_labels = img_shape[0]//3
-
 
 def load_prediction_data(file_name, use_labels=False):
     with np.load(file_name) as d:
@@ -69,62 +66,30 @@ def load_agent_data(file_name):
 
 
 def plot_prediction_error():
-    # # compare different window sizes
-    # samp_meth = 'lif'
-    # pot_str = 'pong'
-    # data_path = get_data_path('lif_clamp_window')
-    # win_sizes = [48]
-    # fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
-    # for win in win_sizes:
-    #     fname = data_path + pot_str + '_win{}_prediction.npz'.format(win)
-    #     frac, median, lower_quart, upper_quart = load_prediction_data(fname)
-    #     fractions.append(frac)
-    #     medians.append(median)
-    #     lower_quartiles.append(lower_quart)
-    #     upper_quartiles.append(upper_quart)
-    # fig_name = '{}_{}_prediction_error'.format(samp_meth, pot_str)
-    # labels = ['window size: {}'.format(win) for win in win_sizes]
+    # compare window sizes
+    # data_path = get_data_path('gibbs_sampling')
+    # winsize = [48, 12]
+    # data_prefixes = [data_path + 'knick_win{}'.format(w) for w in winsize]
+    # data_prefixes.insert(0, data_path + 'pong_win48')
+    # labels = ['window size: {}'.format(win) for win in winsize]
+    # labels.insert(0, 'No knick')
+    # fig_name = 'gibbs_knick_prediction_error'
 
-    # # compare LIF and Gibbs
-    # pot_str = 'pong'
-    # win_size = 48
-    # data_paths = [get_data_path('gibbs_sampling'),
-    #               get_data_path('lif_clamp_window')]
-    # fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
-    # for path in data_paths:
-    #     fname = path + pot_str + '_win{}_prediction.npz'.format(win_size)
-    #     frac, median, lower_quart, upper_quart = load_prediction_data(fname)
-    #     fractions.append(frac)
-    #     medians.append(median)
-    #     lower_quartiles.append(lower_quart)
-    #     upper_quartiles.append(upper_quart)
-    # fig_name = pot_str + '_compare_lif_gibbs_win{}'.format(win_size)
-    # labels = ['Gibbs', 'LIF']
+    # Other comparisons are possible, just make a list of which prediction
+    # files to use
+    data_path = get_data_path('lif_clamp_window')
+    data_prefixes = [data_path + s for s in ['pong_win48', 'pong_win48_post']]
+    labels = ['pre', 'post']
+    fig_name = 'lif_compare_post_prederror'
 
-    # compare LIF (e.g. TSO)
-    pot_str = 'pong'
-    win_size = 48
-    # options = ['gibbs', '', '_static', '_renewing']
-    options = ['gibbs', 'fast', '']
+    fnames = [s + '_prediction.npz' for s in data_prefixes]
     fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
-    for s in options:
-        if s == 'gibbs':
-            path = get_data_path('gibbs_sampling')
-            s = '_test'
-        elif s == 'fast':
-            path = get_data_path('lif_performance')
-            s = ''
-        else:
-            path = get_data_path('lif_clamp_window')
-        fname = path + pot_str + '_win{}_prediction{}.npz'.format(win_size, s)
-        frac, median, lower_quart, upper_quart = load_prediction_data(fname)
+    for fn in fnames:
+        frac, median, lower_quart, upper_quart = load_prediction_data(fn)
         fractions.append(frac)
         medians.append(median)
         lower_quartiles.append(lower_quart)
         upper_quartiles.append(upper_quart)
-    fig_name = pot_str + '_compare_tso_win{}'.format(win_size)
-    # labels = ['Gibbs', 'Mixing', 'Static', 'Renewing']
-    labels = ['Gibbs', 'Fast', 'Smooth clamping']
 
     # plot prediction error
     fig, ax = plt.subplots()
@@ -147,11 +112,11 @@ def plot_prediction_error():
 
 def plot_agent_performance():
     # plot agent performance
-    pot_str = 'pong'
-    win_size = 48
-    base_name = pot_str + '_win{}_agent_performance'.format(win_size)
-    labels = ['lif', 'gibbs']
-    file_names = [s + '_' + base_name for s in labels]
+    data_prefixes = ['gibbs_knick_win48', 'gibbs_knick_win12',
+                     'gibbs_pong_win48']
+    labels = ['Knick (48)', 'Knick (12)', 'Pong (48)']
+    file_names = [s + '_agent_performance' for s in data_prefixes]
+    figname = 'gibbs_knick_agent_performance'
 
     fig, ax = plt.subplots()
     ax.set_xlabel('Agent speed / ball speed')
@@ -166,14 +131,17 @@ def plot_agent_performance():
         speeds.append(spe)
 
     for i, fn in enumerate(file_names):
-        ax.plot(speeds[i], successes[i], label=fn)
+        ax.plot(speeds[i], successes[i], label=labels[i])
 
     plt.legend()
-    plt.savefig(make_figure_folder() + pot_str + '_agent_performance.pdf')
+    plt.savefig(make_figure_folder() + figname + '.pdf')
 
-if __name__ == '__main__':
-    plot_prediction_error()
-    # plot_agent_performance()
+
+# main
+img_shape = (36, 48)
+n_labels = img_shape[0]//3
+plot_prediction_error()
+# plot_agent_performance()
 
 # === other plots, not functional ===
 # image dissimilarity

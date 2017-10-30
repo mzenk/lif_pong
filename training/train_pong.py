@@ -33,7 +33,7 @@ else:
 assert np.prod(img_shape) == n_pxls
 
 training_params = {
-    'n_epochs': 30,
+    'n_epochs': 5,
     'batch_size': 20,
     'lrate': .1,
     'cd_steps': 5,
@@ -63,35 +63,32 @@ if sys.argv[1] == 'gen':
     pj[pj == 0] = 1e-5
     pj[pj == 1] = 1 - 1e-5
     bias_init = np.log(pj / (1 - pj))
-    my_rbm = RBM(train_set.shape[1], n_hidden=200, vbias=bias_init)
+    my_rbm = RBM(train_set.shape[1], n_hidden=400, vbias=bias_init)
 
     start = time.time()
     my_rbm.train(train_set, valid_set=valid_set,
-                 filename='log/pong_gen_log.txt', **training_params)
+                 log_name='log/pong_gen_log.txt', **training_params)
 
     print('Total training time: {:.1f} min'.format((time.time() - start)/60))
 
     if save:
         # Save crbm for later inspection
-        with open(make_data_folder('saved_rbms', True) + fname + '_rbm.pkl', 'wb') as output:
+        with open(make_data_folder('saved_rbms', True) + fname + '_rbm_test.pkl', 'wb') as output:
             cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
 
 if sys.argv[1] == 'dis':
     print('Training discriminative RBM on Pong on  {}'
           ' instances...'.format(train_set[0].shape[0]))
 
-    train_wlabel = np.concatenate((train_set[0], train_targets), axis=1)
-    valid_wlabel = np.concatenate((valid_set[0], valid_targets), axis=1)
+    train_wlabel = np.concatenate(((train_set[0] > .5)*1., train_targets), axis=1)
+    valid_wlabel = np.concatenate(((valid_set[0] > .5)*1., valid_targets), axis=1)
 
     # initialize biases like in Hinton's guide
     pj = np.average(train_wlabel, axis=0)
     pj[pj == 0] = 1e-5
     pj[pj == 1] = 1 - 1e-5
     bias_init = np.log(pj / (1 - pj))
-    n_hidden = 200
-    # for r in [.001, .01, .1]:
-    #     training_params['lrate'] = r
-    #     print(r)
+    n_hidden = 500
 
     my_rbm = CRBM(n_inputs=n_pxls,
                   n_hidden=n_hidden,
@@ -100,14 +97,14 @@ if sys.argv[1] == 'dis':
 
     start = time.time()
     my_rbm.train(train_wlabel, valid_set=valid_wlabel,
-                 filename='log/pong_dis_log.txt', **training_params)
+                 log_name='log/pong_dis_bin.log', **training_params)
 
     print('Training took {:.1f} min'.format((time.time() - start)/60))
 
     if save:
         # Save crbm for later inspection, the training parameters should be
         # recorded elsewhere!
-        with open(make_data_folder('saved_rbms', True) + fname + '_crbm_cast.pkl', 'wb') as output:
+        with open(make_data_folder('saved_rbms', True) + fname + '_crbm_bin.pkl', 'wb') as output:
             cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
 
 if sys.argv[1] == 'deep':

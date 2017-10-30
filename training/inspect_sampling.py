@@ -27,9 +27,9 @@ def plot_samples(rbm, n_samples, img_shape):
 #     _, _, test_set = np.load(f)
 # img_shape = (28, 28)
 
-img_shape = (18, 24)
+img_shape = (36, 48)
 data_name = 'pong_var_start{}x{}'.format(*img_shape)
-testrbm = load_rbm(data_name + '_crbm')
+testrbm = load_rbm(data_name + '_crbm_bin')
 _, _, test_set = load_images(data_name)
 n_pixels = np.prod(img_shape)
 

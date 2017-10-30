@@ -50,10 +50,11 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
         starts = np.array([[field[1]*.5]])
         fname = pot_str + '_fixed_start{1}x{0}'.format(grid[0], grid[1])
     else:
-        nangles = 100  # 400
-        nstarts = 40   # 100
+        nangles = 200
+        nstarts = 100
         starts = field[1]*np.random.beta(1.5, 1.5, nstarts)
         fname = pot_str + '_var_start{1}x{0}'.format(grid[0], grid[1])
+        fname = 'pong_knick'
     # draw for each start position nangles angles
     angles = max_angle * 2*(np.random.rand(nstarts, nangles) - .5)
 
@@ -131,7 +132,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
 
 
 if __name__ == '__main__':
-    generate_data([24, 18], pot_str='pong', fixed_start=False, save=True)
+    generate_data([48, 36], pot_str='pong', fixed_start=False, save=True)
 
     # # check balancing of dataset
     # plt.figure()

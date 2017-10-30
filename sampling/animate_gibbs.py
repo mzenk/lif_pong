@@ -1,3 +1,4 @@
+# animate gibbs examples
 import numpy as np
 import sys
 from general_animation import make_animation
@@ -6,10 +7,10 @@ from utils.data_mgmt import get_data_path, make_figure_folder
 
 img_shape = (36, 48)
 n_pixels = np.prod(img_shape)
-pot_str = 'pong'
+pot_str = 'knick'
 
 # file with sampled states
-sample_file = pot_str + '_win48_avg_chunk000'
+sample_file = pot_str + '_win12_avg_chunk000'
 print(sample_file)
 with np.load(get_data_path('gibbs_sampling') + sample_file + '.npz') as d:
     vis_samples = d['vis']
@@ -42,7 +43,7 @@ with np.load(get_data_path('gibbs_sampling') + sample_file + '.npz') as d:
 #     predictions[i] = average_helper(img_shape[0], last_col[i])
 # predictions = predictions.T
 
-fig_name = 'test'
+fig_name = 'win'
 n = 3
 for i in range(n):
     print('Making animation {} of {}'.format(i + 1, n))

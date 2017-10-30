@@ -8,6 +8,7 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
+kink = True
 
 def gauss1d(x, mu, sigma):
         mu = np.repeat(np.expand_dims(mu, 1), x.shape[0], axis=1)
@@ -45,6 +46,9 @@ class Trajectory:
         vy = self.v0 * np.sin(self.angle)
         size = self.field_size
 
+        if kink:
+            kink_pos = (np.random.rand()/3 + .333) * self.field_size[0]
+
         # use ode solver for integration
         r = ode(self.force_fct).set_integrator('vode', method='adams')
         r.set_initial_value([self.pos[0], self.pos[1], vx, vy], 0.)
@@ -67,6 +71,13 @@ class Trajectory:
             curr_pos[i] = r.y[:2]
             if write_pixels:
                 self.add_to_image(r.y[:2])
+
+            if kink and r.y[0] > kink_pos:
+                # inject random y-momentum in [.33, .66]*field
+                randmom = .5*self.v0*(.2*np.random.randn() +
+                                      2*(np.random.randint(2) - .5))
+                r.set_initial_value(r.y + np.array([0, 0, 0, randmom]), r.t)
+                kink_pos = 2*self.field_size[0]
 
             # reflect if particle hits top or bottom
             if r.y[1] > size[1] or r.y[1] < 0:

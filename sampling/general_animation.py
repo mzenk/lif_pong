@@ -1,4 +1,3 @@
-# animation class for Pong
 from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
@@ -96,7 +95,7 @@ class Pong_updater(object):
 
 def make_animation(fig_name, img_shape, win_size, vis_samples, paddle_len=0,
                    predictions=None, clamp_interval=1, anim_interval=100.):
-    # set sup figure
+    # set up figure
     fig = plt.figure()
     width = .7
     ax1 = fig.add_axes([.05, .2, width, width*3/4])

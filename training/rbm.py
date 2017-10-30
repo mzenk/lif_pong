@@ -3,17 +3,16 @@ from __future__ import division
 from __future__ import print_function
 import numpy as np
 from utils import logsum, logdiff
+import compute_isl as isl
 import itertools
 import time
+import logging
 
 
 class RBM(object):
-    def __init__(self,
-                 n_visible, n_hidden,
-                 w=None,
-                 vbias=None, hbias=None,
-                 numpy_seed=None,
-                 dbm_factor=[1, 1]):
+    def __init__(self, n_visible, n_hidden,
+                 w=None, vbias=None, hbias=None,
+                 numpy_seed=None, dbm_factor=[1, 1]):
         # Set seed for reproducatbility
         self.np_rng = np.random.RandomState(numpy_seed)
 
@@ -39,6 +38,7 @@ class RBM(object):
         # a simple solution
         self.dbm_factor = dbm_factor
 
+    # get parameters in BM notation
     def bm_params(self):
         w = np.vstack(
             (np.hstack((np.zeros(2*(self.n_visible,)), self.w)),
@@ -51,6 +51,13 @@ class RBM(object):
         return - np.einsum('ik,il,kl->i', v, h, self.w) - \
             v.dot(self.vbias) - h.dot(self.hbias)
 
+    def free_energy(self, v_data):
+        if len(v_data.shape) == 1:
+            v_data = np.expand_dims(v_data, 0)
+        activation = v_data.dot(self.w) + self.hbias
+        hidden_term = np.sum(np.log(1 + np.exp(activation)), axis=1)
+        return - v_data.dot(self.vbias) - hidden_term
+
     def compute_partition_sum(self):
         # visible units are too many to sum over
         h_all = np.array(list(itertools.product([0, 1], repeat=self.n_hidden)))
@@ -62,12 +69,7 @@ class RBM(object):
             log_ph = np.concatenate((log_ph, tmp))
         return logsum(log_ph)
 
-    def free_energy(self, v_data):
-        if len(v_data.shape) == 1:
-            v_data = np.expand_dims(v_data, 0)
-        activation = v_data.dot(self.w) + self.hbias
-        hidden_term = np.sum(np.log(1 + np.exp(activation)), axis=1)
-        return - v_data.dot(self.vbias) - hidden_term
+    # ======== Sampling methods ========
 
     # generalized method for sampling quickly from many chains (numpy).
     # TODO: For >1 chains there might be a bug with (clamped) sampling.
@@ -301,44 +303,7 @@ class RBM(object):
         v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
         return [p_on.squeeze(), v_samples.squeeze()]
 
-    # deprecated: compute CSL
-    def compute_csl(self, valid_set):
-        # compute CSL for validation set
-        n_data = valid_set.shape[0]
-        n_samples = 1000
-
-        h_samples = self.draw_samples(100 + n_samples,
-                                      n_chains=n_data)[:, 100:,
-                                                       -self.n_hidden:]
-        v_act = h_samples.reshape((n_data * n_samples,
-                                  self.n_hidden)).dot(self.w.T) + self.vbias
-        model_pv = 1./(1 + np.exp(-v_act.reshape((n_samples, n_data,
-                                                 self.n_visible))))
-        data_prob = np.prod((2*model_pv - 1)*valid_set + 1 - model_pv, axis=2)
-        # I use a linear interpolation between v=0 and v=1
-        csl = np.log(np.average(data_prob, axis=1))
-
-        return np.average(csl)
-
-    def compute_logpl(self, valid_set):
-        # pseudo-likelihood:
-        # binarize images
-        data = np.round(valid_set)
-        n_data = data.shape[0]
-        # flip randomly one bit in each data vector
-        flip_indices = self.np_rng.randint(data.shape[1], size=n_data)
-        data_flip = data.copy()
-        data_flip[np.arange(n_data), flip_indices] = 1 - \
-            data[np.arange(n_data), flip_indices]
-
-        # calculate free energies
-        fe_data = self.free_energy(data)
-        fe_data_flip = self.free_energy(data_flip)
-
-        # from rbm tutorial (deeplearning.net)
-        log_pl = self.n_visible * np.log(1. / (1. +
-                                         np.exp(-(fe_data_flip - fe_data))))
-        return np.average(log_pl)
+    # ======== Training --- (P)CD and CAST ========
 
     def compute_grad_cdn(self, batch, n_steps, persistent=None,
                          cast_variables=None):
@@ -351,8 +316,6 @@ class RBM(object):
         """
 
         # data must be normalized to [0,1]
-        # v0 = (self.np_rng.rand(*batch.shape) < batch)*1.
-        # v0 = (batch > .5)*1.
         v0 = batch
 
         # sampling step for train_data average
@@ -398,23 +361,17 @@ class RBM(object):
             ph = np.expand_dims(ph, 0)
             pv = np.expand_dims(pv, 0)
 
-        # if ph0.shape[0] != ph.shape[0]:
         # compute AVERAGED gradients
         grad_w = np.einsum('ij,ik', batch, ph0)/ph0.shape[0] - \
             np.einsum('ij,ik', pv, ph)/ph.shape[0]
         grad_bh = np.average(ph0, axis=0) - np.average(ph, axis=0)
         grad_bv = np.average(batch, axis=0) - np.average(pv, axis=0)
-        # else:
-        #     grad_w = np.einsum('ij,ik', batch, ph0) - \
-        #         np.einsum('ij,ik', pv, ph)
-        #     grad_bh = np.sum(ph0, axis=0) - np.sum(ph, axis=0)
-        #     grad_bv = np.sum(batch, axis=0) - np.sum(pv, axis=0)
 
         return [grad_w, grad_bv, grad_bh], [vis_recon, hid_recon]
 
     def train(self, train_data, n_epochs=5, batch_size=10, lrate=.01,
               cd_steps=1, persistent=False, cast=False, valid_set=None,
-              momentum=0, weight_cost=1e-5, filename='train_log.txt'):
+              momentum=0, weight_cost=1e-5, log_name=None):
         # initializations
         n_instances = train_data.shape[0]
         n_batches = int(np.ceil(n_instances/batch_size))
@@ -425,15 +382,26 @@ class RBM(object):
         hb_incr = np.zeros_like(self.hbias)
         initial_lrate = lrate
 
-        # log monitoring quantities in this file
-        log_file = open(filename, 'a')
-        log_file.write('---------------------------------------------\n')
-        log_file.write('#hidden: {}\nBatch size: {}\nLearning_rate: {}\n'
-                       'CD-steps: {}\nPersistent: {}\nCAST: {}\n'
-                       ''.format(self.n_hidden, batch_size, lrate, cd_steps,
-                                 persistent, cast))
-        if type(self) is not CRBM:
-            log_file.write('update step | free energy difference | log PL\n')
+        # logging
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        # create console handler and set level to debug
+        if log_name is None:
+            log_name = time.strftime('%y%m%d%-H%M') + 'train.log'
+        ch = logging.FileHandler(log_name)
+        ch.setLevel(logging.INFO)
+        # create formatter
+        formatter = logging.Formatter('%(asctime)s : %(message)s',
+                                      datefmt='%Y-%m-%d %H:%M:%S')
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
+        logger.info('\n---------------------------------------------\n'
+                    '#hidden: {}\nBatch size: {}\nLearning_rate: {}\n'
+                    'CD-steps: {}\nPersistent: {}\nCAST: {}'
+                    '\n---------------------------------------------'
+                    ''.format(self.n_hidden, batch_size, lrate, cd_steps,
+                              persistent, cast))
+        logger.debug('Step | Free energy difference | log Pseudolikelihood')
 
         # ++++++++++++
         # new for cast
@@ -456,12 +424,11 @@ class RBM(object):
             swap_state = np.zeros((n_fast_chains, self.n_hidden))
         # +++++++++++++
 
-        # time measurement; delete later
         monitoring_time = 0
-        #
+        self.monitor_progress(train_data, valid_set, logger)
 
         for epoch_index in range(n_epochs):
-            print('Epoch {}'.format(epoch_index + 1))
+            logger.info('Epoch {}'.format(epoch_index + 1))
             # if momentum != 0 and epoch_index > 5:
             #     # momentum = min(momentum + .1, .9)
             #     momentum = .9
@@ -516,46 +483,87 @@ class RBM(object):
                 if persistent:
                     pchain_init = reconstruction[1]
 
-                # Run monitoring four times per epoch
-                if batch_index % (max(1, n_batches // 4)) == 0 and \
-                        valid_set is not None:
-                    # # free energy difference between training subset
-                    # # and validation set
-                    # f_valid = self.free_energy(valid_set)
-                    # f_train = \
-                    #     self.free_energy(shuffled_data[-valid_set.shape[0]:])
-                    # delta_f = np.mean(f_valid) - np.mean(f_train)
-                    delta_f = 0
-
+                # More detailed monitoring for debugging
+                if update_step % 10 == 0 and valid_set is not None:
                     # random subset
-                    subset_ind = \
-                        self.np_rng.choice(valid_set.shape[0],
-                                           min(1000, valid_set.shape[0]),
-                                           replace=False)
+                    subset_ind = self.np_rng.choice(
+                        valid_set.shape[0], min(1000, valid_set.shape[0]),
+                        replace=False)
 
-                    # pseudo-likelihood
+                    # pseudo-likelihood and delta F
+                    df = self.free_energy_diff(shuffled_data, valid_set)
                     pl = self.compute_logpl(valid_set[subset_ind, :])
-                    # import compute_isl as isl
-                    # model = isl.ISL_density_model()
-                    # vis_samples = \
-                    #     self.draw_samples(1e4, binary=True)[:, :self.n_visible]
-                    # model.fit(vis_samples, quick=True)
-                    # isl_ll = model.avg_loglik((valid_set > .5)*1.)
 
+                    logger.debug('{} {} {}'.format(update_step, df, pl))
+
+                    # # Other options:
                     # # make a histogram of the weights and relative increments
                     # w_histo = np.histogram(...)
                     # incr_histo = np.histogram(...)
 
-                    log_file.write('{} {} {}\n'.format(
-                        update_step, delta_f, pl))
-
+            # run monitoring after epoch
             start_time = time.time()
-            self.monitor_progress(train_data, valid_set, log_file)
+            self.monitor_progress(train_data, valid_set, logger)
             monitoring_time += time.time() - start_time
         print('Monitoring took {:.1f} min'.format(monitoring_time/60.))
-        log_file.close()
         return
 
+    def monitor_progress(self, train_set, valid_set, logger):
+        # logger.info('LL-estimate with AIS: {:.3f}'.format(
+        #     self.run_ais(valid_set, logger)))
+        subset_ind = self.np_rng.choice(
+            train_set.shape[0], min(5000, train_set.shape[0]), replace=False)
+        logger.info('log-PL of training subset: {:.3f}'.format(
+            self.compute_logpl(train_set[subset_ind])))
+        if valid_set is not None:
+            subset_ind = self.np_rng.choice(
+                valid_set.shape[0], min(5000, valid_set.shape[0]), False)
+            logger.info('log-PL of validation set: {:.3f}'.format(
+                self.compute_logpl(valid_set)))
+            logger.info('LL-estimate with ISL: {:.3f}'.format(
+                self.estimate_loglik_isl(
+                    1e4, valid_set[subset_ind])))
+
+    # free energy difference between training subset and validation set
+    def free_energy_diff(self, train_set, valid_set):
+        f_valid = self.free_energy(valid_set)
+        f_train = self.free_energy(train_set[-len(valid_set):])
+        return np.mean(f_valid) - np.mean(f_train)
+
+    # ======== Functions for estimating the LL ========
+    # with ISL-method
+    def estimate_loglik_isl(self, n_samples, test_vis):
+        if type(self) is CRBM:
+            nv = self.n_inputs
+        else:
+            nv = self.n_visible
+        vis_samples = self.draw_samples(n_samples, binary=True)[:, :nv]
+        dm = isl.ISL_density_model()
+        dm.fit(vis_samples, quick=True)
+        # ISL needs binarized data
+        return dm.avg_loglik(np.round(test_vis))
+
+    # pseudo-likelihood like Bengio in his online tutorial
+    def compute_logpl(self, test_set):
+        # binarize images
+        data = np.round(test_set)
+        n_data = data.shape[0]
+        # flip randomly one bit in each data vector
+        flip_indices = self.np_rng.randint(data.shape[1], size=n_data)
+        data_flip = data.copy()
+        data_flip[np.arange(n_data), flip_indices] = 1 - \
+            data[np.arange(n_data), flip_indices]
+
+        # calculate free energies
+        fe_data = self.free_energy(data)
+        fe_data_flip = self.free_energy(data_flip)
+
+        # from rbm tutorial (deeplearning.net)
+        log_pl = self.n_visible * np.log(1. / (1. +
+                                         np.exp(-(fe_data_flip - fe_data))))
+        return np.average(log_pl)
+
+    # AIS
     def estimate_partition_sum(self, n_runs, betas):
         # draw samples from the base model (uniform distr) and initialise logw
         samples = np.random.randint(2, size=(n_runs, self.n_visible))
@@ -592,38 +600,34 @@ class RBM(object):
         logZ_down = logdiff([logstd_rais + np.log(3), r_ais]) + logZ_base
         return logZ, logstd_rais + logZ_base, logZ_up, logZ_down
 
-    def run_ais(self, test_data, train_data=None, n_runs=100, exact=False):
+    def run_ais(self, test_data, logger, train_data=None, n_runs=100,
+                exact=False):
         if exact:
             # compute the true partition sum of the RBM (if possible)
             logZ_true = self.compute_partition_sum()
             avg_ll_true = np.mean(-self.free_energy(test_data)) - logZ_true
-            print('True partition sum: {:.2f}'.format(logZ_true))
-            print('True average loglik: {:.2f}'.format(avg_ll_true))
+            logger.debug('True partition sum: {:.2f}'.format(logZ_true))
+            logger.debug('True average loglik: {:.2f}'.format(avg_ll_true))
 
         # Use AIS to estimate the partition sum
-        # betas = np.concatenate((np.linspace(0, .5, 500, endpoint=False),
-        #                         np.linspace(.5, .9, 10000, endpoint=False),
-        #                         np.linspace(.9, 1., 4000)))
-        betas = np.linspace(0, 1, 20000)
+        betas = np.concatenate((np.linspace(0, .5, 500, endpoint=False),
+                                np.linspace(.5, .9, 10000, endpoint=False),
+                                np.linspace(.9, 1., 4000)))
+        # betas = np.linspace(0, 1, 20000)
         logZ_est, logstdZ, est_up, est_down = \
             self.estimate_partition_sum(n_runs, betas)
 
         # compute the estimated average log likelihood of a test set
         ll_est_test = np.mean(-self.free_energy(test_data)) - logZ_est
-        print('Est. partition sum (+- 3*std): {:.2f}, {:.2f}, {:.2f}'
-              ''.format(logZ_est, est_up, est_down))
-        print('Est. average loglik (test): {:.2f}'.format(ll_est_test))
+        logger.debug('Est. partition sum (+- 3*std): {:.2f}, {:.2f}, {:.2f}'
+                     ''.format(logZ_est, est_up, est_down))
+        logger.debug('Est. average loglik (test): {:.2f}'.format(ll_est_test))
         if train_data is not None:
             ll_est_train = np.mean(-self.free_energy(train_data)) - logZ_est
-            print('Est. average loglik (train): {:.2f}'.format(ll_est_train))
-
-    def monitor_progress(self, train_set, valid_set, output_file):
-        # # try ais
-        # self.run_ais(valid_set, train_set)
-        subset_ind = self.np_rng.randint(train_set.shape[0], size=5000)
-        s = 'Log-PL of random training subset: '\
-            '{}'.format(self.compute_logpl(train_set[subset_ind]))
-        print(s)
+            logger.debug('Est. average loglik (train): {:.2f}'
+                         ''.format(ll_est_train))
+            return ll_est_test, ll_est_train
+        return ll_est_test
 
 
 class CRBM(RBM):
@@ -733,20 +737,23 @@ class CRBM(RBM):
                                               clamped_ind=clamped_ind,
                                               clamped_val=bin_labels)
 
-    def monitor_progress(self, train_set, valid_set, output_file):
-        prediction = self.classify(train_set[:, :self.n_inputs])
-        labels = np.argmax(train_set[:, self.n_inputs:], axis=1)
-        s = 'Correct classifications on training set: '\
-            '{:.3f}'.format(np.average(prediction == labels))
-        print(s, end='')
-        output_file.write(s)
+    def monitor_progress(self, train_set, valid_set, logger):
+        train_vis = train_set[:, :self.n_inputs]
+        train_lab = train_set[:, self.n_inputs:]
+        valid_vis = valid_set[:, :self.n_inputs]
+        valid_lab = valid_set[:, self.n_inputs:]
+        prediction = self.classify(train_vis)
+        labels = np.argmax(train_lab, axis=1)
+        logger.info('Correct classifications on training set: '
+                    '{:.3f}'.format(np.average(prediction == labels)))
         if valid_set is not None:
-            prediction = self.classify(valid_set[:, :self.n_inputs])
-            labels = np.argmax(valid_set[:, self.n_inputs:], axis=1)
-            s = '; validation set: '\
-                '{:.3f}'.format(np.average(prediction == labels))
-            print(s)
-            output_file.write(s + '\n')
-        else:
-            print('')
-            output_file.write('\n')
+            prediction = self.classify(valid_vis)
+            labels = np.argmax(valid_lab, axis=1)
+            logger.info('Correct classifications on validation set: '
+                        '{:.3f}'.format(np.average(prediction == labels)))
+
+            subset_ind = self.np_rng.choice(
+                valid_vis.shape[0], min(2000, valid_vis.shape[0]), False)
+            # compare to LL-estimate
+            logger.info('LL-estimate with ISL: {:.3f}'.format(
+                self.estimate_loglik_isl(1e4, valid_vis[subset_ind])))

@@ -3,9 +3,7 @@ from __future__ import print_function
 import numpy as np
 import multiprocessing as mp
 from functools import partial
-from utils.data_mgmt import load_rbm
-from utils import to_1_of_c, logsum
-from rbm import RBM, CRBM
+from utils import logsum
 
 
 def loglik_helper(x, beta, y):
@@ -105,36 +103,44 @@ class ISL_density_model(object):
 
 
 if __name__ == '__main__':
-    # import gzip
-    # img_shape = (28, 28)
-    # with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
-    #     train_set, _, test_set = np.load(f)
-    #     train_data = np.hstack(((train_set[0] > .5)*1,
-    #                             to_1_of_c(train_set[1], 10)))[::100]
-    #     test_data = np.hstack(((test_set[0] > .5)*1,
-    #                            to_1_of_c(test_set[1], 10)))
-    # good_rbm = load_rbm('mnist_disc_rbm')
-    # bad_rbm = CRBM(good_rbm.n_inputs, good_rbm.n_hidden, good_rbm.n_labels)
+    from rbm import RBM, CRBM
+    from utils.data_mgmt import load_rbm, load_images
+    img_shape = (36, 48)
+    data_name = 'pong_var_start{}x{}'.format(*img_shape)
+    _, _, test_set = load_images(data_name)
+    test_data = (test_set[0][:2000] > .5)*1
+    post_rbm = load_rbm(data_name + '_crbm_post')
+    pre_rbm = load_rbm(data_name + '_crbm')
 
-    # good_samples = good_rbm.draw_samples(1e4, binary=True)[:, :good_rbm.n_visible]
-    # bad_samples = bad_rbm.draw_samples(1e4, binary=True)[:, :bad_rbm.n_visible]
+    # compare rbms
+    n_samples = 1e4
+    gibbs_samples = \
+        pre_rbm.draw_samples(n_samples, binary=True)[:, :pre_rbm.n_inputs]
 
-    # isl_model = ISL_density_model()
-    # isl_model.fit(train_data, quick=True)
-    # print('LL with ISL (only train): {}'.format(
-    #     isl_model.avg_loglik(test_data)))
-    # isl_model.fit(bad_samples, train_data, quick=True)
-    # print('LL with ISL (bad + train): {}'.format(
-    #     isl_model.avg_loglik(test_data)))
-    # isl_model.fit(good_samples, train_data, quick=True)
-    # print('LL with ISL (good + train): {}'.format(
-    #     isl_model.avg_loglik(test_data)))
-    # isl_model.fit(bad_samples, quick=True)
-    # print('LL with ISL (bad + train): {}'.format(
-    #     isl_model.avg_loglik(test_data)))
-    # isl_model.fit(good_samples, quick=True)
-    # print('LL with ISL (good + train): {}'.format(
-    #     isl_model.avg_loglik(test_data)))
+    sample_file = '../sampling/data/lif_dreaming_data/pong_samples_pre.npz'
+    with np.load(sample_file) as d:
+        # samples.shape: ([n_instances], n_samples, n_units)
+        samples = d['samples'].astype(float).squeeze()
+        print('Loaded sample array with shape {}'.format(samples.shape))
+        pre_samples = samples[:, :np.prod(img_shape)]
+
+    sample_file = '../sampling/data/lif_dreaming_data/pong_samples_post.npz'
+    with np.load(sample_file) as d:
+        # samples.shape: ([n_instances], n_samples, n_units)
+        samples = d['samples'].astype(float).squeeze()
+        print('Loaded sample array with shape {}'.format(samples.shape))
+        post_samples = samples[:, :np.prod(img_shape)]
+
+    isl_model = ISL_density_model()
+    isl_model.fit(gibbs_samples, quick=True)
+    print('LL with ISL (Gibbs, pre): {}'.format(
+        isl_model.avg_loglik(test_data)))
+    isl_model.fit(pre_samples, quick=True)
+    print('LL with ISL (LIF, pre): {}'.format(
+        isl_model.avg_loglik(test_data)))
+    isl_model.fit(post_samples, quick=True)
+    print('LL with ISL (LIF, post): {}'.format(
+        isl_model.avg_loglik(test_data)))
 
     # ==== testing with minimal RBM ====
     # nv = 4
@@ -166,6 +172,7 @@ if __name__ == '__main__':
     #     print('True Z: ' + str(z_true))
     #     print('True LL: {}'.format(ll_true))
 
+    # # time measurement
     # import timeit
     # setup = 'from __main__ import isl_model, test_samples'
     # print(timeit.Timer('isl_model.avg_loglik(test_samples)',
@@ -173,24 +180,27 @@ if __name__ == '__main__':
     # print(timeit.Timer('isl_model.avg_loglik_serial(test_samples)',
     #                    setup=setup).timeit(number=100))
 
-    nv = 4
-    nh = 3
-    w_small = 2*(np.random.beta(1.5, 1.5, (nv, nh)) - .5)
 
-    target_rbm = RBM(nv, nh, w_small, np.zeros(nv), np.zeros(nh))
-    samples = target_rbm.draw_samples(int(1e4), binary=True)[:, :nv]
-    train_samples = samples[1000:7000]
-    test_samples = samples[8000:]
-    my_rbm = RBM(nv, nh)
-    samples = target_rbm.draw_samples(int(5e3), binary=True)[:, :nv]
-    gen_samples = samples[1000:]
+    # # samples vs LL-plot
+    # from rbm import RBM, CRBM
+    # nv = 4
+    # nh = 3
+    # w_small = 2*(np.random.beta(1.5, 1.5, (nv, nh)) - .5)
 
-    model = ISL_density_model()
-    model.fit(train_samples, quick=True)
-    x, y = model.avg_loglik_vs_samples(test_samples, 10)
-    import matplotlib as mpl
-    mpl.use('Agg')
-    import matplotlib.pyplot as plt
+    # target_rbm = RBM(nv, nh, w_small, np.zeros(nv), np.zeros(nh))
+    # samples = target_rbm.draw_samples(int(1e4), binary=True)[:, :nv]
+    # train_samples = samples[1000:7000]
+    # test_samples = samples[8000:]
+    # my_rbm = RBM(nv, nh)
+    # samples = target_rbm.draw_samples(int(5e3), binary=True)[:, :nv]
+    # gen_samples = samples[1000:]
 
-    plt.plot(x, y, 'o')
-    plt.savefig('test.png')
+    # model = ISL_density_model()
+    # model.fit(train_samples, quick=True)
+    # x, y = model.avg_loglik_vs_samples(test_samples, 10)
+    # import matplotlib as mpl
+    # mpl.use('Agg')
+    # import matplotlib.pyplot as plt
+
+    # plt.plot(x, y, 'o')
+    # plt.savefig('test.png')

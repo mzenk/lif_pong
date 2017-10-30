@@ -22,8 +22,9 @@ import pyNN.nest as sim
 sim.setup(**{"spike_precision": "on_grid", 'quit_on_end': False})
 
 # === Build and instrument the network =======================================
+duration = 500.
 spike_times = 10. + numpy.sort(numpy.random.rand(10)*90.)
-spike_times = numpy.linspace(10., 260., 25.)
+spike_times = numpy.arange(50., duration, 10.)
 spike_source = sim.Population(
     1, sim.SpikeSourceArray(spike_times=spike_times))
 
@@ -35,7 +36,7 @@ connector = sim.AllToAllConnector()
 
 weight = .01
 # nest has different weight units (x1000)
-tau_syn = 10.
+tau_syn = 1.
 tau_m = 1.
 cm = tau_m/20.  # To keep g_l constant. pyNN-default for LIF: cm=1., tau_m=20.
 
@@ -44,9 +45,11 @@ def normalize_weight(syn_params):
     syn_params['weight'] /= syn_params['U']  # same PSP height of first spike
 
 
-dep_params = {"U": 0.01, "tau_rec": 280.0, "tau_fac": 0.0,
+dep_params = {"U": 0.5, "tau_rec": 1000.0, "tau_fac": 0.0,
               "weight": 1000 * weight}
+print(dep_params)
 normalize_weight(dep_params)
+print(dep_params)
 fac_params = {"U": 0.1, "tau_rec": 10.0, "tau_fac": 300.0,
               "weight": 1000 * weight}
 normalize_weight(fac_params)
@@ -55,6 +58,13 @@ depfac_params = {"U": 0.1, "tau_rec": 500.0, "tau_fac": 500.0,
 normalize_weight(depfac_params)
 renewing_params = {"U": 1., "tau_rec": tau_syn, "tau_fac": 0.,
                    "weight": 1000 * weight}
+
+tso_dict = {
+    'depressing': dep_params,
+    'facilitating': fac_params,
+    'dep/fac': depfac_params,
+    'renewing': renewing_params
+}
 
 synapse_types = {
     'static': sim.StaticSynapse(weight=weight, delay=0.5),
@@ -97,7 +107,7 @@ spike_source.record('spikes')
 
 # === Run the simulation =====================================================
 
-sim.run(300.0)
+sim.run(duration)
 
 
 # === Save the results, optionally plot a figure =============================
@@ -116,16 +126,27 @@ mpl.rcParams['font.size'] = 14
 
 figure_filename = 'stp_example.pdf'
 plt.figure()
-for label, alpha in zip(['depressing', 'static', 'renewing'], [1., 0.5, 0.5]):
+for label, alpha in zip(['depressing', 'facilitating'], [1., 0.5]):
     data = populations[label].get_data().segments[0]
     u = data.filter(name='v')[0]
     gsyn = data.filter(name='gsyn_exc')[0]
-    t = np.linspace(0, 300., len(u))
+    t = np.linspace(0, duration, len(u))
     plt.plot(t, gsyn, alpha=alpha, label=label)
+    # theoretical envelope
+    from stp_theory import compute_ru_envelope
+    kwargs = tso_dict[label]
+    w = kwargs['weight']*1e-3
+    del kwargs['weight']
+    r, u = compute_ru_envelope(spike_times, **kwargs)
+    gsyn_theo = r*u*w
+    plt.plot(spike_times, gsyn_theo, '--', label='theory ' + label)
+    print(gsyn_theo[0], w, r[0], u[0])
+
 plt.xlabel('t [ms]')
 plt.ylabel('gsyn_exc')
+plt.xlim([0, 300.])
 plt.tight_layout()
-plt.legend()
+plt.legend(loc='upper right')
 plt.savefig(make_figure_folder() + figure_filename, transparent=True)
 
 # from pyNN.utility.plotting import Figure, Panel
