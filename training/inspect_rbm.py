@@ -14,7 +14,7 @@ mpl.rcParams['font.size'] = 12
 
 
 def plot_data(data, show_idx, img_shape, tile_shape=(5, 5), name='data'):
-    samples = tile_raster_images(train_set[0][idx],
+    samples = tile_raster_images(train_set[0][show_idx],
                                  img_shape=img_shape,
                                  tile_shape=(4, 4),
                                  tile_spacing=(1, 1),
@@ -85,20 +85,21 @@ img_shape = (28, 28)
 with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
     train_set, _, test_set = np.load(f)
 testrbm = load_rbm('mnist_disc500_rbm')
+np.savez('mnist_rbm', weights=testrbm.w, vbias=testrbm.vbias, hbias=testrbm.hbias)
 
-assert np.prod(img_shape) == train_set[0].shape[1]
+# assert np.prod(img_shape) == train_set[0].shape[1]
 
-print('Number of samples: {}, {}'.format(train_set[0].shape[0],
-                                         test_set[0].shape[0]))
+# print('Number of samples: {}, {}'.format(train_set[0].shape[0],
+#                                          test_set[0].shape[0]))
 
-# inspect data
-np.random.seed(42)
-idx = np.random.choice(np.arange(len(train_set[0])), size=25, replace=False)
-idx = np.arange(25)
-plot_data(train_set, idx, img_shape)
+# # inspect data
+# np.random.seed(42)
+# idx = np.random.choice(np.arange(len(train_set[0])), size=25, replace=False)
+# idx = np.arange(25)
+# plot_data(train_set, idx, img_shape)
 
-# RBM-specific plots
-rand_ind = np.random.randint(testrbm.n_hidden, size=16)
+# # RBM-specific plots
+# rand_ind = np.random.randint(testrbm.n_hidden, size=16)
 # plot_receptive_fields(testrbm, rand_ind, img_shape)
 # plot_histograms(testrbm)
 

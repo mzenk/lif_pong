@@ -3,7 +3,7 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 import gzip
-from util import to_1_of_c
+from utils import to_1_of_c
 import sys
 import time
 from rbm import RBM, CRBM
@@ -13,9 +13,8 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 # Load MNIST
-f = gzip.open('../datasets/mnist.pkl.gz', 'rb')
-train_set, valid_set, test_set = cPickle.load(f)
-f.close()
+with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
+    train_set, valid_set, test_set = np.load(f)
 n_pixels = train_set[0].shape[1]
 
 training_params = {

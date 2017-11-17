@@ -13,27 +13,27 @@ from utils.data_mgmt import make_figure_folder, load_images, load_rbm, get_data_
 # Load rbm and data
 
 show_label = False
-# MNIST
-img_shape = (28, 28)
-img_shape = (2, 2)
-n_pixels = np.prod(img_shape)
-import gzip
-f = gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb')
-_, _, test_set = np.load(f)
-f.close()
-rbm = load_rbm('mnist_disc_rbm')
-nv = rbm.n_visible
-n_labels = rbm.n_labels
-sample_file = get_data_path('playground') + \
-    'test_bias_neurons.npz'
-# # Pong
-# img_shape = (36, 48)
+# # MNIST
+# img_shape = (28, 28)
+# img_shape = (2, 2)
 # n_pixels = np.prod(img_shape)
-# n_labels = img_shape[0] // 3
-# data_name = 'pong_var_start{}x{}'.format(*img_shape)
-# _, _, test_set = load_images(data_name)
-# sample_file = get_data_path('lif_clamp_window') + \
-#     'pong_win48_post_chunk000.npz'
+# import gzip
+# f = gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb')
+# _, _, test_set = np.load(f)
+# f.close()
+# rbm = load_rbm('mnist_disc_rbm')
+# nv = rbm.n_visible
+# n_labels = rbm.n_labels
+# sample_file = get_data_path('playground') + \
+#     'test_bias_neurons.npz'
+# Pong
+img_shape = (36, 48)
+n_pixels = np.prod(img_shape)
+n_labels = img_shape[0] // 3
+data_name = 'pong_var_start{}x{}'.format(*img_shape)
+_, _, test_set = load_images(data_name)
+sample_file = get_data_path('lif_clamp_window') + \
+    'pong_win48_test_chunk000.npz'
 
 with np.load(sample_file) as d:
     # samples.shape: ([n_instances], n_samples, n_units)
