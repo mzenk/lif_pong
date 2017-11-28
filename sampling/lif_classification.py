@@ -75,7 +75,7 @@ if __name__ == '__main__':
     chunk_size = int(sys.argv[3])
     end = start + chunk_size
     # simulation parameters
-    n_samples = 10
+    n_samples = 100
     seed = 7741092
     save_file = pot_str + '_classif_{}samples'.format(n_samples)
     calib_file = 'dodo_calib.json'
@@ -105,8 +105,8 @@ if __name__ == '__main__':
         rbm = load_rbm('mnist_disc_rbm')
         test_targets = test_set[1][start:min(end, len(test_set[0]))]
     else:
-        img_shape = (18, 24)
-        data_name = pot_str + '_fixed_start{}x{}'.format(*img_shape)
+        img_shape = (36, 48)
+        data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
         _, _, test_set = load_images(data_name)
         rbm = load_rbm(data_name + '_crbm')
         test_targets = np.argmax(test_set[1][start:min(end, len(test_set[0]))],

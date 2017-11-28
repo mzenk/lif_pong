@@ -104,7 +104,7 @@ start = int(sys.argv[2])
 chunk_size = int(sys.argv[3])
 win_size = int(sys.argv[4])
 if len(sys.argv) == 6:
-    modifier = str(sys.argv[5])
+    modifier = '_' + str(sys.argv[5])
 else:
     modifier = ''
 
@@ -115,7 +115,7 @@ img_shape = (36, 48)
 n_pxls = np.prod(img_shape)
 np.random.seed(5116838)
 # settings for sampling/clamping
-n_samples = 20
+n_samples = 10
 between_burnin = 0
 # no burnin once actual simulation has started
 duration = (img_shape[1] + 1) * (n_samples + between_burnin)

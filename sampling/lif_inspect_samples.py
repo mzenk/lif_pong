@@ -13,9 +13,14 @@ from utils.data_mgmt import make_figure_folder, load_images, load_rbm, get_data_
 # Load rbm and data
 
 show_label = False
+# testing
+img_shape = (2, 2)
+n_pixels = np.prod(img_shape)
+n_labels = 0
+sample_file = get_data_path('lif_clamp_stp') + \
+    'test.npz'
 # # MNIST
 # img_shape = (28, 28)
-# img_shape = (2, 2)
 # n_pixels = np.prod(img_shape)
 # import gzip
 # f = gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb')
@@ -26,14 +31,14 @@ show_label = False
 # n_labels = rbm.n_labels
 # sample_file = get_data_path('playground') + \
 #     'test_bias_neurons.npz'
-# Pong
-img_shape = (36, 48)
-n_pixels = np.prod(img_shape)
-n_labels = img_shape[0] // 3
-data_name = 'pong_var_start{}x{}'.format(*img_shape)
-_, _, test_set = load_images(data_name)
-sample_file = get_data_path('lif_clamp_window') + \
-    'pong_win48_test_chunk000.npz'
+# # Pong
+# img_shape = (36, 48)
+# n_pixels = np.prod(img_shape)
+# n_labels = img_shape[0] // 3
+# data_name = 'pong_var_start{}x{}'.format(*img_shape)
+# _, _, test_set = load_images(data_name)
+# sample_file = get_data_path('lif_clamp_stp') + \
+#     'pong_test_chunk000.npz'
 
 with np.load(sample_file) as d:
     # samples.shape: ([n_instances], n_samples, n_units)

@@ -15,7 +15,7 @@ mpl.rcParams['font.size'] = 14
 
 
 def load_prediction_data(file_name, use_labels=False):
-    with np.load(file_name) as d:
+    with np.load(file_name + '.npz') as d:
         avg_lab = d['label']
         avg_vis = d['last_col']
         if 'data_idx' in d.keys():
@@ -65,26 +65,11 @@ def load_agent_data(file_name):
     return success, dist, speeds
 
 
-def plot_prediction_error():
-    # compare window sizes
-    # data_path = get_data_path('gibbs_sampling')
-    # winsize = [48, 12]
-    # data_prefixes = [data_path + 'knick_win{}'.format(w) for w in winsize]
-    # data_prefixes.insert(0, data_path + 'pong_win48')
-    # labels = ['window size: {}'.format(win) for win in winsize]
-    # labels.insert(0, 'No knick')
-    # fig_name = 'gibbs_knick_prediction_error'
-
-    # Other comparisons are possible, just make a list of which prediction
-    # files to use
-    data_path = get_data_path('lif_clamp_window')
-    data_prefixes = [data_path + s for s in ['pong_win48', 'pong_win48_post']]
-    labels = ['pre', 'post']
-    fig_name = 'lif_compare_post_prederror'
-
-    fnames = [s + '_prediction.npz' for s in data_prefixes]
+def plot_prediction_error(file_names, labels=None, fig_name='pred_error'):
+    if labels is None:
+        labels = ['file {}'.format(i) for i in range(len(file_names))]
     fractions, medians, upper_quartiles, lower_quartiles = [], [], [], []
-    for fn in fnames:
+    for fn in file_names:
         frac, median, lower_quart, upper_quart = load_prediction_data(fn)
         fractions.append(frac)
         medians.append(median)
@@ -110,14 +95,11 @@ def plot_prediction_error():
     plt.close(fig)
 
 
-def plot_agent_performance():
+def plot_agent_performance(file_names, labels=None,
+                           figname='agent_preformance'):
+    if labels is None:
+        labels = ['file {}'.format(i) for i in range(len(file_names))]
     # plot agent performance
-    data_prefixes = ['gibbs_knick_win48', 'gibbs_knick_win12',
-                     'gibbs_pong_win48']
-    labels = ['Knick (48)', 'Knick (12)', 'Pong (48)']
-    file_names = [s + '_agent_performance' for s in data_prefixes]
-    figname = 'gibbs_knick_agent_performance'
-
     fig, ax = plt.subplots()
     ax.set_xlabel('Agent speed / ball speed')
     ax.set_ylabel('Success rate')
@@ -136,12 +118,33 @@ def plot_agent_performance():
     plt.legend()
     plt.savefig(make_figure_folder() + figname + '.pdf')
 
+if __name__ == '__main__':
+    # main
+    img_shape = (36, 48)
+    n_labels = img_shape[0]//3
+    # # compare window sizes
+    # data_path = get_data_path('gibbs_sampling')
+    # winsize = [48, 12]
+    # data_prefixes = [data_path + 'knick_win{}'.format(w) for w in winsize]
+    # data_prefixes.insert(0, data_path + 'pong_win48')
+    # labels = ['window size: {}'.format(win) for win in winsize]
+    # labels.insert(0, 'No knick')
+    # fig_name = 'gibbs_knick_prediction_error'
 
-# main
-img_shape = (36, 48)
-n_labels = img_shape[0]//3
-plot_prediction_error()
-# plot_agent_performance()
+    # Other comparisons are possible, just make a list of which prediction
+    # files to use
+    # data_path = get_data_path('gibbs_sampling')
+    # fnames = [data_path + 'pong_win48{}_prediction'.format(s) for s in
+    #           ['_100samples', '', '_10samples', '_05samples']]
+    # labels = ['n=100', 'n=20', 'n=10', 'n=5']
+    # fig_name = 'compare_nsamples'
+    # plot_prediction_error(fnames, labels, fig_name)
+
+    labels = ['n=100', 'n=20', 'n=10', 'n=5']
+    file_names = ['gibbs_pong_win48{}_agent_performance'.format(s)
+                  for s in ['_100samples', '', '_10samples', '_05samples']]
+    fig_name = 'agent_compare_nsamples'
+    plot_agent_performance(file_names   , labels, fig_name)
 
 # === other plots, not functional ===
 # image dissimilarity

@@ -19,14 +19,14 @@ def submit_job(wrap_cmd, sbatch_options=''):
 if __name__ == '__main__':
     pot_str = 'pong'
     win_size = 48
-    chunk_size = 10
-    n_total = 1000
+    chunk_size = 20
+    n_total = 2000
     starts = range(0, n_total, chunk_size)
     print("Send sampling jobs to slurm")
     jobs = []
-    sim_script_name = 'lif_clamp_window'
-    save_script_name = 'lif_save_prediction_data'
-    save_modifier = 'post'
+    sim_script_name = 'gibbs_sampling'
+    save_script_name = 'gibbs_save_prediction_data'
+    save_modifier = '10samples'
 
     memory_opt = "--mem=8G"
     for start in starts:

@@ -245,7 +245,7 @@ def plot_vmem_dist(data_file):
     plt.savefig(make_figure_folder() + 'vmem_dist.png')
 
 
-def plot_bias_comparison(data_files, biases=None):
+def plot_bias_comparison(data_files, biases=None, savename=None):
     if biases is None:
         biases = []
     fit_params = []
@@ -284,9 +284,11 @@ def plot_bias_comparison(data_files, biases=None):
     assert len(biases) != 0
     fit_params = np.array(fit_params)
     fit_covs = np.array(fit_covs)
+    pcoeff, vcoeff = np.polyfit(biases, fit_params[:, 0], 1, cov=True)
     fig2, ax2 = plt.subplots()
     ax2.errorbar(biases, fit_params[:, 0], fmt='.',
                  yerr=np.sqrt(fit_covs[:, 0, 0]))
+    ax2.plot(biases, pcoeff[0]*np.array(biases)  + pcoeff[1])
     ax2.set_xlabel('bias')
     ax2.set_ylabel('wp05')
     plt.tight_layout()
@@ -299,6 +301,11 @@ def plot_bias_comparison(data_files, biases=None):
     ax3.set_ylabel('alpha')
     plt.tight_layout()
     plt.savefig(make_figure_folder() + 'biases_alpha.png')
+
+    # save fit parameters
+    if savename is not None:
+        np.savez('calibrations/' + savename, wp05=pcoeff[1],
+                 alpha=np.mean(fit_params[:, 1]), bias_factor=pcoeff[0])
 
     return biases, fit_params, fit_covs
 
@@ -483,30 +490,30 @@ if __name__ == '__main__':
     # save_calib_fit(savename)
 
     # duration = 5e4
-    # n_neurons = 100
+    # n_neurons = 200
     # biases = np.linspace(-5, 1, 20)
     # for i, b in enumerate(biases):
     #     weights = np.linspace(-.05, .07, n_neurons)
     #     clamping_expt(n_neurons, duration, dodo_params, dodo_noise, config_file,
     #                   synweight=weights, tso_params=renewing_tso_params,
-    #                   bias=b, spike_interval=10., savename='long{}'.format(i))
+    #                   bias=b, spike_interval=1., savename='short_dt{}'.format(i))
 
     # duration = 1e4
     # n_neurons = 4
     # leak_potentials = np.linspace(-70., -50., n_neurons)
     # get_calibration(leak_potentials, duration, dodo_params, dodo_noise)
 
-    # activity for depressing synapse
-    n_neurons = 300
-    duration = 2000.
-    spike_interval = 1.
-    wrange = np.linspace(.01, .1, 10)
-    for i, w in enumerate(wrange):
-            clamping_expt(n_neurons, duration, dodo_params, dodo_noise,
-                          config_file, synweight=w,
-                          tso_params=clamp_tso_params,
-                          spike_interval=spike_interval,
-                          savename='wscan_depr{}'.format(i))
+    # # activity for depressing synapse
+    # n_neurons = 300
+    # duration = 2000.
+    # spike_interval = 1.
+    # wrange = np.linspace(.01, .1, 10)
+    # for i, w in enumerate(wrange):
+    #         clamping_expt(n_neurons, duration, dodo_params, dodo_noise,
+    #                       config_file, synweight=w,
+    #                       tso_params=clamp_tso_params,
+    #                       spike_interval=spike_interval,
+    #                       savename='wscan_depr{}'.format(i))
 
     # === Plot a figure =============================
 
@@ -516,11 +523,16 @@ if __name__ == '__main__':
     # analysis of time evolution --- under construction
     # analyse_sweep(['wscan_depr{}.pkl'.format(i) for i in range(20)], n_avg=30)
 
-    # t vs p_on given synaptic weight
+    # # t vs p_on given synaptic weight
     filenames = ['wscan_depr{}.pkl'.format(i) for i in range(10)]
-    d = np.load(get_data_path('neuron_clamping') + 'nu1_calib_data_fit.npz')
-    wp05 = d['popt'][0]
-    alpha = d['popt'][1]
+    with np.load('calibrations/dt1ms_calib.npz') as d:
+        wp05 = d['wp05']
+        alpha = d['alpha']
+    # d = np.load('calibrations/nu1_calib_data_fit.npz')
+    # wp05 = d['popt'][0]
+    # alpha = d['popt'][1]
+    # d.close()
+    # print(4*alpha + wp05)
     exp_kwargs = {
         'spike_times': numpy.arange(.1, 2000, 1.),
         'spike_interval': 1.,
@@ -541,20 +553,20 @@ if __name__ == '__main__':
     # # bias expt
     # filenames = ['short_dt_bias{}.pkl'.format(i) for i in range(20)]
     # b1, fp1, fc1 = plot_bias_comparison(filenames)
-    # filenames = ['long{}.pkl'.format(i) for i in range(20)]
+    # filenames = ['bias{}.pkl'.format(i) for i in range(20)]
     # b2, fp2, fc2 = plot_bias_comparison(filenames)
 
     # fig2, ax2 = plt.subplots()
-    # ax2.errorbar(b1, fp1[:, 0], fmt='.', yerr=np.sqrt(fc1[:, 0, 0]), label='10ms')
-    # ax2.errorbar(b2, fp2[:, 0], fmt='.', yerr=np.sqrt(fc2[:, 0, 0]), label='30ms')
+    # ax2.errorbar(b1, fp1[:, 0], fmt='.', yerr=np.sqrt(fc1[:, 0, 0]), label='1ms')
+    # ax2.errorbar(b2, fp2[:, 0], fmt='.', yerr=np.sqrt(fc2[:, 0, 0]), label='10ms')
     # ax2.set_xlabel('bias')
     # ax2.set_ylabel('wp05')
     # plt.legend()
     # plt.tight_layout()
     # plt.savefig(make_figure_folder() + 'biases_wp05.png')
     # fig3, ax3 = plt.subplots()
-    # ax3.errorbar(b1, fp1[:, 1], fmt='.', yerr=np.sqrt(fc1[:, 1, 1]), label='10ms')
-    # ax3.errorbar(b2, fp2[:, 1], fmt='.', yerr=np.sqrt(fc2[:, 1, 1]), label='30ms')
+    # ax3.errorbar(b1, fp1[:, 1], fmt='.', yerr=np.sqrt(fc1[:, 1, 1]), label='1ms')
+    # ax3.errorbar(b2, fp2[:, 1], fmt='.', yerr=np.sqrt(fc2[:, 1, 1]), label='10ms')
     # ax3.set_xlabel('bias')
     # ax3.set_ylabel('alpha')
     # plt.legend()

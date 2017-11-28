@@ -15,7 +15,7 @@ pot_str = sys.argv[1]
 win_size = int(sys.argv[2])
 script_name = sys.argv[3]
 if len(sys.argv) == 5:
-    modifier = str(sys.argv[4])
+    modifier = '_' + str(sys.argv[4])
 else:
     modifier = ''
 
@@ -25,8 +25,8 @@ data_name = pot_str + '_win{}{}_avg_chunk'.format(win_size, modifier)
 
 lab, last_col, data_idx = 0, 0, 0
 data_path = get_data_path(script_name)
-save_name = data_path + '_'.join(data_name.split('_')[:2]) + '_prediction' + \
-    modifier
+save_name = data_path + '_'.join(data_name.split('_')[:2]) + modifier + \
+    '_prediction'
 
 n_instances = 0
 for i in np.arange(150):

@@ -14,9 +14,11 @@ sim.setup(timestep=dt, **{"spike_precision": "on_grid", 'quit_on_end': False})
 
 # === Build and instrument the network =======================================
 rates = np.linspace(.1, 1, 20) * .1
-spike_times = range(100, 1100, 10)
+spike_times = [range(100, 1100, 10), range(1, 100, 10), []]
 spike_source = sim.Population(
-    1, sim.SpikeSourceArray(spike_times=spike_times))
+    3, sim.SpikeSourceArray, cellparams={'spike_times': spike_times})
+# for i, st in enumerate(spike_times):
+#     spike_source[i].set_parameters(spike_times=st)
 
 connector = sim.AllToAllConnector()
 
@@ -40,7 +42,7 @@ dodo_params = {
         "i_offset"   : 0.,
     }
 
-weights = np.arange(.01, .05, .5e-3)
+weights = np.arange(.01, .05, .02)
 coba_lif = sim.IF_cond_exp(**dodo_params)
 populations = []
 projections = []
@@ -69,12 +71,12 @@ for i, pop in enumerate(populations):
     spiketrain = pop.get_data().segments[0].spiketrains[0]
     p_on.append(len(spiketrain)*10./(duration - 100.))
     t = np.linspace(0, duration, len(vmem[0]))
-#     plt.plot(t, vmem[i], '-', label='Weight: {:.2f}'.format(weights[i]))
-# plt.xlabel('t [ms]')
-# plt.ylabel('membrane potential')
-# plt.tight_layout()
-# plt.legend()
-# plt.savefig(make_figure_folder() + figure_filename)
+    plt.plot(t, vmem[i], '-', label='Weight: {:.2f}'.format(weights[i]))
+plt.xlabel('t [ms]')
+plt.ylabel('membrane potential')
+plt.tight_layout()
+plt.legend()
+plt.savefig(make_figure_folder() + figure_filename)
 
 plt.plot(weights, p_on, '.')
 plt.savefig(make_figure_folder() + 'scan.pdf')

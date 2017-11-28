@@ -49,8 +49,9 @@ class Pong_agent(object):
         success = np.mean(dist <= .5 * self.paddle_len)
         return success, dist, paddle_trace
 
+
 if __name__ == '__main__':
-    if len(sys.argv) != 4:
+    if len(sys.argv) < 4:
         print('Wrong no. of arguments given.')
         sys.exit()
     else:
@@ -65,9 +66,13 @@ if __name__ == '__main__':
         pot_str = sys.argv[2]
         win_size = sys.argv[3]
         # can give 'baseline' as second argument
+        if len(sys.argv) == 5:
+            name_mod = '_' + sys.argv[4]
+        else:
+            name_mod = ''
 
     img_shape = (36, 48)
-    n_labels = 12
+    n_labels = img_shape[0] // 3
     lab_width = img_shape[0] / n_labels
     # ball velocity measured in pixels per time between two clamping frames
     v_ball = 1.
@@ -75,9 +80,9 @@ if __name__ == '__main__':
     # load targets and prediction data
     data_file = pot_str + '_var_start{}x{}'.format(*img_shape)
     pred_path = get_data_path(script_name)
-    pred_file = pot_str + '_win{}_prediction'.format(win_size)
-    save_file = '{}_{}_win{}_agent_performance'.format(
-        method, pot_str, win_size)
+    pred_file = pot_str + '_win{}{}_prediction'.format(win_size, name_mod)
+    save_file = '{}_{}_win{}{}_agent_performance'.format(
+        method, pot_str, win_size, name_mod)
 
     _, _, test_set = load_images(data_file)
     tmp = test_set[1]
