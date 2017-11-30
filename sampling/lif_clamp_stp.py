@@ -133,30 +133,30 @@ if __name__ == '__main__':
         "tso_params": mixing_tso_params
     }
 
-    # # load stuff
-    # img_shape = (36, 48)
-    # n_pixels = np.prod(img_shape)
-    # data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
-    # _, _, test_set = load_images(data_name)
-    # end = min(end, len(test_set[0]))
-    # rbm = load_rbm(data_name + '_crbm')
+    # load stuff
+    img_shape = (36, 48)
+    n_pixels = np.prod(img_shape)
+    data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
+    _, _, test_set = load_images(data_name)
+    end = min(end, len(test_set[0]))
+    rbm = load_rbm(data_name + '_crbm')
 
-    # samples = lif_tso_clamping_expt(
-    #     test_set[0][start:end], img_shape, rbm, calib_file, sbs_kwargs,
-    #     clamp_kwargs, n_samples=n_samples)
-
-    # testing
-    img_shape = (2, 2)
-    rbm = CRBM(4, 5, 2)
-    test_set = (np.array(([0, 1, 0, 1], [1, 0, 0, 1]), dtype=float), 0)
-    start = 0
-    end = len(test_set[0])
-    save_file = 'test'
-
-    n_samples = 1000
-    samples = test(
+    samples = lif_tso_clamping_expt(
         test_set[0][start:end], img_shape, rbm, calib_file, sbs_kwargs,
         clamp_kwargs, n_samples=n_samples)
+
+    # # testing
+    # img_shape = (2, 2)
+    # rbm = CRBM(4, 5, 2)
+    # test_set = (np.array(([0, 1, 0, 1], [1, 0, 0, 1]), dtype=float), 0)
+    # start = 0
+    # end = len(test_set[0])
+    # save_file = 'test'
+
+    # n_samples = 1000
+    # samples = test(
+    #     test_set[0][start:end], img_shape, rbm, calib_file, sbs_kwargs,
+    #     clamp_kwargs, n_samples=n_samples)
 
     # import timeit
     # setup = 'from __main__ import test, test_set, start, end, img_shape, rbm, calib_file, sbs_kwargs, clamp_kwargs, n_samples'

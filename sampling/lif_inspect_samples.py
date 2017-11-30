@@ -17,8 +17,8 @@ show_label = False
 img_shape = (2, 2)
 n_pixels = np.prod(img_shape)
 n_labels = 0
-sample_file = get_data_path('lif_clamp_stp') + \
-    'test.npz'
+# sample_file = get_data_path('lif_clamp_stp') + 'test.npz'
+sample_file = '/wang/users/mzenk/cluster_home/experiment/simulations/TestSweep/0.001_1000.0/samples.npz'
 # # MNIST
 # img_shape = (28, 28)
 # n_pixels = np.prod(img_shape)
@@ -45,7 +45,8 @@ with np.load(sample_file) as d:
     samples = d['samples'].astype(float)
     if len(samples.shape) == 2:
         samples = np.expand_dims(samples, 0)
-    data_idx = d['data_idx']
+    if 'data_idx' in d.keys():
+        data_idx = d['data_idx']
     n_samples = samples.shape[1]
     n_imgs = samples.shape[0]
     print('Loaded sample array with shape {}'.format(samples.shape))

@@ -297,13 +297,19 @@ def gather_network_spikes_clamped_sf(
         nv, sim.SpikeSourceArray, cellparams={'spike_times': inh_spiketrains})
 
     # calculate weights according to the calibration from wp_fit_params
-    w_on = wp_fit_params['wp05'] + 2*4*wp_fit_params['alpha']
-    w_off = wp_fit_params['wp05'] - 2*4*wp_fit_params['alpha']
-    bias_factor = wp_fit_params['bias_factor']
-    exc_weights = w_on + bias_factor * network.biases_theo[:nv]
-    inh_weights = w_off + bias_factor * network.biases_theo[:nv]
-    # choose symmetric weights so that decay takes equally long. Necessary?
-    weights = np.maximum(np.abs(exc_weights), np.abs(inh_weights))
+    if wp_fit_params is not None:
+        w_on = wp_fit_params['wp05'] + 2*4*wp_fit_params['alpha']
+        w_off = wp_fit_params['wp05'] - 2*4*wp_fit_params['alpha']
+        bias_factor = wp_fit_params['bias_factor']
+        exc_weights = w_on + bias_factor * network.biases_theo[:nv]
+        inh_weights = w_off + bias_factor * network.biases_theo[:nv]
+        # choose symmetric weights so that decay takes equally long. Necessary?
+        weights = np.maximum(np.abs(exc_weights), np.abs(inh_weights))
+    elif clamp_tso_params is not None and 'weight' in clamp_tso_params.keys():
+        weights = clamp_tso_params['weight'] * np.ones(nv)
+    else:
+        weights = np.zeros(nv)
+        log.warning('No weights provided for bias neuron synapses.')
 
     # apply corrections (nest units, compensate U, compensate accumulation)
     tau_syn = population.get('tau_syn_E')
