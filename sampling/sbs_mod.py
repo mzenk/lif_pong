@@ -8,7 +8,6 @@ import pyNN.nest as sim
 import cPickle
 import sys
 sys.path.insert(0, '../gibbs_rbm')
-from rbm import RBM, CRBM
 #example of custom(standalone) gather_spikes function for sbs
 
 #how to use (this is just a partitioned and modified version of gather_spikes):

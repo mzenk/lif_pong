@@ -1,8 +1,8 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
-from utils.data_mgmt import get_data_path, make_figure_folder, load_images
-from utils import average_helper
+from lif_pong.utils.data_mgmt import get_data_path, make_figure_folder, load_images
+from lif_pong.utils import average_helper
 from cycler import cycler
 import os
 import matplotlib as mpl
@@ -133,18 +133,18 @@ if __name__ == '__main__':
 
     # Other comparisons are possible, just make a list of which prediction
     # files to use
-    # data_path = get_data_path('gibbs_sampling')
-    # fnames = [data_path + 'pong_win48{}_prediction'.format(s) for s in
-    #           ['_100samples', '', '_10samples', '_05samples']]
-    # labels = ['n=100', 'n=20', 'n=10', 'n=5']
-    # fig_name = 'compare_nsamples'
-    # plot_prediction_error(fnames, labels, fig_name)
+    data_path = get_data_path('lif_clamp_window')
+    fnames = [data_path + 'pong_win48{}_prediction'.format(s) for s in
+              ['', '_N1000', '_N100']]
+    labels = ['N=2000', 'N=1000', 'N=100']
+    fig_name = 'compare_nimages'
+    plot_prediction_error(fnames, labels, fig_name)
 
-    labels = ['n=100', 'n=20', 'n=10', 'n=5']
-    file_names = ['gibbs_pong_win48{}_agent_performance'.format(s)
-                  for s in ['_100samples', '', '_10samples', '_05samples']]
-    fig_name = 'agent_compare_nsamples'
-    plot_agent_performance(file_names   , labels, fig_name)
+    # labels = ['n=100', 'n=20', 'n=10', 'n=5']
+    # file_names = ['gibbs_pong_win48{}_agent_performance'.format(s)
+    #               for s in ['_100samples', '', '_10samples', '_05samples']]
+    # fig_name = 'agent_compare_nsamples'
+    # plot_agent_performance(file_names   , labels, fig_name)
 
 # === other plots, not functional ===
 # image dissimilarity

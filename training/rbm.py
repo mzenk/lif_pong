@@ -2,11 +2,20 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
-from utils import logsum, logdiff
+from lif_pong.utils import logsum, logdiff
 import compute_isl as isl
 import itertools
 import time
 import logging
+import cPickle
+
+
+def load(rbm_dict):
+    rbm_type = rbm_dict.pop('type')
+    if rbm_type == 'rbm':
+        return RBM(**rbm_dict)
+    if rbm_type == 'crbm':
+        return CRBM(**rbm_dict)
 
 
 class RBM(object):
@@ -37,6 +46,18 @@ class RBM(object):
         # Making it a instance variable is not good OOP-style but
         # a simple solution
         self.dbm_factor = dbm_factor
+
+    def save(self, filename):
+        rbm_dict = {
+            'type': 'rbm',
+            'n_visible': self.n_visible,
+            'n_hidden': self.n_hidden,
+            'w': self.w,
+            'vbias': self.vbias,
+            'hbias': self.hbias
+        }
+        with open(filename, 'wb') as output:
+            cPickle.dump(rbm_dict, output, cPickle.HIGHEST_PROTOCOL)
 
     # get parameters in BM notation
     def bm_params(self):
@@ -681,6 +702,20 @@ class CRBM(RBM):
         # Making it a instance variable is not good OOP-style but
         # a simple solution
         self.dbm_factor = dbm_factor
+
+    def save(self, filename):
+        rbm_dict = {
+            'type': 'crbm',
+            'n_inputs': self.n_inputs,
+            'n_hidden': self.n_hidden,
+            'n_labels': self.n_labels,
+            'wv': self.wv,
+            'wl': self.wl,
+            'vbias': self.vbias,
+            'hbias': self.hbias
+        }
+        with open(filename, 'wb') as output:
+            cPickle.dump(rbm_dict, output, cPickle.HIGHEST_PROTOCOL)
 
     # For the CDBM I need a special sampling method for the top layer, which
     # is a CRBM.

@@ -4,8 +4,8 @@ import cPickle, gzip
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-from utils import tile_raster_images
-from utils.data_mgmt import load_rbm, load_images, make_figure_folder
+from lif_pong.utils import tile_raster_images
+from lif_pong.utils.data_mgmt import load_rbm, load_images, make_figure_folder
 
 
 def plot_samples(rbm, n_samples, img_shape):

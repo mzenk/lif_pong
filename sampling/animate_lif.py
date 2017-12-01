@@ -3,7 +3,7 @@ import numpy as np
 import sys
 from general_animation import make_animation
 sys.path.insert(0, '../')
-from utils.data_mgmt import get_data_path, make_figure_folder
+from lif_pong.utils.data_mgmt import get_data_path, make_figure_folder
 
 img_shape = (36, 48)
 n_pixels = np.prod(img_shape)

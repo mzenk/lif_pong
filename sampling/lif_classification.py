@@ -3,8 +3,8 @@ from __future__ import print_function
 import sys
 import numpy as np
 import lif_clamped_sampling as lifsampl
-from utils.data_mgmt import make_data_folder, load_images, load_rbm
-from rbm import RBM, CRBM
+from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict
+import lif_pong.training.rbm as rbm_pkg
 import multiprocessing as mp
 from functools import partial
 
@@ -102,13 +102,13 @@ if __name__ == '__main__':
         img_shape = (28, 28)
         with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
             _, _, test_set = np.load(f)
-        rbm = load_rbm('mnist_disc_rbm')
+        rbm = rbm_pkg.load(get_rbm_dict('mnist_disc_rbm'))
         test_targets = test_set[1][start:min(end, len(test_set[0]))]
     else:
         img_shape = (36, 48)
         data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
         _, _, test_set = load_images(data_name)
-        rbm = load_rbm(data_name + '_crbm')
+        rbm = rbm_pkg.load(get_rbm_dict(data_name + '_crbm'))
         test_targets = np.argmax(test_set[1][start:min(end, len(test_set[0]))],
                                  axis=1)
 

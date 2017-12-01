@@ -15,7 +15,7 @@ def make_data_folder(name=None, shared_data=False):
     # if data is used across project save in shared_data folder
     if shared_data:
         home = os.path.expanduser('~')
-        data_path = home + '/Projects/Pong/shared_data/'
+        data_path = home + '/Projects/lif_pong/shared_data/'
     else:
         data_path = 'data/'
 
@@ -55,17 +55,25 @@ def load_images(data_name):
     if socket.gethostname() == 'asdf':
         path = os.path.expanduser('~') + '/mnt/hel_mnt/shared_data/datasets/'
     else:
-        path = os.path.expanduser('~') + '/Projects/Pong/shared_data/datasets/'
+        path = os.path.expanduser('~') + '/Projects/lif_pong/shared_data/datasets/'
     with np.load(path + data_name + '.npz') as d:
         train_set, valid_set, test_set = d[d.keys()[0]]
     return train_set, valid_set, test_set
 
 
-def load_rbm(data_name):
+# The previous load_rbm method can be problematic if no relative import is used, cf.
+# https://stackoverflow.com/questions/13398462/unpickling-python-objects-with-a-changed-module-path
+# Hence, I switched to a dictionary-based storing of RBMs, where a shortcut to the shared
+# data path is provided by the following method and the loading done in the rbm module.
+def get_rbm_dict(rbm_name):
     if socket.gethostname() == 'asdf':
         path = os.path.expanduser('~') + '/mnt/hel_mnt/shared_data/saved_rbms/'
     else:
-        path = os.path.expanduser('~') + '/Projects/Pong/shared_data/saved_rbms/'
-    with open(path + data_name + '.pkl', 'rb') as f:
-        rbm = cPickle.load(f)
-    return rbm
+        path = os.path.expanduser('~') + '/Projects/lif_pong/shared_data/saved_rbms/'
+    with open(path + rbm_name + '.pkl', 'rb') as f:
+        try:
+            rbm_dict = cPickle.load(f)
+        except ImportError:
+            print('Cannot unpickle the object because it is a non-primitive type')
+            return None
+    return rbm_dict

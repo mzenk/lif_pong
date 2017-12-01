@@ -7,8 +7,8 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import lif_clamped_sampling as lifsampl
-from utils.data_mgmt import load_images, load_rbm
-from rbm import RBM, CRBM
+from lif_pong.utils.data_mgmt import load_images, get_rbm_dict
+import lif_pong.training.rbm as rbm_pkg
 
 
 def lif_tso_clamping_expt(test_imgs, img_shape, rbm, sbs_kwargs,
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     img_shape = general_dict['img_shape']
     # load data
     _, _, test_set = load_images(general_dict['data_name'])
-    rbm = load_rbm(general_dict['rbm_name'])
+    rbm = rbm_pkg.load(get_rbm_dict(general_dict['rbm_name']))
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
 
@@ -135,7 +135,7 @@ if __name__ == '__main__':
 
     # testing
     img_shape = (2, 2)
-    rbm = CRBM(4, 5, 2)
+    rbm = rbm_pkg.CRBM(4, 5, 2)
     test_set = (np.array(([0, 1, 0, 1], [1, 0, 0, 1]), dtype=float), 0)
 
     samples = test(

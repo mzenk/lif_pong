@@ -4,9 +4,9 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 import sys
-from rbm import RBM, CRBM
-from utils.data_mgmt import make_data_folder, load_images, load_rbm
-from utils import get_windowed_image_index, average_pool
+import lif_pong.training.rbm as rbm_pkg
+from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict
+from lif_pong.utils import get_windowed_image_index, average_pool
 
 
 # shouldn't be used with more than a few imgs (due to memory limitations)
@@ -129,7 +129,7 @@ rbm_name = data_name + '_crbm'
 if pot_str == 'knick':
     rbm_name = 'pong_var_start{}x{}_crbm'.format(*img_shape)
 _, _, test_set = load_images(data_name)
-rbm = load_rbm(rbm_name)
+rbm = rbm_pkg.load(get_rbm_dict(rbm_name))
 
 end = min(start + chunk_size, len(test_set[0]))
 idx = np.arange(start, end)

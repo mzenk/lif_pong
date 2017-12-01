@@ -6,7 +6,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from training.rbm import RBM, CRBM
-from utils.data_mgmt import make_figure_folder, load_images, load_rbm, get_data_path, make_data_folder
+from lif_pong.utils.data_mgmt import make_figure_folder, load_images, get_rbm_dict, get_data_path, make_data_folder
 
 
 # # =============================
@@ -18,7 +18,7 @@ from utils.data_mgmt import make_figure_folder, load_images, load_rbm, get_data_
 # f = gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb')
 # _, _, test_set = np.load(f)
 # f.close()
-# rbm = load_rbm('mnist_disc_rbm')
+# rbm = rbm_pkg.load(get_rbm_dict('mnist_disc_rbm'))
 # nv = rbm.n_visible
 # nl = rbm.n_labels
 # sample_file = get_data_path('lif_classification') + \
@@ -122,7 +122,7 @@ img_shape = (28, 28)
 n_pixels = np.prod(img_shape)
 with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
     _, _, test_set = np.load(f)
-rbm = load_rbm('mnist_disc_rbm')
+rbm = rbm_pkg.load(get_rbm_dict('mnist_disc_rbm'))
 start = 0
 end = 2
 test_targets = test_set[1][start:end]

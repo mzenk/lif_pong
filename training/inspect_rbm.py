@@ -2,8 +2,8 @@ from __future__ import division
 from __future__ import print_function
 import numpy as np
 import cPickle
-from utils import tile_raster_images, to_1_of_c
-from utils.data_mgmt import load_images, load_rbm, make_figure_folder
+from lif_pong.utils import tile_raster_images, to_1_of_c
+from lif_pong.utils.data_mgmt import load_images, load_rbm, make_figure_folder
 from rbm import RBM, CRBM
 import matplotlib as mpl
 mpl.use('agg')

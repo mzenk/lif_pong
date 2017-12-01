@@ -3,8 +3,8 @@ from __future__ import print_function
 import sys
 import numpy as np
 import lif_clamped_sampling as lifsampl
-from utils.data_mgmt import make_data_folder, load_images, load_rbm
-from rbm import RBM, CRBM
+from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict
+import lif_pong.training.rbm as rbm_pkg
 
 
 def lif_window_expt(win_size, test_imgs, img_shape, rbm, calib_file,
@@ -106,7 +106,7 @@ n_pixels = np.prod(img_shape)
 data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
 _, _, test_set = load_images(data_name)
 end = min(end, len(test_set[0]))
-rbm = load_rbm(data_name + '_crbm')
+rbm = rbm_pkg.load(get_rbm_dict(data_name + '_crbm'))
 
 samples = lif_window_expt(
     win_size, test_set[0][start:end], img_shape, rbm, calib_file, sbs_kwargs,
@@ -114,7 +114,7 @@ samples = lif_window_expt(
 
 # # testing
 # img_shape = (2, 2)
-# rbm = CRBM(4, 5, 2)
+# rbm = rbm_pkg.CRBM(4, 5, 2)
 # test_set = (np.array(([0, 1, 0, 1], [1, 0, 0, 1]), dtype=float), 0)
 # start = 0
 # end = len(test_set[0])

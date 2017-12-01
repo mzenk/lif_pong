@@ -5,7 +5,7 @@ import cPickle
 import sys
 from scipy.ndimage import convolve1d
 sys.path.insert(0, '../gibbs_rbm')
-from rbm import RBM, CRBM
+import lif_pong.training.rbm as rbm_pkg
 import matplotlib as mpl
 mpl.use( "Agg" )
 import matplotlib.pyplot as plt

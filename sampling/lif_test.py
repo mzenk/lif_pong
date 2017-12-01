@@ -6,9 +6,9 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 import lif_clamped_sampling as lifsampl
-from utils.data_mgmt import make_data_folder, load_images, load_rbm, get_data_path
-from utils import get_windowed_image_index
-from rbm import RBM, CRBM
+from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict, get_data_path
+from lif_pong.utils import get_windowed_image_index
+import lif_pong.training.rbm as rbm_pkg
 
 
 def lif_unclamp(test_imgs, rbm, calib_file, sbs_kwargs, n_samples=50):
@@ -123,7 +123,7 @@ if __name__ == '__main__':
     # img_shape = (36, 48)
     # data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
     # _, _, test_set = load_images(data_name)
-    # rbm = load_rbm(data_name + '_crbm')
+    # rbm = rbm_pkg.load(get_rbm_dict(data_name + '_crbm'))
 
     # save_file = 'test'
     # samples = lif_clamp_beginning(

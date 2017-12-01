@@ -6,7 +6,7 @@ import numpy as np
 import os
 import sys
 import yaml
-from utils import average_pool
+from lif_pong.utils import average_pool
 import pong_agent
 
 assert os.path.exists('analysis')

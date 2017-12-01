@@ -9,7 +9,7 @@ import os
 from inspect import isfunction, getargspec
 import json
 import training.compute_isl as isl
-from utils.data_mgmt import load_rbm, load_images, make_data_folder, \
+from lif_pong.utils.data_mgmt import load_images, make_data_folder, \
     make_figure_folder, get_data_path
 
 

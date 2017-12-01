@@ -3,9 +3,9 @@ from __future__ import print_function
 import sys
 import numpy as np
 import lif_clamped_sampling as lifsampl
-from utils.data_mgmt import make_data_folder, load_images, load_rbm
-from utils import get_windowed_image_index
-from rbm import RBM, CRBM
+from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict
+from lif_pong.utils import get_windowed_image_index
+import lif_pong.training.rbm as rbm_pkg
 import multiprocessing as mp
 from functools import partial
 
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     img_shape = (36, 48)
     data_name = pot_str + '_var_start{}x{}'.format(*img_shape)
     _, _, test_set = load_images(data_name)
-    rbm = load_rbm(data_name + '_crbm')
+    rbm = rbm_pkg.load(get_rbm_dict(data_name + '_crbm'))
 
     samples, winpos = lif_window_quick(
         test_set[0][start:end], rbm, calib_file, sbs_kwargs,

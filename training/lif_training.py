@@ -6,10 +6,10 @@ import numpy as np
 import multiprocessing as mp
 import logging
 import sampling.lif_clamped_sampling as lifsampl
-from utils.data_mgmt import make_data_folder, load_images, load_rbm
+from lif_pong.utils.data_mgmt import make_data_folder, load_images, load_rbm
 from rbm import RBM, CRBM
 from functools import partial
-from utils import bin_to_dec, compute_dkl
+from lif_pong.utils import bin_to_dec, compute_dkl
 import matplotlib.pyplot as plt
 import time
 import cPickle
@@ -377,8 +377,7 @@ if __name__ == '__main__':
           weight_cost=1e-4, sbs_kwargs=sbs_kwargs)
 
     # Save rbm for later use
-    with open('../shared_data/saved_rbms/' + rbm_name + '_post.pkl', 'wb') as output:
-        cPickle.dump(rbm, output, cPickle.HIGHEST_PROTOCOL)
+    rbm.save('../shared_data/saved_rbms/' + rbm_name + '_post.pkl')
 
     # # test
     # seed = 1234567

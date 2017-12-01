@@ -6,8 +6,8 @@ from __future__ import print_function
 import numpy as np
 import os
 import sys
-from utils.data_mgmt import get_data_path
-from utils import average_pool
+from lif_pong.utils.data_mgmt import get_data_path
+from lif_pong.utils import average_pool
 
 if len(sys.argv) < 4:
     print('Required arguments: pong/gauss, win_size, '

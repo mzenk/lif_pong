@@ -6,8 +6,8 @@ from dbm import DBM, CDBM
 import sys
 import time
 import cPickle
-from utils.data_mgmt import make_data_folder, load_images
-from utils import to_1_of_c
+from lif_pong.utils.data_mgmt import make_data_folder, load_images
+from lif_pong.utils import to_1_of_c
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -73,8 +73,7 @@ if sys.argv[1] == 'gen':
 
     if save:
         # Save crbm for later inspection
-        with open(make_data_folder('saved_rbms', True) + fname + '_rbm_test.pkl', 'wb') as output:
-            cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
+        my_rbm.save(make_data_folder('saved_rbms', True) + fname + '_rbm_test.pkl')
 
 if sys.argv[1] == 'dis':
     print('Training discriminative RBM on Pong on  {}'
@@ -104,8 +103,7 @@ if sys.argv[1] == 'dis':
     if save:
         # Save crbm for later inspection, the training parameters should be
         # recorded elsewhere!
-        with open(make_data_folder('saved_rbms', True) + fname + '_crbm_bin.pkl', 'wb') as output:
-            cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
+        my_rbm.save(make_data_folder('saved_rbms', True) + fname + '_crbm_bin.pkl')
 
 if sys.argv[1] == 'deep':
     # ----- test DBN/DBM -----

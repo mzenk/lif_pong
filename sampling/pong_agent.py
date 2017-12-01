@@ -4,8 +4,8 @@ from __future__ import division
 from __future__ import print_function
 import numpy as np
 import sys
-from utils.data_mgmt import get_data_path, make_data_folder, load_images
-from utils import average_helper
+from lif_pong.utils.data_mgmt import get_data_path, make_data_folder, load_images
+from lif_pong.utils import average_helper
 
 
 # copied from animate_gibbs

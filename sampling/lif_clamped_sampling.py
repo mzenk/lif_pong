@@ -2,7 +2,7 @@ from __future__ import division
 import sbs
 from sbs.gather_data import get_callbacks, eta_from_burnin
 from sbs.logcfg import log
-from utils import get_windowed_image_index
+from lif_pong.utils import get_windowed_image_index
 import time
 import sys
 import numpy as np

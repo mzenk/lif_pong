@@ -21,7 +21,8 @@ if len(sys.argv) != 2:
     sys.exit()
 expt_name = sys.argv[1]
 
-simfolder = '/work/ws/nemo/hd_kq433-data_workspace-0/experiment/simulations/'
+simfolder = '/wang/users/mzenk/cluster_home/experiment/simulations/'
+# simfolder = '/work/ws/nemo/hd_kq433-data_workspace-0/experiment/simulations/'
 worker_script = '/home/hd/hd_hd/hd_kq433/git-repos/lif-pong/sampling/lif_analysefm_worker.py'
 
 stub = """#!/usr/bin/env bash
@@ -64,12 +65,12 @@ for i, u in enumerate(us):
             f.write(content)
         time.sleep(.1)
 
-for job in taskfiles:
-    # submit batch jobs of worker scripts
-    try:
-        jobid = subprocess.check_output(['msub', job])
-    except subprocess.CalledProcessError:
-        raise
+# for job in taskfiles:
+#     # submit batch jobs of worker scripts
+#     try:
+#         jobid = subprocess.check_output(['msub', job])
+#     except subprocess.CalledProcessError:
+#         raise
 
 # plot results (depending on how costly send to cluster)
 # ...

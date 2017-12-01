@@ -3,7 +3,7 @@ from __future__ import print_function
 import numpy as np
 import multiprocessing as mp
 from functools import partial
-from utils import logsum
+from lif_pong.utils import logsum
 
 
 def loglik_helper(x, beta, y):
@@ -104,7 +104,7 @@ class ISL_density_model(object):
 
 if __name__ == '__main__':
     from rbm import RBM, CRBM
-    from utils.data_mgmt import load_rbm, load_images
+    from lif_pong.utils.data_mgmt import load_rbm, load_images
     img_shape = (36, 48)
     data_name = 'pong_var_start{}x{}'.format(*img_shape)
     _, _, test_set = load_images(data_name)

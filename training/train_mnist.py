@@ -3,7 +3,7 @@ from __future__ import print_function
 import numpy as np
 import cPickle
 import gzip
-from utils import to_1_of_c
+from lif_pong.utils import to_1_of_c
 import sys
 import time
 from rbm import RBM, CRBM
@@ -61,8 +61,7 @@ if sys.argv[1] == 'gen':
           '{}'.format(my_rbm.compute_logpl(train_set[0])))
 
     # Save crbm for later inspection
-    with open('saved_rbms/mnist_gen_rbm.pkl', 'wb') as output:
-        cPickle.dump(my_rbm, output, cPickle.HIGHEST_PROTOCOL)
+    my_rbm.save('../shared_data/saved_rbms/mnist_gen_rbm.pkl')
 
 if sys.argv[1] == 'dis':
     # ----- test ClassRBM -----
@@ -83,9 +82,8 @@ if sys.argv[1] == 'dis':
     test_performance = np.average(prediction == test_set[1])
     print("Correct classifications on test set: " + str(test_performance))
 
-    # # Save crbm for later inspection
-    # with open('saved_rbms/mnist_disc_rbm.pkl', 'wb') as output:
-    #     cPickle.dump(crbm, output, cPickle.HIGHEST_PROTOCOL)
+    # Save crbm for later inspection
+    crbm.save('../shared_data/saved_rbms/mnist_disc_rbm.pkl')
 
 if sys.argv[1] == 'deep':
     # ----- test (C)DBM -----

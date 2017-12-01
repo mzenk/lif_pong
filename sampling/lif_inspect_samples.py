@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import sys
 sys.path.insert(0, '../')
-from training.rbm import RBM, CRBM
-from utils import tile_raster_images
-from utils.data_mgmt import make_figure_folder, load_images, load_rbm, get_data_path
+import lif_pong.training.rbm as rbm_pkg
+from lif_pong.utils import tile_raster_images
+from lif_pong.utils.data_mgmt import make_figure_folder, load_images, get_rbm_dict, get_data_path
 
 # Load rbm and data
 
@@ -18,7 +18,7 @@ img_shape = (2, 2)
 n_pixels = np.prod(img_shape)
 n_labels = 0
 # sample_file = get_data_path('lif_clamp_stp') + 'test.npz'
-sample_file = '/wang/users/mzenk/cluster_home/experiment/simulations/TestSweep/0.001_1000.0/samples.npz'
+sample_file = '/wang/users/mzenk/cluster_home/experiment/simulations/TestSweep/0.001_2000.0/samples.npz'
 # # MNIST
 # img_shape = (28, 28)
 # n_pixels = np.prod(img_shape)
@@ -26,7 +26,7 @@ sample_file = '/wang/users/mzenk/cluster_home/experiment/simulations/TestSweep/0
 # f = gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb')
 # _, _, test_set = np.load(f)
 # f.close()
-# rbm = load_rbm('mnist_disc_rbm')
+# rbm = rbm_pkg.load(get_rbm_dict('mnist_disc_rbm'))
 # nv = rbm.n_visible
 # n_labels = rbm.n_labels
 # sample_file = get_data_path('playground') + \

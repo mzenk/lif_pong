@@ -5,8 +5,8 @@ import matplotlib.animation as animation
 # since this script is still called from my office pc, expand path variable
 import sys
 sys.path.insert(0, '../')
-from utils.data_mgmt import get_data_path, make_figure_folder
-from utils import average_helper
+from lif_pong.utils.data_mgmt import get_data_path, make_figure_folder
+from lif_pong.utils import average_helper
 from pong_agent import Pong_agent
 
 

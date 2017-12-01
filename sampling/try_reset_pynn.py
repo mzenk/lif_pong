@@ -3,8 +3,8 @@ from __future__ import print_function
 import sys
 import numpy as np
 import lif_clamped_sampling as lifsampl
-from utils.data_mgmt import make_data_folder, load_images, load_rbm
-from rbm import RBM, CRBM
+from lif_pong.utils.data_mgmt import make_data_folder, load_images, load_rbm
+from lif_pong.training.rbm import RBM, CRBM
 
 # ==========
 # das hier kommt in lif_clamped_sampling.py

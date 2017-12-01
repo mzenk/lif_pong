@@ -24,9 +24,9 @@ if __name__ == '__main__':
     starts = range(0, n_total, chunk_size)
     print("Send sampling jobs to slurm")
     jobs = []
-    sim_script_name = 'gibbs_sampling'
-    save_script_name = 'gibbs_save_prediction_data'
-    save_modifier = '10samples'
+    sim_script_name = 'lif_clamp_window'
+    save_script_name = 'lif_save_prediction_data'
+    save_modifier = ''
 
     memory_opt = "--mem=8G"
     for start in starts:
