@@ -9,6 +9,7 @@ import yaml
 from utils import average_pool
 import pong_agent
 
+assert os.path.exists('analysis')
 
 if len(sys.argv) != 4:
     print('Wrong number of arguments.')
