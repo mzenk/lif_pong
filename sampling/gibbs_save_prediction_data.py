@@ -26,6 +26,8 @@ data_list = [f for f in os.listdir(data_path)
 if len(sys.argv) == 4:
     n_data = int(sys.argv[3])
     save_name = data_path + data_name + '_N{}_prediction'.format(n_data)
+else:
+    n_data = -1
 
 n_instances = 0
 for i, f in enumerate(data_list):
@@ -49,7 +51,7 @@ for i, f in enumerate(data_list):
     data_idx = chunk_idx if i == 0 else np.concatenate((data_idx, chunk_idx))
 
     # no need to load more than necessary
-    if n_instances > n_data:
+    if n_data != -1 and n_instances > n_data:
         break
 
 # restrict number of images in prediction file

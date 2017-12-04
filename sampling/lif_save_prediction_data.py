@@ -33,6 +33,7 @@ else:
     n_data = -1
 
 n_instances = 0
+
 for i, f in enumerate(data_list):
     path = data_path + f
     if not os.path.exists(path):
@@ -65,7 +66,7 @@ for i, f in enumerate(data_list):
     data_idx = chunk_idx if i == 0 else np.concatenate((data_idx, chunk_idx))
 
     # no need to load more than necessary
-    if n_instances > n_data:
+    if n_data != -1 and n_instances > n_data:
         break
 
 # restrict number of images in prediction file
