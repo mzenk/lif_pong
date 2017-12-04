@@ -6,36 +6,40 @@ from lif_pong.utils.data_mgmt import get_data_path
 import os
 import sys
 
-if len(sys.argv) < 4:
-    print('Required arguments: pong/gauss, win_size, '
-          'script (data generation) name [name_modifier]')
+if len(sys.argv) < 3:
+    print('Required arguments: data_name, '
+          '(data generation) script name, [n_files]')
     sys.exit()
 
-pot_str = sys.argv[1]
-win_size = int(sys.argv[2])
-script_name = sys.argv[3]
-if len(sys.argv) == 5:
-    modifier = '_' + str(sys.argv[4])
-else:
-    modifier = ''
+data_name = sys.argv[1]
+script_name = sys.argv[2]
 
 img_shape = (36, 48)
 n_labels = img_shape[0]//3
-data_name = pot_str + '_win{}{}_avg_chunk'.format(win_size, modifier)
+n_pxls = np.prod(img_shape)
 
 lab, last_col, data_idx = 0, 0, 0
 data_path = get_data_path(script_name)
-save_name = data_path + '_'.join(data_name.split('_')[:2]) + modifier + \
-    '_prediction'
+save_name = data_path + data_name + '_prediction'
+data_list = [f for f in os.listdir(data_path)
+             if data_name + '_avg_chunk' in f]
+if len(sys.argv) == 4:
+    n_data = int(sys.argv[3])
+    if n_data > len(data_list):
+        print('Warning: Less data files exist than specified.')
+    data_list = data_list[:n_data]
+    save_name = data_path + data_name + '_N{}_prediction'.format(n_data)
 
 n_instances = 0
-for i in np.arange(150):
-    path = data_path + data_name + '{:03d}.npz'.format(i)
+for i, f in enumerate(data_list):
+    path = data_path + f
     if not os.path.exists(path):
+        print('!!!\nFile does not exit: {}\n!!!'.format(path))
         continue
+
     print('Processing chunk ' + str(i))
     with np.load(path) as d:
-        assert win_size == d['win_size']
+        win_size = d['win_size']
         chunk_vis = d['vis']
         chunk_idx = d['data_idx']
     n_instances += len(chunk_idx)

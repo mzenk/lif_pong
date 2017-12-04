@@ -9,47 +9,49 @@ import sys
 from lif_pong.utils.data_mgmt import get_data_path
 from lif_pong.utils import average_pool
 
-if len(sys.argv) < 4:
-    print('Required arguments: pong/gauss, win_size, '
-          'script (data generation) name [name_modifier]')
+if len(sys.argv) < 3:
+    print('Required arguments: data_name, '
+          '(data generation) script name, [n_files]')
     sys.exit()
 
-pot_str = sys.argv[1]
-win_size = int(sys.argv[2])
-script_name = sys.argv[3]
-if len(sys.argv) == 5:
-    modifier = '_' + str(sys.argv[4])
-else:
-    modifier = ''
+data_name = sys.argv[1]
+script_name = sys.argv[2]
+
 img_shape = (36, 48)
 n_labels = img_shape[0]//3
 n_pxls = np.prod(img_shape)
-data_name = pot_str + '_win{}{}_chunk'.format(win_size, modifier)
 
 lab, last_col, data_idx = 0, 0, 0
-sample_data_path = get_data_path(script_name)
-save_name = sample_data_path + '_'.join(data_name.split('_')[:2]) + \
-    modifier + '_prediction'
+data_path = get_data_path(script_name)
+data_list = [f for f in os.listdir(data_path)
+             if data_name + '_chunk' in f]
+save_name = data_path + data_name + '_prediction'
+if len(sys.argv) == 4:
+    n_data = int(sys.argv[3])
+    if n_data > len(data_list):
+        print('Warning: Less data files exist than specified.')
+    data_list = data_list[:n_data]
+    save_name = data_path + data_name + '_N{}_prediction'.format(n_data)
 
-for i in np.arange(100):
-    path = sample_data_path + data_name + '{:03d}.npz'.format(i)
+for i, f in enumerate(data_list):
+    path = data_path + f
     if not os.path.exists(path):
+        print('!!!\nFile does not exit: {}\n!!!'.format(path))
         continue
 
     print('Processing chunk ' + str(i))
     with np.load(path) as d:
-        assert win_size == d['win_size']
         chunk_samples = d['samples'].astype(float)
         chunk_vis = chunk_samples[..., :n_pxls + n_labels]
         chunk_idx = d['data_idx']
         n_samples = d['samples_per_frame']
+        win_size = d['win_size']
         winpos = np.arange(win_size + 1)
         if 'winpos' in d.keys():
             winpos = d['winpos']
 
     # first average pool on each chunk
     chunk_vis = average_pool(chunk_vis, n_samples, n_samples)
-    print(chunk_vis.shape)
 
     # then compute prediction
     tmp_col = chunk_vis[..., :-n_labels].reshape(
