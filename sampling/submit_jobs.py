@@ -28,14 +28,15 @@ if __name__ == '__main__':
     save_script_name = 'lif_save_prediction_data'
     save_modifier = ''
 
-    memory_opt = "--mem=8G"
+    memory_opt = "--mem=6G"
     for start in starts:
         args = (sim_script_name, pot_str, start, chunk_size, win_size,
                 save_modifier)
         wrap_cmd = 'python {}.py {} {} {} {} {}'.format(*args)
         jobs.append(submit_job(wrap_cmd, memory_opt))
 
-    args = (pot_str, win_size, sim_script_name, save_modifier)
+    args = ('{}_win{}_{}'.format(pot_str, win_size, save_modifier),
+            sim_script_name)
     dependency = "--kill-on-invalid-dep=yes" \
         " --dependency=afterok:" + ":".join(jobs)
     submit_job('python {}.py {} {} {} {}'.format(save_script_name, *args),
