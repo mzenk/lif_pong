@@ -52,9 +52,12 @@ def get_data_path(source_script_name):
 
 
 def load_images(data_name):
+    path = ''
     if socket.gethostname() == 'asdf':
         path = os.path.expanduser('~') + '/mnt/hel_mnt/shared_data/datasets/'
-    else:
+    if 'nemo' in socket.gethostname():
+        path = os.path.expanduser('~') + '/git_repos/lif_pong/shared_data/datasets/'
+    if socket.gethostname() == 'hel':
         path = os.path.expanduser('~') + '/Projects/lif_pong/shared_data/datasets/'
     with np.load(path + data_name + '.npz') as d:
         train_set, valid_set, test_set = d[d.keys()[0]]
@@ -66,9 +69,12 @@ def load_images(data_name):
 # Hence, I switched to a dictionary-based storing of RBMs, where a shortcut to the shared
 # data path is provided by the following method and the loading done in the rbm module.
 def get_rbm_dict(rbm_name):
+    path = ''
     if socket.gethostname() == 'asdf':
         path = os.path.expanduser('~') + '/mnt/hel_mnt/shared_data/saved_rbms/'
-    else:
+    if 'nemo' in socket.gethostname():
+        path = os.path.expanduser('~') + '/git_repos/lif_pong/shared_data/saved_rbms/'
+    if socket.gethostname() == 'hel':
         path = os.path.expanduser('~') + '/Projects/lif_pong/shared_data/saved_rbms/'
     with open(path + rbm_name + '.pkl', 'rb') as f:
         try:

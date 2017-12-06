@@ -109,9 +109,8 @@ def compute_performance(img_shape, data_name, prediction_path):
     distances = np.zeros((len(speed_range), len(targets)))
     n_recorded = len(targets)//100
     traces = np.zeros((speed_range.shape[0], predictions.shape[0], n_recorded))
+    print('sweep agent speed ({} to {})...'.format(speed_range[0], speed_range[-1]))
     for i, speed in enumerate(speed_range):
-        print('sweep agent speed ({} of {})...'
-              ''.format(i + 1, len(speed_range)))
         my_agent = Pong_agent(img_shape[0], paddle_len=lab_width,
                               max_step=speed)
         success_rates[i], success_rates_std[i], distances[i], tmp = \

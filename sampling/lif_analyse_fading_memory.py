@@ -21,15 +21,14 @@ if len(sys.argv) != 2:
     sys.exit()
 expt_name = sys.argv[1]
 
-simfolder = '/wang/users/mzenk/cluster_home/experiment/simulations/'
-# simfolder = '/work/ws/nemo/hd_kq433-data_workspace-0/experiment/simulations/'
-worker_script = '/home/hd/hd_hd/hd_kq433/git-repos/lif-pong/sampling/lif_analysefm_worker.py'
+simfolder = '/work/ws/nemo/hd_kq433-data_workspace-0/experiment/simulations/'
+worker_script = '/home/hd/hd_hd/hd_kq433/git_repos/lif_pong/sampling/lif_analysefm_worker.py'
 
 stub = """#!/usr/bin/env bash
 
-#MSUB -l nodes=1:ppn=10
-#MSUB -l walltime=05:00:00
-#MSUB -l pmem=4000mb
+#MSUB -l nodes=1:ppn=1
+#MSUB -l walltime=00:30:00
+#MSUB -l pmem=10000mb
 #MSUB -N analysis
 
 cd "{folder}" &&
@@ -65,12 +64,43 @@ for i, u in enumerate(us):
             f.write(content)
         time.sleep(.1)
 
-# for job in taskfiles:
-#     # submit batch jobs of worker scripts
-#     try:
-#         jobid = subprocess.check_output(['msub', job])
-#     except subprocess.CalledProcessError:
-#         raise
+for job in taskfiles:
+    # submit batch jobs of worker scripts
+    try:
+        jobid = subprocess.check_output(['msub', job])
+    except subprocess.CalledProcessError:
+        raise
 
 # plot results (depending on how costly send to cluster)
 # ...
+
+def plot_agent_performance(file_names, labels=None,
+                           figname='agent_preformance'):
+    if labels is None:
+        labels = ['file {}'.format(i) for i in range(len(file_names))]
+    # plot agent performance
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Agent speed / ball speed')
+    ax.set_ylabel('Success rate')
+    ax.set_ylim([0., 1.])
+
+    successes, distances, speeds = [], [], []
+    for fn in file_names:
+        suc, dis, spe = load_agent_data(fn)
+        successes.append(suc)
+        distances.append(dis)
+        speeds.append(spe)
+
+    for i, fn in enumerate(file_names):
+        ax.plot(speeds[i], successes[i], label=labels[i])
+
+    plt.legend()
+    plt.savefig(make_figure_folder() + figname + '.pdf')
+
+def load_agent_data(file_name):
+    with np.load(get_data_path('pong_agent') + file_name + '.npz') as d:
+        success = d['successes']
+        dist = d['distances']
+        speeds = d['speeds']
+    print('Asymptotic value (full history): {}'.format(success.max()))
+    return success, dist, speeds

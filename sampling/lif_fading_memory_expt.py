@@ -122,24 +122,32 @@ if __name__ == '__main__':
     }
 
     sim_setup_kwargs = {
-        'rng_seeds_seed': sbs_dict['seed']
+        'rng_seeds_seed': sbs_dict['seed'],
+        'threads': general_dict['threads']
     }
 
     sbs_kwargs = sbs_dict
     del sbs_kwargs['seed']
     sbs_kwargs['sim_setup_kwargs'] = sim_setup_kwargs
 
-    # samples = lif_tso_clamping_expt(
-    #     test_set[0][start:end], img_shape, rbm, sbs_kwargs, clamp_kwargs,
-    #     n_samples=n_samples)
-
-    # testing
-    img_shape = (2, 2)
-    rbm = rbm_pkg.CRBM(4, 5, 2)
-    test_set = (np.array(([0, 1, 0, 1], [1, 0, 0, 1]), dtype=float), 0)
-
-    samples = test(
+    samples = lif_tso_clamping_expt(
         test_set[0][start:end], img_shape, rbm, sbs_kwargs, clamp_kwargs,
         n_samples=n_samples)
+
+    # # testing
+    # img_shape = (2, 2)
+    # rbm = rbm_pkg.CRBM(4, 5, 2)
+    # test_set = (np.array(([1, 0, 1, 0],
+    #                       [0, 1, 0, 1],
+    #                       [1, 1, 0, 0],
+    #                       [0, 0, 1, 1],
+    #                       [0, 1, 1, 0],
+    #                       [1, 0, 0, 1],
+    #                       [0, 1, 1, 1],
+    #                       [1, 1, 1, 0]), dtype=float), 0)
+
+    # samples = test(
+    #     test_set[0][start:end], img_shape, rbm, sbs_kwargs, clamp_kwargs,
+    #     n_samples=n_samples)
 
     np.savez_compressed(general_dict['save_name'], samples=samples.astype(bool))
