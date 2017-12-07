@@ -58,7 +58,8 @@ def sample_network_clamped(
     return samples
 
 
-def initialise_network(config_file, weights, biases, tso_params=None):
+def initialise_network(config_file, weights, biases, tso_params=None,
+                       weight_scaling=1.):
     if weights is None or biases is None:
         print('Please provide weights and biases.')
         sys.exit()
@@ -78,9 +79,13 @@ def initialise_network(config_file, weights, biases, tso_params=None):
         bm.saturating_synapses_enabled = False
     else:
         bm.saturating_synapses_enabled = True
-        if tso_params != 'renewing':
+        # only adjust if not renewing
+        log.warning('Check for renewing synapses assumes tau_syn == 10.')
+        if not (tso_params['U'] == 1. and tso_params['tau_fac'] == 0
+                and tso_params['tau_rec'] == 10.):
             bm.tso_params = tso_params
-            bm.weights_bio /= tso_params['U']
+            # weight scaling could be swept over
+            bm.weights_bio *= weight_scaling / tso_params['U']
         bm.use_proper_tso = True
     return bm
 

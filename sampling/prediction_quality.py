@@ -59,10 +59,14 @@ def load_prediction_data(file_name, use_labels=False):
 def load_agent_data(file_name):
     with np.load(get_data_path('pong_agent') + file_name + '.npz') as d:
         success = d['successes']
+        success_std = d['successes_std']
         dist = d['distances']
         speeds = d['speeds']
+        if 'n_instances' in d.keys():
+            success /= d['n_instances']
+            success_std /= d['n_instances']
     print('Asymptotic value (full history): {}'.format(success.max()))
-    return success, dist, speeds
+    return success, success_std, dist, speeds
 
 
 def plot_prediction_error(file_names, labels=None, fig_name='pred_error'):
@@ -105,15 +109,17 @@ def plot_agent_performance(file_names, labels=None,
     ax.set_ylabel('Success rate')
     ax.set_ylim([0., 1.])
 
-    successes, distances, speeds = [], [], []
+    successes, successes_std, distances, speeds = [], [], []
     for fn in file_names:
-        suc, dis, spe = load_agent_data(fn)
+        suc, sucstd, dis, spe = load_agent_data(fn)
         successes.append(suc)
+        successes_std.append(sucstd)
         distances.append(dis)
         speeds.append(spe)
 
     for i, fn in enumerate(file_names):
-        ax.plot(speeds[i], successes[i], label=labels[i])
+        ax.errorbar(speeds[i], successes[i], yerr=successes_std[i],
+                    label=labels[i])
 
     plt.legend()
     plt.savefig(make_figure_folder() + figname + '.pdf')

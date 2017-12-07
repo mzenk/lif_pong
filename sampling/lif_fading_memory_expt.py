@@ -7,7 +7,9 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import lif_clamped_sampling as lifsampl
+import lif_fading_memory_analysis as fm_analysis
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict
+from lif_pong.utils import average_pool
 import lif_pong.training.rbm as rbm_pkg
 
 
@@ -71,35 +73,10 @@ def test(test_imgs, img_shape, rbm, sbs_kwargs,
     return np.array(results)
 
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('Wrong number of arguments. Please provide a yaml-config file.')
-        sys.exit()
-    with open(sys.argv[1]) as configfile:
-        config = yaml.load(configfile)
-
-    '''
-    Arguments that must be passed to this script:
-    - data_name
-    - rbm_name
-    - img_shape
-    - save_name
-    - index of start and end data sample
-    - n_samples
-    - sbs-kwargs:
-      seed, dt, burnintime, sampling interval, tso-params for rbm synapses,
-      calibration file for lif-neurons
-    - clamp_kwargs:
-      tso-params for clamping synapses, calibration file for clamping
-    '''
-
-    general_dict = config.pop('general')
-    sbs_dict = config.pop('sbs')
-    clamp_dict = config.pop('clamping')
-
+def main(general_dict, sbs_dict, clamp_dict):
     # pass arguments from dictionaries to simulation
     n_samples = general_dict['n_samples']
-    img_shape = general_dict['img_shape']
+    img_shape = tuple(general_dict['img_shape'])
     # load data
     _, _, test_set = load_images(general_dict['data_name'])
     rbm = rbm_pkg.load(get_rbm_dict(general_dict['rbm_name']))
@@ -150,4 +127,24 @@ if __name__ == '__main__':
     #     test_set[0][start:end], img_shape, rbm, sbs_kwargs, clamp_kwargs,
     #     n_samples=n_samples)
 
-    np.savez_compressed(general_dict['save_name'], samples=samples.astype(bool))
+    np.savez_compressed('samples', samples=samples.astype(bool))
+
+    # also possible: perform analysis on chunk right here
+    # analysis can be replaced
+    fm_analysis.inf_speed_analysis(samples)
+    
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print('Wrong number of arguments. Please provide a yaml-config file.')
+        sys.exit()
+    with open(sys.argv[1]) as configfile:
+        config = yaml.load(configfile)
+
+    general_dict = config.pop('general')
+    sbs_dict = config.pop('sbs')
+    clamp_dict = config.pop('clamping')
+
+    main(general_dict, sbs_dict, clamp_dict)
+    

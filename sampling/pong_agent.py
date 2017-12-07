@@ -46,8 +46,8 @@ class Pong_agent(object):
             paddle_trace[i] = self.pos.copy()
 
         dist = np.abs(self.pos - targets)
-        success = np.mean(dist <= .5 * self.paddle_len)
-        success_std = np.std(dist <= .5 * self.paddle_len)
+        success = np.sum(dist <= .5 * self.paddle_len)
+        success_std = np.std(dist <= .5 * self.paddle_len) * len(dist)
         return success, success_std, dist, paddle_trace
 
 
@@ -104,8 +104,8 @@ def compute_performance(img_shape, data_name, prediction_path):
 
     # sensible max_step range: one paddle length per one ball x-step => v=1.
     speed_range = np.linspace(0, 1.2 * v_ball, 100)
-    success_rates = np.zeros_like(speed_range)
-    success_rates_std = np.zeros_like(speed_range)
+    successes = np.zeros_like(speed_range)
+    successes_std = np.zeros_like(speed_range)
     distances = np.zeros((len(speed_range), len(targets)))
     n_recorded = len(targets)//100
     traces = np.zeros((speed_range.shape[0], predictions.shape[0], n_recorded))
@@ -113,17 +113,19 @@ def compute_performance(img_shape, data_name, prediction_path):
     for i, speed in enumerate(speed_range):
         my_agent = Pong_agent(img_shape[0], paddle_len=lab_width,
                               max_step=speed)
-        success_rates[i], success_rates_std[i], distances[i], tmp = \
+        successes[i], successes_std[i], distances[i], tmp = \
             my_agent.simulate_games(predictions, targets)
         traces[i] = tmp[:, :n_recorded]
 
-    # save data - speed normalized to ball speed:
+    # save data - speed normalized to ball speed
+    # caution: success_std is n_instances * standard dev. of success rate!
     result = {
-        'successes': success_rates,
-        'successes_std': success_rates_std,
+        'successes': successes,
+        'successes_std': successes_std,
         'distances': distances,
         'traces': traces,
-        'speeds': speed_range/v_ball
+        'speeds': speed_range/v_ball,
+        'n_instances': len(data_idx)
     }
     return result
 
