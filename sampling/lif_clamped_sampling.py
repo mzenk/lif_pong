@@ -81,8 +81,8 @@ def initialise_network(config_file, weights, biases, tso_params=None,
         bm.saturating_synapses_enabled = True
         # only adjust if not renewing
         log.warning('Check for renewing synapses assumes tau_syn == 10.')
-        if not (tso_params['U'] == 1. and tso_params['tau_fac'] == 0
-                and tso_params['tau_rec'] == 10.):
+        if not (tso_params['U'] == 1. and tso_params['U'] == 0 and
+                tso_params['tau_fac'] == 0 and tso_params['tau_rec'] == 10.):
             bm.tso_params = tso_params
             # weight scaling could be swept over
             bm.weights_bio *= weight_scaling / tso_params['U']
@@ -318,7 +318,7 @@ def gather_network_spikes_clamped_sf(
 
     # apply corrections (nest units, compensate U, compensate accumulation)
     tau_syn = population.get('tau_syn_E')
-    if clamp_tso_params is not None:
+    if clamp_tso_params is not None and clamp_tso_params['U'] != 0:
         weights *= 1000. / clamp_tso_params['U']
         if clamp_tso_params['U'] != 1 \
                 and clamp_tso_params['tau_rec'] != tau_syn:
