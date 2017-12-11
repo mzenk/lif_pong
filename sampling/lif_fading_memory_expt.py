@@ -4,12 +4,9 @@ from __future__ import print_function
 import sys
 import yaml
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
 import lif_clamped_sampling as lifsampl
 import lif_fading_memory_analysis as fm_analysis
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict
-from lif_pong.utils import average_pool
 import lif_pong.training.rbm as rbm_pkg
 
 

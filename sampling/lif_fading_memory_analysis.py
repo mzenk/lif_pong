@@ -8,37 +8,42 @@ from lif_pong.utils import average_pool
 import pong_agent
 
 
-def inf_speed_analysis(samples=None):
+# identifier params will be save in the analysis file; defaults to fm-choice
+def inf_speed_analysis(samples=None, identifier_params=None):
     with open('sim.yaml') as config:
         simdict = yaml.load(config)
 
     general_dict = simdict.pop('general')
-    tso_params = simdict['clamping']['tso_params']
+    if identifier_params is None:
+        identifier_params = simdict['clamping']['tso_params']
     n_samples = general_dict['n_samples']
+    start = general_dict['start_idx']
+    chunksize = general_dict['chunksize']
     img_shape = tuple(general_dict['img_shape'])
     n_labels = img_shape[0]//3
     n_pxls = np.prod(img_shape)
 
     if samples is None:
-        anadict = {'n_instances': general_dict['chunksize'],
+        anadict = {'n_instances': chunksize,
                    'inf_success': float('nan'), 'inf_std': float('nan')}
     else:
         # make prediction files from samples
         chunk_vis = samples[..., :n_pxls + n_labels]
         chunk_vis = average_pool(chunk_vis, n_samples, n_samples)
+        chunk_idxs = np.arange(start, start + len(chunk_vis))
 
         last_col = chunk_vis[..., :-n_labels].reshape(
-                    chunk_vis.shape[:-1] + img_shape)[..., -1]
+            chunk_vis.shape[:-1] + img_shape)[..., -1]
         lab = chunk_vis[..., -n_labels:]
 
-        pred_file = 'prediction'
         print('Saving prediction data of {} instances'.format(len(last_col)))
         # save data (averaged samples for label units and last column)
-        np.savez_compressed('prediction', label=lab, last_col=last_col)
+        np.savez_compressed('prediction', label=lab, last_col=last_col,
+                            data_idx=chunk_idxs)
 
         # compute agent performance
         result_dict = pong_agent.compute_performance(
-            img_shape, general_dict['data_name'], pred_file + '.npz')
+            img_shape, general_dict['data_name'], chunk_idxs, last_col)
         print('Saving agent performance data...')
         np.savez_compressed('agent_performance', **result_dict)
 
@@ -49,9 +54,9 @@ def inf_speed_analysis(samples=None):
                    'inf_success': inf_success, 'inf_std': inf_std}
 
     # add clamping-tso parameters for identification
-    anadict['start_idx'] = general_dict['start_idx']
-    for k in tso_params.keys():
-        anadict[k] = tso_params[k]
+    anadict['start_idx'] = start
+    for k in identifier_params.keys():
+        anadict[k] = identifier_params[k]
     with open('analysis', 'w') as f:
         f.write(yaml.dump(anadict))
     return anadict

@@ -14,8 +14,7 @@ def make_data_folder(name=None, shared_data=False):
 
     # if data is used across project save in shared_data folder
     if shared_data:
-        home = os.path.expanduser('~')
-        data_path = home + '/Projects/lif_pong/shared_data/'
+        data_path = os.path.expanduser('~/Projects/lif_pong/shared_data/')
     else:
         data_path = 'data/'
 
@@ -54,12 +53,12 @@ def get_data_path(source_script_name):
 def load_images(data_name):
     path = ''
     if socket.gethostname() == 'asdf':
-        path = os.path.expanduser('~') + '/mnt/hel_mnt/shared_data/datasets/'
-    if 'nemo' in socket.gethostname():
-        path = os.path.expanduser('~') + '/git_repos/lif_pong/shared_data/datasets/'
-    if socket.gethostname() == 'hel':
-        path = os.path.expanduser('~') + '/Projects/lif_pong/shared_data/datasets/'
-    with np.load(path + data_name + '.npz') as d:
+        path = os.path.expanduser('~/mnt/hel_mnt/shared_data/datasets')
+    elif 'nemo' in socket.gethostname():
+        path = os.path.expanduser('~/git_repos/lif_pong/shared_data/datasets')
+    else:
+        path = os.path.expanduser('~/Projects/lif_pong/shared_data/datasets')
+    with np.load(os.path.join(path, data_name + '.npz')) as d:
         train_set, valid_set, test_set = d[d.keys()[0]]
     return train_set, valid_set, test_set
 
@@ -71,12 +70,12 @@ def load_images(data_name):
 def get_rbm_dict(rbm_name):
     path = ''
     if socket.gethostname() == 'asdf':
-        path = os.path.expanduser('~') + '/mnt/hel_mnt/shared_data/saved_rbms/'
-    if 'nemo' in socket.gethostname():
-        path = os.path.expanduser('~') + '/git_repos/lif_pong/shared_data/saved_rbms/'
-    if socket.gethostname() == 'hel':
-        path = os.path.expanduser('~') + '/Projects/lif_pong/shared_data/saved_rbms/'
-    with open(path + rbm_name + '.pkl', 'rb') as f:
+        path = os.path.expanduser('~/mnt/hel_mnt/shared_data/saved_rbms')
+    elif 'nemo' in socket.gethostname():
+        path = os.path.expanduser('~/git_repos/lif_pong/shared_data/saved_rbms')
+    else:
+        path = os.path.expanduser('~/Projects/lif_pong/shared_data/saved_rbms')
+    with open(os.path.join(path, rbm_name + '.pkl'), 'rb') as f:
         try:
             rbm_dict = cPickle.load(f)
         except ImportError:

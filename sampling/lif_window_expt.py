@@ -1,10 +1,12 @@
+#! /usr/bin/env python
 from __future__ import division
 from __future__ import print_function
 import sys
 import numpy as np
 import yaml
 import lif_clamped_sampling as lifsampl
-from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict
+import lif_fading_memory_analysis as fm_analysis
+from lif_pong.utils.data_mgmt import load_images, get_rbm_dict
 import lif_pong.training.rbm as rbm_pkg
 
 
@@ -56,6 +58,10 @@ def main(general_dict, sbs_dict):
                               sbs_kwargs, n_samples=n_samples)
 
     np.savez_compressed('samples', samples=samples.astype(bool))
+
+    # produce analysis file
+    fm_analysis.inf_speed_analysis(
+        samples, identifier_params=sbs_kwargs['tso_params'])
 
 
 if __name__ == '__main__':
