@@ -42,6 +42,7 @@ def inf_speed_analysis(samples=None, identifier_params=None):
                             data_idx=chunk_idxs)
 
         # compute agent performance
+        data_idxs = np.arange(start, start + chunksize)
         result_dict = pong_agent.compute_performance(
             img_shape, general_dict['data_name'], chunk_idxs, last_col)
         print('Saving agent performance data...')
