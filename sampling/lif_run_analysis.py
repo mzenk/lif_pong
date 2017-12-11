@@ -40,7 +40,7 @@ for folder in os.listdir(os.path.join(simfolder, expt_name)):
                                 script=worker_script,
                                 envscript=experiment_dict['envscript'])
           f.write(content)
-      time.sleep(.1)
+time.sleep(.1)
 
 for job in taskfiles:
     # submit batch jobs of worker scripts

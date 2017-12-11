@@ -57,7 +57,7 @@ def load_prediction_data(file_name, use_labels=False):
 
 
 def load_agent_data(file_name):
-    with np.load(get_data_path('pong_agent') + file_name + '.npz') as d:
+    with np.load(file_name + '.npz') as d:
         success = d['successes']
         success_std = d['successes_std']
         dist = d['distances']
@@ -147,7 +147,8 @@ if __name__ == '__main__':
     plot_prediction_error(fnames, labels, fig_name)
 
     # labels = ['n=100', 'n=20', 'n=10', 'n=5']
-    # file_names = ['gibbs_pong_win48{}_agent_performance'.format(s)
+    # data_path = get_data_path('pong_agent')
+    # file_names = [data_path + 'gibbs_pong_win48{}_agent_performance'.format(s)
     #               for s in ['_100samples', '', '_10samples', '_05samples']]
     # fig_name = 'agent_compare_nsamples'
     # plot_agent_performance(file_names   , labels, fig_name)

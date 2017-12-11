@@ -73,48 +73,48 @@ def test():
     plt.savefig('figures/test.png')
 
 
-def compute_performance(img_shape, data_name, prediction_path):
-    n_labels = img_shape[0] // 3
-    lab_width = img_shape[0] / n_labels
-    # ball velocity measured in pixels per time between two clamping frames
-    v_ball = 1.
+def compute_performance(img_shape, data_name, data_idx, prediction,
+                        use_labels=False, paddle_width=3, leave_uncovered=1):
+    if use_labels:
+        n_pos = img_shape[0] // 3
+    else:
+        n_pos = img_shape[0]
 
+    n_instances = prediction.shape[0]
+    n_frames = prediction.shape[1]
     # load targets and prediction data
     _, _, test_set = load_images(data_name)
-    with np.load(prediction_path) as d:
-        avg_lab = d['label']
-        avg_vis = d['last_col']
-        if 'data_idx' in d.keys():
-            data_idx = d['data_idx']
-        else:
-            data_idx = np.arange(len(avg_vis))
 
     # compare vis_prediction dataset pixels
-    last_col = test_set[0].reshape((-1,) + img_shape)[..., -1]
-    targets = average_helper(img_shape[0], last_col)[data_idx]
+    if use_labels:
+        groundtruth = test_set[1]
+    else:
+        groundtruth = test_set[0].reshape((-1,) + img_shape)[..., -1]
+    targets = average_helper(n_pos, groundtruth)[data_idx]
 
-    lab_prediction = np.zeros(avg_lab.shape[:-1])
-    vis_prediction = np.zeros(avg_vis.shape[:-1])
-    for i in range(len(avg_lab)):
-        lab_prediction[i] = average_helper(n_labels, avg_lab[i])
-        vis_prediction[i] = average_helper(img_shape[0], avg_vis[i])
-    predictions = vis_prediction.T
+    predicted_pos = np.zeros((n_instances, n_frames))
+    for i in range(n_instances):
+        predicted_pos[i] = average_helper(n_pos, prediction[i])
+    predicted_pos = predicted_pos.T
     # exclude fully clamped prediction because it is always correct
-    predictions = predictions[:-1]
+    if leave_uncovered > 0:
+        predicted_pos = predicted_pos[:-leave_uncovered]
 
     # sensible max_step range: one paddle length per one ball x-step => v=1.
+    # ball velocity measured in pixels per time between two clamping frames
+    v_ball = 1.
     speed_range = np.linspace(0, 1.2 * v_ball, 100)
     successes = np.zeros_like(speed_range)
     successes_std = np.zeros_like(speed_range)
     distances = np.zeros((len(speed_range), len(targets)))
     n_recorded = len(targets)//100
-    traces = np.zeros((speed_range.shape[0], predictions.shape[0], n_recorded))
+    traces = np.zeros((speed_range.shape[0], predicted_pos.shape[0], n_recorded))
     print('sweep agent speed ({} to {})...'.format(speed_range[0], speed_range[-1]))
     for i, speed in enumerate(speed_range):
-        my_agent = Pong_agent(img_shape[0], paddle_len=lab_width,
+        my_agent = Pong_agent(img_shape[0], paddle_len=paddle_width,
                               max_step=speed)
         successes[i], successes_std[i], distances[i], tmp = \
-            my_agent.simulate_games(predictions, targets)
+            my_agent.simulate_games(predicted_pos, targets)
         traces[i] = tmp[:, :n_recorded]
 
     # save data - speed normalized to ball speed
