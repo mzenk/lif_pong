@@ -70,7 +70,7 @@ def test(test_imgs, img_shape, rbm, sbs_kwargs,
     return np.array(results)
 
 
-def main(general_dict, sbs_dict, clamp_dict):
+def main(general_dict, sbs_dict, clamp_dict, identifiers):
     # pass arguments from dictionaries to simulation
     gather_data = general_dict['gather_data']
     n_samples = general_dict['n_samples']
@@ -120,7 +120,7 @@ def main(general_dict, sbs_dict, clamp_dict):
             samples = None
     # also possible: perform analysis on chunk right here
     # analysis can be replaced
-    analysis.inf_speed_analysis(clamp_dict['tso_params'], samples)
+    analysis.inf_speed_analysis(identifiers, samples)
 
 
 if __name__ == '__main__':
@@ -133,5 +133,6 @@ if __name__ == '__main__':
     general_dict = config.pop('general')
     sbs_dict = config.pop('sbs')
     clamp_dict = config.pop('clamping')
+    identifiers = config.pop('identifier')
 
-    main(general_dict, sbs_dict, clamp_dict)
+    main(general_dict, sbs_dict, clamp_dict, identifiers)

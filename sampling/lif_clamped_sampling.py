@@ -92,7 +92,8 @@ def initialise_network(config_file, weights, biases, tso_params=None,
 
 def gather_network_spikes_clamped(
         network, duration, dt=0.1, burn_in_time=0., create_kwargs=None,
-        sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None):
+        sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None,
+        on_thresh=.5, off_thresh=None):
     """
         create_kwargs: Extra parameters for the networks creation routine.
 
@@ -129,10 +130,18 @@ def gather_network_spikes_clamped(
         sim.run(burn_in_time)
         eta_from_burnin(t_start, burn_in_time, duration)
 
+    if off_thresh is None:
+        off_thresh = on_thresh
+    elif off_thresh > on_thresh:
+        log.error('Pixel threshold for off-state larger than for on-state.'
+                  ' Aborting...')
+        return None
+
     # add clamping functionality
     if clamp_fct is not None:
         callbacks.append(
-            ClampCallback(network, clamp_fct, duration, offset=burn_in_time))
+            ClampCallback(network, clamp_fct, duration, offset=burn_in_time,
+                          off_thresh=off_thresh, on_thresh=on_thresh))
     log.info("Starting data gathering run.")
     sim.run(duration, callbacks=callbacks)
 
@@ -264,11 +273,12 @@ def gather_network_spikes_clamped_bn(
     return return_data
 
 
-# Under construction
+# Clamping implemented with bias neurons that fire at 1kHz whenever unit "on"
 def gather_network_spikes_clamped_sf(
         network, duration, nv, dt=0.1, burn_in_time=0., create_kwargs=None,
         sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None,
-        clamp_tso_params=None, wp_fit_params=None):
+        clamp_tso_params=None, wp_fit_params=None, on_thresh=.5,
+        off_thresh=None):
     """
         create_kwargs: Extra parameters for the networks creation routine.
 
@@ -294,7 +304,8 @@ def gather_network_spikes_clamped_sf(
     # Create spike sources for whole simulation
     spike_interval = 1.   # ms
     exc_spiketrains, inh_spiketrains = clampfct_to_spiketrain(
-        clamp_fct, nv, duration + burn_in_time, dt, spike_interval)
+        clamp_fct, nv, duration + burn_in_time, dt, spike_interval,
+        on_thresh=on_thresh)
 
     exc_bias_neurons = sim.Population(
         nv, sim.SpikeSourceArray, cellparams={'spike_times': exc_spiketrains})
@@ -404,7 +415,9 @@ def gather_network_spikes_clamped_sf(
 
 
 def clampfct_to_spiketrain(clamp_fct, n_neurons, duration, dt,
-                           spike_interval=1.):
+                           spike_interval=1., off_thresh=None, on_thresh=.5):
+    if off_thresh is not None:
+        raise NotImplementedError
     # clamp_fct has time as argument and returns time to next call,
     # index and value of clamped neurons
     t = 0
@@ -415,11 +428,11 @@ def clampfct_to_spiketrain(clamp_fct, n_neurons, duration, dt,
         inh_spiketimes_array.append([])
     while t < duration:
         delta_t, curr_idx, curr_val = clamp_fct(t)
-        # this part can be changed so that smooth clamping is possible
+        # can try smooth clamping (var. spike_interval) or different threshold
         t_next = min(t + delta_t, duration)
         st_firing = np.arange(t + dt, t_next, spike_interval)
         for i, x in zip(curr_idx, curr_val):
-            if x >= .5:
+            if x >= on_thresh:
                 exc_spiketimes_array[i] += st_firing.tolist()
             else:
                 inh_spiketimes_array[i] += st_firing.tolist()
@@ -433,7 +446,8 @@ def inv_sigma(p):
 
 class ClampCallback(object):
 
-    def __init__(self, network, clamp_fct, duration, offset=0.):
+    def __init__(self, network, clamp_fct, duration,
+                 offset=0., off_thresh=.5, on_thresh=.5):
         self.network = network
         self.initial_biases = network.biases_theo.copy()
         self.duration = duration
@@ -442,6 +456,9 @@ class ClampCallback(object):
         self.clamped_idx = []
         self.clamped_val = []
         self.on_bias = 100.
+        assert on_thresh >= off_thresh
+        self.on_thresh = on_thresh
+        self.off_thresh = off_thresh
 
     def __call__(self, t):
         if np.isclose(t, self.duration + self.offset):
@@ -451,15 +468,13 @@ class ClampCallback(object):
             return float('inf')
 
         dt, curr_idx, curr_val = self.clamp_fct(t - self.offset)
-        # assert np.all(np.in1d(curr_val, [0, 1]))
-        # # assuming binary clamped values
-
         tmp_bias = self.network.biases_theo.copy()
         # leave unchanged units clamped for efficiency -> is it worth it?
         released = np.setdiff1d(self.clamped_idx, curr_idx).astype(int)
         tmp_bias[released] = self.initial_biases[released]
         if len(curr_idx) != 0:
-            tmp_bias[curr_idx] = self.smooth_biases(curr_val, .5, .5)
+            tmp_bias[curr_idx] = self.soft_biases(curr_val, self.off_thresh,
+                                                  self.on_thresh)
             # # if I don't want to add negative biases to the initial bias (cf. notes)
             # tmp_bias[curr_idx] = np.minimum(self.initial_biases[curr_idx],
             #                                 tmp_bias[curr_idx])
@@ -474,7 +489,7 @@ class ClampCallback(object):
         binary_val = 1.*(clamped_val > thresh)
         return 2 * (binary_val - .5) * self.on_bias
 
-    def smooth_biases(self, clamped_val, off_thresh=.2, on_thresh=.8):
+    def soft_biases(self, clamped_val, off_thresh=.2, on_thresh=.8):
         hard_on = clamped_val >= on_thresh
         hard_off = clamped_val <= off_thresh
         soft = np.logical_not(np.logical_or(hard_on, hard_off))

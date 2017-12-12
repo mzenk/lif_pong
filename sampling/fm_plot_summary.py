@@ -27,6 +27,8 @@ def plot_trec_U(df, figname='paramsweep.png'):
     plt.imshow(z, cmap=plt.cm.viridis, interpolation='nearest', origin='lower',
                extent=[xmin, xmax, ymin, ymax],
                aspect='auto')
+    plt.xlabel('tau_rec')
+    plt.xlabel('U')
     plt.colorbar()
     # alternatively take pcolormesh, but there is some difference about x/y
     plt.savefig(figname)
@@ -48,11 +50,14 @@ with open(os.path.join(collectfolder, expt_name)) as f:
     df = pd.DataFrame(yaml.load(f))
 
 # average over chunks
-params = []
-for k in simdict['replacements'].keys():
-    if k in df.columns:
-        params.append(k)
-params.remove('start_idx')
+if 'identifier' in simdict.keys():
+    params = simdict['identifier'].keys()
+else:
+    params = []
+    for k in simdict['replacements'].keys():
+        if k in df.columns:
+            params.append(k)
+    params.remove('start_idx')
 print('Group dataframe by: ' + ', '.join('{}'.format(p) for p in params))
 grouped = df.groupby(params, as_index=False)
 result = grouped.aggregate(np.sum)
