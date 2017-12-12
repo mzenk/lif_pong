@@ -5,7 +5,7 @@ import sys
 import numpy as np
 import yaml
 import lif_clamped_sampling as lifsampl
-import lif_fading_memory_analysis as fm_analysis
+import lif_chunk_analysis as analysis
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict
 import lif_pong.training.rbm as rbm_pkg
 
@@ -36,6 +36,7 @@ def lif_window_expt(win_size, test_imgs, img_shape, rbm, sbs_kwargs,
 
 def main(general_dict, sbs_dict):
     # pass arguments from dictionaries to simulation
+    gather_data = general_dict['gather_data']
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
     # load data
@@ -54,14 +55,20 @@ def main(general_dict, sbs_dict):
     del sbs_kwargs['seed']
     sbs_kwargs['sim_setup_kwargs'] = sim_setup_kwargs
 
-    samples = lif_window_expt(winsize, test_set[0][start:end], img_shape, rbm,
-                              sbs_kwargs, n_samples=n_samples)
+    if gather_data:
+        samples = lif_window_expt(winsize, test_set[0][start:end], img_shape,
+                                  rbm, sbs_kwargs, n_samples=n_samples)
 
-    np.savez_compressed('samples', samples=samples.astype(bool))
-
+        np.savez_compressed('samples', samples=samples.astype(bool))
+    else:
+        try:
+            with np.load('samples.npz') as d:
+                samples = d['samples'].astype(float)
+        except Exception:
+            print('Missing sample file', file=sys.stderr)
+            samples = None
     # produce analysis file
-    fm_analysis.inf_speed_analysis(
-        samples, identifier_params=sbs_kwargs['tso_params'])
+    analysis.inf_speed_analysis(sbs_kwargs['tso_params'], samples)
 
 
 if __name__ == '__main__':
