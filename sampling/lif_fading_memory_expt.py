@@ -5,7 +5,7 @@ import sys
 import yaml
 import numpy as np
 import lif_clamped_sampling as lifsampl
-import lif_fading_memory_analysis as fm_analysis
+import lif_chunk_analysis as analysis
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict
 import lif_pong.training.rbm as rbm_pkg
 
@@ -72,6 +72,7 @@ def test(test_imgs, img_shape, rbm, sbs_kwargs,
 
 def main(general_dict, sbs_dict, clamp_dict):
     # pass arguments from dictionaries to simulation
+    gather_data = general_dict['gather_data']
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
     # load data
@@ -104,32 +105,22 @@ def main(general_dict, sbs_dict, clamp_dict):
     del sbs_kwargs['seed']
     sbs_kwargs['sim_setup_kwargs'] = sim_setup_kwargs
 
-    samples = lif_tso_clamping_expt(
-        test_set[0][start:end], img_shape, rbm, sbs_kwargs, clamp_kwargs,
-        n_samples=n_samples)
+    if gather_data:
+        samples = lif_tso_clamping_expt(
+            test_set[0][start:end], img_shape, rbm, sbs_kwargs, clamp_kwargs,
+            n_samples=n_samples)
 
-    # # testing
-    # img_shape = (2, 2)
-    # rbm = rbm_pkg.CRBM(4, 5, 2)
-    # test_set = (np.array(([1, 0, 1, 0],
-    #                       [0, 1, 0, 1],
-    #                       [1, 1, 0, 0],
-    #                       [0, 0, 1, 1],
-    #                       [0, 1, 1, 0],
-    #                       [1, 0, 0, 1],
-    #                       [0, 1, 1, 1],
-    #                       [1, 1, 1, 0]), dtype=float), 0)
-
-    # samples = test(
-    #     test_set[0][start:end], img_shape, rbm, sbs_kwargs, clamp_kwargs,
-    #     n_samples=n_samples)
-
-    np.savez_compressed('samples', samples=samples.astype(bool))
-
+        np.savez_compressed('samples', samples=samples.astype(bool))
+    else:
+        try:
+            with np.load('samples.npz') as d:
+                samples = d['samples'].astype(float)
+        except Exception:
+            print('Missing sample file', file=sys.stderr)
+            samples = None
     # also possible: perform analysis on chunk right here
     # analysis can be replaced
-    fm_analysis.inf_speed_analysis(samples)
-    
+    analysis.inf_speed_analysis(clamp_dict['tso_params'], samples)
 
 
 if __name__ == '__main__':
@@ -144,4 +135,3 @@ if __name__ == '__main__':
     clamp_dict = config.pop('clamping')
 
     main(general_dict, sbs_dict, clamp_dict)
-    
