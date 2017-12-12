@@ -59,14 +59,12 @@ def load_prediction_data(file_name, use_labels=False):
 def load_agent_data(file_name):
     with np.load(file_name + '.npz') as d:
         success = d['successes']
-        success_std = d['successes_std']
         dist = d['distances']
         speeds = d['speeds']
         if 'n_instances' in d.keys():
             success /= d['n_instances']
-            success_std /= d['n_instances']
     print('Asymptotic value (full history): {}'.format(success.max()))
-    return success, success_std, dist, speeds
+    return success, dist, speeds
 
 
 def plot_prediction_error(file_names, labels=None, fig_name='pred_error'):
@@ -109,20 +107,19 @@ def plot_agent_performance(file_names, labels=None,
     ax.set_ylabel('Success rate')
     ax.set_ylim([0., 1.])
 
-    successes, successes_std, distances, speeds = [], [], []
+    successes, distances, speeds = [], [], []
     for fn in file_names:
-        suc, sucstd, dis, spe = load_agent_data(fn)
+        suc, dis, spe = load_agent_data(fn)
         successes.append(suc)
-        successes_std.append(sucstd)
         distances.append(dis)
         speeds.append(spe)
 
     for i, fn in enumerate(file_names):
-        ax.errorbar(speeds[i], successes[i], yerr=successes_std[i],
-                    label=labels[i])
+        ax.plot(speeds[i], successes[i], label=labels[i])
 
     plt.legend()
     plt.savefig(make_figure_folder() + figname + '.pdf')
+
 
 if __name__ == '__main__':
     # main
@@ -137,21 +134,22 @@ if __name__ == '__main__':
     # labels.insert(0, 'No knick')
     # fig_name = 'gibbs_knick_prediction_error'
 
-    # Other comparisons are possible, just make a list of which prediction
-    # files to use
-    data_path = get_data_path('lif_clamp_window')
-    fnames = [data_path + 'pong_win48{}_prediction'.format(s) for s in
-              ['', '_N1000', '_N100']]
-    labels = ['N=2000', 'N=1000', 'N=100']
-    fig_name = 'compare_nimages'
-    plot_prediction_error(fnames, labels, fig_name)
+    # # Other comparisons are possible, just make a list of which prediction
+    # # files to use
+    # data_path = get_data_path('lif_clamp_window')
+    # fnames = [data_path + 'pong_win48{}_prediction'.format(s) for s in
+    #           ['', '_N1000', '_N100']]
+    # labels = ['N=2000', 'N=1000', 'N=100']
+    # fig_name = 'compare_nimages'
+    # plot_prediction_error(fnames, labels, fig_name)
 
-    # labels = ['n=100', 'n=20', 'n=10', 'n=5']
-    # data_path = get_data_path('pong_agent')
-    # file_names = [data_path + 'gibbs_pong_win48{}_agent_performance'.format(s)
-    #               for s in ['_100samples', '', '_10samples', '_05samples']]
-    # fig_name = 'agent_compare_nsamples'
-    # plot_agent_performance(file_names   , labels, fig_name)
+    shown = [24, 36, 42, 43, 45, 47, 48]
+    labels = ['{}/48 shown'.format(s) for s in shown]
+    data_path = get_data_path('pong_agent')
+    file_names = [data_path + 'pong_win48_100samples_{}shown'.format(s)
+                  for s in shown]
+    fig_name = 'agent_compare_lastshown'
+    plot_agent_performance(file_names, labels, fig_name)
 
 # === other plots, not functional ===
 # image dissimilarity

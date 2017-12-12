@@ -208,7 +208,7 @@ if __name__ == '__main__':
     predictions = predictions[:-1]
     # sensible max_step range: one paddle length per one ball x-step => v=1.
     speed_range = np.linspace(0, 1.2 * v_ball, 100)
-    success_rates = np.zeros_like(speed_range)
+    successes = np.zeros_like(speed_range)
     distances = np.zeros((len(speed_range), len(targets)))
     n_recorded = len(targets)//100
     traces = np.zeros((speed_range.shape[0], predictions.shape[0], n_recorded))
@@ -217,11 +217,88 @@ if __name__ == '__main__':
               ''.format(i + 1, len(speed_range)))
         my_agent = Pong_agent(img_shape[0], paddle_len=lab_width,
                               max_step=speed)
-        success_rates[i], _, distances[i], tmp = \
+        successes[i], _, distances[i], tmp = \
             my_agent.simulate_games(predictions, targets)
         traces[i] = tmp[:, :n_recorded]
+    success_rates = successes/len(targets)
 
     # save data - speed normalized to ball speed:
     np.savez_compressed(make_data_folder() + save_file,
                         successes=success_rates, distances=distances,
                         traces=traces, speeds=speed_range/v_ball)
+
+    # # for the "lastcol" plot
+    # notshown = 0
+    # ydata = []
+    # xdata = np.arange(0, 49)
+    # for notshown in range(0, 49):
+    #     save_file = 'pong_win48_100samples_{}shown'.format(48 - notshown)
+
+    #     _, _, test_set = load_images(data_file)
+    #     tmp = test_set[1]
+    #     tmp[np.all(tmp == 0, axis=1)] = 1.
+    #     targets = np.average(np.tile(np.arange(n_labels), (len(tmp), 1)),
+    #                          weights=tmp, axis=1)
+    #     with np.load(pred_path + pred_file + '.npz') as d:
+    #         avg_lab = d['label']
+    #         avg_vis = d['last_col']
+    #         if 'data_idx' in d.keys():
+    #             data_idx = d['data_idx']
+    #         else:
+    #             data_idx = np.arange(len(avg_vis))
+
+    #     lab2pxl = img_shape[0] / n_labels
+    #     # targets = average_helper(n_labels, test_set[1]) * lab2pxl
+    #     # compare vis_prediction not to label but to actual pixels
+    #     last_col = test_set[0].reshape((-1,) + img_shape)[..., -1]
+    #     targets = average_helper(img_shape[0], last_col)[data_idx]
+
+    #     lab_prediction = np.zeros(avg_lab.shape[:-1])
+    #     vis_prediction = np.zeros(avg_vis.shape[:-1])
+    #     for i in range(len(avg_lab)):
+    #         lab_prediction[i] = average_helper(n_labels, avg_lab[i])
+    #         vis_prediction[i] = average_helper(img_shape[0], avg_vis[i])
+    #     predictions = vis_prediction.T
+    #     # exclude fully clamped prediction because it is always correct
+
+    #     # baseline agent: follows y coordinate of ball
+    #     if win_size == 'baseline':
+    #         save_file = 'baseline_agent_performance'
+    #         imgs = test_set[0].reshape((-1,) + img_shape)
+    #         baseline_preds = np.zeros((img_shape[1], len(targets)))
+    #         for i in range(len(baseline_preds)):
+    #             curr_col = imgs[..., i]
+    #             baseline_preds[i] = average_helper(img_shape[0], curr_col)
+    #         # print((np.abs(baseline_preds[-1] - targets) < .5 * lab_width).mean())
+    #         predictions = baseline_preds
+
+    #     print(len(targets), predictions.shape)
+    #     # exclude fully clamped prediction because it is always correct?
+    #     if notshown != 0:
+    #         predictions = predictions[:-notshown]
+    #     # sensible max_step range: one paddle length per one ball x-step => v=1.
+    #     speed_range = np.linspace(0, 3. * v_ball, 100)
+    #     successes = np.zeros_like(speed_range)
+    #     distances = np.zeros((len(speed_range), len(targets)))
+    #     n_recorded = len(targets)//100
+    #     traces = np.zeros((speed_range.shape[0], predictions.shape[0], n_recorded))
+    #     print(notshown)
+    #     for i, speed in enumerate(speed_range):
+    #         # print('sweep agent speed ({} of {})...'
+    #         #       ''.format(i + 1, len(speed_range)))
+    #         my_agent = Pong_agent(img_shape[0], paddle_len=lab_width,
+    #                               max_step=speed)
+    #         successes[i], _, distances[i], tmp = \
+    #             my_agent.simulate_games(predictions, targets)
+    #         traces[i] = tmp[:, :n_recorded]
+    #     success_rates = successes/len(targets)
+
+    #     ydata.insert(0, success_rates.max())
+
+    # import matplotlib
+    # matplotlib.use('Agg')
+    # import matplotlib.pyplot as plt
+    # plt.plot(xdata, ydata, 'o')
+    # plt.xlabel('Last shown pixel column index')
+    # plt.ylabel('Asymptotic success')
+    # plt.savefig('lastshowncol.pdf')
