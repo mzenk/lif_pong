@@ -59,6 +59,9 @@ class RBM(object):
         with open(filename, 'wb') as output:
             cPickle.dump(rbm_dict, output, cPickle.HIGHEST_PROTOCOL)
 
+    def set_seed(self, seed):
+        self.np_rng = np.random.RandomState(seed)
+
     # get parameters in BM notation
     def bm_params(self):
         w = np.vstack(
@@ -93,32 +96,33 @@ class RBM(object):
     # ======== Sampling methods ========
 
     # generalized method for sampling quickly from many chains (numpy).
-    # TODO: For >1 chains there might be a bug with (clamped) sampling.
-    # Also, AST does not work with multiple chains
+    # AST does not work with multiple chains
     def draw_samples(self, n_samples, v_init=None, n_chains=1, binary=False,
                      clamped=None, clamped_val=None, ast=False):
+        clamped_idx = clamped  # quick fix (don't want to touch scripts)
         if ast:
-            if clamped is not None:
-                print('No clamped sampling with AST')
+            if clamped_idx is not None:
+                print('No clamped_idx sampling with AST')
                 return 0
             return self.draw_samples_ast(n_samples, v_init, binary)
 
         # initialize the chains
-        if v_init is None:
-            if clamped is not None and len(clamped_val.shape) == 2:
-                n_chains = clamped_val.shape[0]
-            v_init = self.np_rng.randint(2, size=(n_chains, self.n_visible))
-        else:
-            if len(v_init.shape) == 2:
-                n_chains = v_init.shape[0]
-            else:
-                v_init = np.expand_dims(v_init, 0)
-        v_curr = v_init.astype(float)
+        # for clamping each chain can take different clamped_val
+        if clamped_idx is not None:
+            assert clamped_val is not None
+            if len(clamped_val.shape) == 1:
+                clamped_val = np.expand_dims(clamped_val, 0)
+            n_chains = clamped_val.shape[0]
 
-        if clamped is not None:
-            if len(clamped_val.shape) == 2:
-                assert n_chains == clamped_val.shape[0]
-            v_curr[:, clamped] = clamped_val
+        if v_init is None:
+            v_init = self.np_rng.randint(2, size=(n_chains, self.n_visible))
+        elif len(v_init.shape) == 1:
+            v_init = np.expand_dims(v_init, 0)
+
+        v_curr = v_init.astype(float)
+        if clamped_idx is not None:
+            v_curr[:, clamped_idx] = clamped_val
+            assert n_chains == v_init.shape[0]
 
         n_samples = int(n_samples)
         samples = np.empty((n_samples, n_chains, self.n_visible +
@@ -127,12 +131,13 @@ class RBM(object):
         # update units and renew clamping if necessary
         for t in range(n_samples):
             pv, v_curr, ph, h_curr = self.gibbs_vhv(v_curr)
-            if clamped is not None:
+            if clamped_idx is not None:
                 if n_chains == 1:
-                    v_curr = np.expand_dims(v_curr, 0).astype(float)
-                    pv = np.expand_dims(pv, 0).astype(float)
-                v_curr[:, clamped] = clamped_val
-                pv[:, clamped] = clamped_val
+                    v_curr = np.expand_dims(v_curr, 0)
+                    pv = np.expand_dims(pv, 0)
+                v_curr[:, clamped_idx] = clamped_val
+                pv[:, clamped_idx] = clamped_val
+
             if binary:
                 samples[t] = np.hstack((v_curr.squeeze(), h_curr))
             else:
@@ -309,7 +314,7 @@ class RBM(object):
 
         u = beta * self.dbm_factor[0] * (v_in.dot(self.w) + self.hbias)
         p_on = 1./(1 + np.exp(-u))
-        h_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
+        h_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1.
         return [p_on.squeeze(), h_samples.squeeze()]
 
     def sample_v_given_h(self, h_in, beta=1.):
@@ -321,7 +326,7 @@ class RBM(object):
 
         u = beta * self.dbm_factor[1] * (h_in.dot(self.w.T) + self.vbias)
         p_on = 1./(1 + np.exp(-u))
-        v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
+        v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1.
         return [p_on.squeeze(), v_samples.squeeze()]
 
     # ======== Training --- (P)CD and CAST ========
@@ -731,7 +736,7 @@ class CRBM(RBM):
         pi_on = 1./(1 + np.exp(-u_inp))
         pl_on = 1./(1 + np.exp(-u_lab))
         p_on = np.hstack((pi_on, pl_on))
-        v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1
+        v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1.
         return [p_on.squeeze(), v_samples.squeeze()]
 
     def classify(self, v_data, class_prob=False):

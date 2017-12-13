@@ -1,10 +1,9 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
-import cPickle
 from lif_pong.utils import tile_raster_images, to_1_of_c
-from lif_pong.utils.data_mgmt import load_images, load_rbm, make_figure_folder
-from rbm import RBM, CRBM
+from lif_pong.utils.data_mgmt import load_images, get_rbm_dict, make_figure_folder
+import lif_pong.training.rbm as rbm_pkg
 import matplotlib as mpl
 mpl.use('agg')
 import matplotlib.pyplot as plt
@@ -75,7 +74,7 @@ def plot_histograms(rbm):
 
 # Load data -- Pong
 img_shape = (36, 48)
-data_name = 'pong_knick'.format(*img_shape)
+data_name = 'pong_fixed_start36x48_bgnoise'
 train_set, _, test_set = load_images(data_name)
 # # Load data -- MNIST
 # import gzip
@@ -95,7 +94,7 @@ idx = np.random.choice(np.arange(len(train_set[0])),
 plot_data(train_set, idx, img_shape)
 print(train_set[0].shape)
 # # RBM-specific plots
-# testrbm = load_rbm(data_name + '_crbm')
+# testrbm = rbm_pkg.load(get_rbm_dict(data_name + '_crbm'))
 # rand_ind = np.random.randint(testrbm.n_hidden, size=16)
 # plot_receptive_fields(testrbm, rand_ind, img_shape)
 # plot_histograms(testrbm)

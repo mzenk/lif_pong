@@ -35,7 +35,7 @@ def run_simulation(rbm, n_steps, imgs, v_init=None,
         delta_t, clamped_ind = clamp_fct(t)
         n_samples = delta_t if t + delta_t <= n_steps else n_steps - t
 
-        # there's a bug in this method if called with more than one img
+        # # probably slower
         # temp = rbm.draw_samples(n_samples, v_init=v_init,
         #                         clamped=clamped_ind,
         #                         clamped_val=imgs[:, clamped_ind])
@@ -44,7 +44,7 @@ def run_simulation(rbm, n_steps, imgs, v_init=None,
         # hid_samples[t:t + n_samples] = temp[..., rbm.n_visible:]
 
         unclamped_vis = rbm.sample_with_clamped_units(
-            n_samples, clamped_ind, imgs[:, clamped_ind])
+            n_samples, clamped_ind, imgs[:, clamped_ind], v_init=v_init)
         if imgs.shape[0] == 1:
             unclamped_vis = np.expand_dims(unclamped_vis, 1)
         unclamped_ind = np.setdiff1d(np.arange(rbm.n_visible), clamped_ind)
