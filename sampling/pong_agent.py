@@ -73,7 +73,7 @@ def test():
     plt.savefig('figures/test.png')
 
 
-def compute_performance(img_shape, data_name, data_idx, prediction,
+def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=5.,
                         use_labels=False, paddle_width=3, leave_uncovered=1):
     if use_labels:
         n_pos = img_shape[0] // 3
@@ -103,7 +103,7 @@ def compute_performance(img_shape, data_name, data_idx, prediction,
     # sensible max_step range: one paddle length per one ball x-step => v=1.
     # ball velocity measured in pixels per time between two clamping frames
     v_ball = 1.
-    speed_range = np.linspace(0, 1.2 * v_ball, 100)
+    speed_range = np.linspace(0, max_speedup * v_ball, 100)
     successes = np.zeros_like(speed_range)
     successes_std = np.zeros_like(speed_range)
     distances = np.zeros((len(speed_range), len(targets)))

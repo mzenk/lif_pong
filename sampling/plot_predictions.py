@@ -54,7 +54,7 @@ def get_performance_data(basefolder, compare_stub):
 
         # only append predictions if it has same parameters
         if compare_stub != simdict:
-            findDiff(compare_stub, simdict)
+            # findDiff(compare_stub, simdict)
             continue
 
         general_dict = simdict.pop('general')
@@ -91,11 +91,10 @@ def get_performance_data(basefolder, compare_stub):
         counter += 1
 
     print('Merged prediction data of {} chunks'.format(counter))
-    # save data (averaged samples for label units and last column)?
-    np.savez(os.path.expanduser('~/pong/sampling/predictions{}'.format(compare_stub['general']['winsize'])),
-             last_col=prediction, lab=prediction[..., :12], data_idx=data_idx)
+    # # save data (averaged samples for label units and last column)?
+    # np.savez(os.path.expanduser('~/pong/sampling/predictions'),
+    #          last_col=prediction, lab=prediction[..., :12], data_idx=data_idx)
     if counter > 0:
-        print(data_idx.shape)
         # compute agent performance
         agent_result = pong_agent.compute_performance(
             img_shape, general_dict['data_name'], data_idx, prediction)
@@ -141,7 +140,7 @@ def plot_prediction_error(ax, prediction, data_name, data_idx, label=None,
     # load data and compute groundtruth
     _, _, test_set = load_images(data_name)
     test_data = test_set[0][data_idx]
-    print(len(data_idx))
+
     targets = test_data.reshape((len(test_data), n_pxlrows, -1))[..., -1]
 
     median, lower_quart, upper_quart = \
@@ -189,10 +188,10 @@ def main(stub_list, experiment_dict):
         plot_agent_performance(ax_ap, agent_result, label)
 
     ax_pe.legend()
-    fig_pe.savefig(make_figure_folder() + 'testp.pdf', transparent=True)
+    fig_pe.savefig(make_figure_folder() + 'pred_error.pdf', transparent=True)
     ax_ap.plot(ax_ap.get_xlim(), [1, 1], 'k:')
     ax_ap.legend()
-    fig_ap.savefig(make_figure_folder() + 'testa.pdf', transparent=True)
+    fig_ap.savefig(make_figure_folder() + 'agent_perf.pdf', transparent=True)
 
 
 if __name__ == '__main__':

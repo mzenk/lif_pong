@@ -14,22 +14,24 @@ def lif_window_expt(win_size, test_imgs, img_shape, rbm, sbs_kwargs,
                     n_samples=20):
     # Bring weights and biases into right form
     w, b = rbm.bm_params()
-    sampling_interval = sbs_kwargs['sampling_interval']
+    sampling_interval = sbs_kwargs.pop('sampling_interval')
     # clamp sliding window
     clamp_duration = n_samples * sampling_interval
     duration = clamp_duration * (img_shape[1] + 1)
 
     bm = lifsampl.initialise_network(
-        sbs_kwargs['calib_file'], w, b, tso_params=sbs_kwargs['tso_params'],
-        weight_scaling=sbs_kwargs['weight_scaling'])
-    kwargs = {k: sbs_kwargs[k] for k in ('dt', 'sim_setup_kwargs',
-                                         'burn_in_time')}
+        sbs_kwargs.pop('calib_file'), w, b,
+        tso_params=sbs_kwargs.pop('tso_params'),
+        weight_scaling=sbs_kwargs.pop('weight_scaling'))
     results = []
+
     for img in test_imgs:
         clamp_fct = lifsampl.Clamp_window(
             clamp_duration, img.reshape(img_shape), win_size)
         bm.spike_data = lifsampl.gather_network_spikes_clamped(
-            bm, duration, clamp_fct=clamp_fct, **kwargs)
+            bm, duration, clamp_fct=clamp_fct, **sbs_kwargs)
+        if bm.spike_data is None:
+            return None
         results.append(bm.get_sample_states(sampling_interval))
     return np.array(results)
 

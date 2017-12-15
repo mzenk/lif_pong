@@ -17,6 +17,7 @@ saved_rbms/
 *.npy
 *.gz
 *.json
+*.yaml
 
 # Python bytecode, profiler
 *.pyc

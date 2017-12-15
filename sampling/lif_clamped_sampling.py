@@ -81,11 +81,12 @@ def initialise_network(config_file, weights, biases, tso_params=None,
         bm.saturating_synapses_enabled = True
         # only adjust if not renewing
         log.warning('Check for renewing synapses assumes tau_syn == 10.')
-        if not (tso_params['U'] == 1. and tso_params['U'] == 0 and
+        if not (tso_params['U'] == 1. and 
                 tso_params['tau_fac'] == 0 and tso_params['tau_rec'] == 10.):
             bm.tso_params = tso_params
             # weight scaling could be swept over
-            bm.weights_bio *= weight_scaling / tso_params['U']
+            if tso_params['U'] != 0:
+                bm.weights_bio *= weight_scaling / tso_params['U']
         bm.use_proper_tso = True
     return bm
 
@@ -107,6 +108,13 @@ def gather_network_spikes_clamped(
     log.info("Gathering spike data...")
     if sim_setup_kwargs is None:
         sim_setup_kwargs = {}
+
+    if off_thresh is None:
+        off_thresh = on_thresh
+    elif off_thresh > on_thresh:
+        log.error('Pixel threshold for off-state larger than for on-state.'
+                  ' Aborting...')
+        return None
 
     sim.setup(timestep=dt, **sim_setup_kwargs)
 
@@ -130,12 +138,6 @@ def gather_network_spikes_clamped(
         sim.run(burn_in_time)
         eta_from_burnin(t_start, burn_in_time, duration)
 
-    if off_thresh is None:
-        off_thresh = on_thresh
-    elif off_thresh > on_thresh:
-        log.error('Pixel threshold for off-state larger than for on-state.'
-                  ' Aborting...')
-        return None
 
     # add clamping functionality
     if clamp_fct is not None:
@@ -305,7 +307,7 @@ def gather_network_spikes_clamped_sf(
     spike_interval = 1.   # ms
     exc_spiketrains, inh_spiketrains = clampfct_to_spiketrain(
         clamp_fct, nv, duration + burn_in_time, dt, spike_interval,
-        on_thresh=on_thresh)
+        offset=burn_in_time, on_thresh=on_thresh)
 
     exc_bias_neurons = sim.Population(
         nv, sim.SpikeSourceArray, cellparams={'spike_times': exc_spiketrains})
@@ -414,20 +416,21 @@ def gather_network_spikes_clamped_sf(
     return return_data
 
 
-def clampfct_to_spiketrain(clamp_fct, n_neurons, duration, dt,
-                           spike_interval=1., off_thresh=None, on_thresh=.5):
+def clampfct_to_spiketrain(clamp_fct, n_neurons, duration, dt, spike_interval,
+                           offset=0, off_thresh=None, on_thresh=.5):
     if off_thresh is not None:
         raise NotImplementedError
     # clamp_fct has time as argument and returns time to next call,
     # index and value of clamped neurons
-    t = 0
+    t = offset
     exc_spiketimes_array = []
     inh_spiketimes_array = []
     for i in range(n_neurons):
         exc_spiketimes_array.append([])
         inh_spiketimes_array.append([])
     while t < duration:
-        delta_t, curr_idx, curr_val = clamp_fct(t)
+        delta_t, curr_idx, curr_val = clamp_fct(t - offset)
+        log.debug('t={}, #clamped={}'.format(t, len(curr_idx)))
         # can try smooth clamping (var. spike_interval) or different threshold
         t_next = min(t + delta_t, duration)
         st_firing = np.arange(t + dt, t_next, spike_interval)
@@ -468,6 +471,7 @@ class ClampCallback(object):
             return float('inf')
 
         dt, curr_idx, curr_val = self.clamp_fct(t - self.offset)
+        log.debug(len(curr_idx))
         tmp_bias = self.network.biases_theo.copy()
         # leave unchanged units clamped for efficiency -> is it worth it?
         released = np.setdiff1d(self.clamped_idx, curr_idx).astype(int)

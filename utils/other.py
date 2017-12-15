@@ -91,14 +91,22 @@ def to_1_of_c(labels, c):
 
 
 def get_windowed_image_index(img_shape, end_index,
-                             window_size=-1, fractional=False):
-    assert end_index <= img_shape[1]
+                             window_size=None, fractional=False):
+    if end_index > img_shape[1]:
+        print('End of window out of image bounds.'
+              ' Replaced with largest possible value.')
+        end_index = img_shape[1]
+    elif end_index < 0:
+        print('End of window out of image bounds.'
+              ' Replaced with smallest possible value.')
+        end_index = 0
+
     mask = np.zeros(img_shape)
     if fractional:
         end_index = int(end_index * img_shape[1])
     else:
         assert isinstance(end_index, int)
-    if window_size < 0:
+    if window_size is None:
         window_size = end_index
     start_index = max(0, end_index - window_size)
     mask[:, start_index:end_index] = 1

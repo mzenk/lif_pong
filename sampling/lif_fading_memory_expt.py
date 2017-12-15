@@ -14,17 +14,17 @@ def lif_tso_clamping_expt(test_imgs, img_shape, rbm, sbs_kwargs,
                           clamp_kwargs, n_samples=20):
     # Bring weights and biases into right form
     w, b = rbm.bm_params()
-    sampling_interval = sbs_kwargs['sampling_interval']
+    sampling_interval = sbs_kwargs.pop('sampling_interval')
     # clamp using TSO
     clamp_duration = n_samples * sampling_interval
     duration = clamp_duration * (img_shape[1] + 1)
 
     bm = lifsampl.initialise_network(
-        sbs_kwargs['calib_file'], w, b, tso_params=sbs_kwargs['tso_params'])
+        sbs_kwargs.pop('calib_file'), w, b,
+        tso_params=sbs_kwargs.pop('tso_params'))
 
     # add all necessary kwargs to one dictionary
-    kwargs = {k: sbs_kwargs[k] for k in
-              ('dt', 'sim_setup_kwargs', 'burn_in_time')}
+    kwargs = {k: sbs_kwargs[k] for k in sbs_kwargs.keys()}
     for k in clamp_kwargs.keys():
         kwargs[k] = clamp_kwargs[k]
     results = []
