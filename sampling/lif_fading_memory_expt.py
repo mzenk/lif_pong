@@ -105,19 +105,21 @@ def main(general_dict, sbs_dict, clamp_dict, identifiers):
     del sbs_kwargs['seed']
     sbs_kwargs['sim_setup_kwargs'] = sim_setup_kwargs
 
-    if gather_data:
-        samples = lif_tso_clamping_expt(
-            test_set[0][start:end], img_shape, rbm, sbs_kwargs, clamp_kwargs,
-            n_samples=n_samples)
+    try:
+        with np.load('samples.npz') as d:
+            samples = d['samples'].astype(float)
+    except Exception:
+        print('Missing sample file', file=sys.stderr)
+        samples = None
+        # temporary? ensures that only experiments that didn't produce data are
+        # repeated
+        if gather_data:
+            samples = lif_tso_clamping_expt(
+                test_set[0][start:end], img_shape, rbm, sbs_kwargs, clamp_kwargs,
+                n_samples=n_samples)
 
-        np.savez_compressed('samples', samples=samples.astype(bool))
-    else:
-        try:
-            with np.load('samples.npz') as d:
-                samples = d['samples'].astype(float)
-        except Exception:
-            print('Missing sample file', file=sys.stderr)
-            samples = None
+            np.savez_compressed('samples', samples=samples.astype(bool))
+
     # also possible: perform analysis on chunk right here
     # analysis can be replaced
     analysis.inf_speed_analysis(identifiers, samples)

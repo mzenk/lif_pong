@@ -73,7 +73,7 @@ def test():
     plt.savefig('figures/test.png')
 
 
-def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=5.,
+def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=2.,
                         use_labels=False, paddle_width=3, leave_uncovered=1):
     if use_labels:
         n_pos = img_shape[0] // 3
@@ -95,11 +95,25 @@ def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=
     predicted_pos = np.zeros((n_instances, n_frames))
     for i in range(n_instances):
         predicted_pos[i] = average_helper(n_pos, prediction[i])
+
+    # for knowing how the agent performs at infinite speed just return the
+    # number of cases where the prediction error is smaller than the
+    # paddle width. successes has n_frames entries (basically time)
+    if max_speedup == np.inf:
+        pred_error = np.abs(predicted_pos - targets.reshape((len(targets), 1)))
+        successes = np.sum(pred_error < .5*paddle_width, axis=0)
+        result = {
+            'successes': successes,
+            'pred_error': pred_error,
+            'speeds': np.inf,
+            'n_instances': len(data_idx)
+        }
+        return result
+
     predicted_pos = predicted_pos.T
     # exclude fully clamped prediction because it is always correct
     if leave_uncovered > 0:
         predicted_pos = predicted_pos[:-leave_uncovered]
-
     # sensible max_step range: one paddle length per one ball x-step => v=1.
     # ball velocity measured in pixels per time between two clamping frames
     v_ball = 1.

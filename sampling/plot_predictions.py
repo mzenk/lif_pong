@@ -99,7 +99,7 @@ def get_performance_data(basefolder, compare_stub):
         agent_result = pong_agent.compute_performance(
             img_shape, general_dict['data_name'], data_idx, prediction)
     else:
-        agent_result = {}
+        raise RuntimeError('No matching data could be found. Check yaml file.')
     return data_idx, prediction, agent_result
 
 

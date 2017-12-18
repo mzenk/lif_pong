@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 # script for drawing gibbs samples from an RBM with dynamic clamping
 from __future__ import division
 from __future__ import print_function
@@ -127,7 +128,7 @@ if __name__ == '__main__':
         print('Wrong number of arguments. Please provide a yaml-config file.')
         sys.exit()
     with open(sys.argv[1]) as configfile:
-        config = yaml.load(configfile)['stub']
+        config = yaml.load(configfile)
 
     general_dict = config.pop('general')
     identifiers = config.pop('identifier')

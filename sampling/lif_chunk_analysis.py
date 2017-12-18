@@ -8,7 +8,7 @@ from lif_pong.utils import average_pool
 import pong_agent
 
 
-# identifier params will be save in the analysis file; defaults to fm-choice
+# identifier params will be save in the analysis file
 def inf_speed_analysis(identifier_params, samples=None):
     with open('sim.yaml') as config:
         simdict = yaml.load(config)
@@ -16,13 +16,12 @@ def inf_speed_analysis(identifier_params, samples=None):
     general_dict = simdict.pop('general')
     n_samples = general_dict['n_samples']
     start = general_dict['start_idx']
-    chunksize = general_dict['chunksize']
     img_shape = tuple(general_dict['img_shape'])
     n_labels = img_shape[0]//3
     n_pxls = np.prod(img_shape)
 
     if samples is None:
-        anadict = {'n_instances': chunksize,
+        anadict = {'n_instances': float('nan'),
                    'inf_success': float('nan'), 'inf_std': float('nan')}
     else:
         # make prediction files from samples
@@ -41,15 +40,15 @@ def inf_speed_analysis(identifier_params, samples=None):
 
         # compute agent performance
         result_dict = pong_agent.compute_performance(
-            img_shape, general_dict['data_name'], chunk_idxs, last_col)
+            img_shape, general_dict['data_name'], chunk_idxs, last_col,
+            max_speedup=np.inf)
         print('Saving agent performance data...')
         np.savez_compressed('agent_performance', **result_dict)
 
         # save summarized analysis data for this chunk
-        inf_success = float(result_dict['successes'][-1])
-        inf_std = float(result_dict['successes_std'][-1])
+        inf_success = float(result_dict['successes'][-2])
         anadict = {'n_instances': result_dict['n_instances'],
-                   'inf_success': inf_success, 'inf_std': inf_std}
+                   'inf_success': inf_success}
 
     # add clamping-tso parameters for identification
     anadict['start_idx'] = start
