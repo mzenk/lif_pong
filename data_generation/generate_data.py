@@ -3,7 +3,7 @@ from __future__ import print_function
 import numpy as np
 from trajectory import Gaussian_trajectory, Const_trajectory
 from scipy.ndimage import convolve1d
-from utils.data_mgmt import make_data_folder
+from lif_pong.utils.data_mgmt import make_data_folder
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -25,7 +25,8 @@ def pool_vector(vec, width, stride, mode='default'):
     return filtered[:, start::stride]
 
 
-def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
+def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
+                  fname=None):
     # c = potential scale; h = grid spacing for pixeled image
     # actually, distinguishing grid and field may be unnecessary since we don't
     # care about physics here, i.e. realistic length scales
@@ -48,13 +49,11 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
         nstarts = 1
         nangles = 2*1000
         starts = np.array([[field[1]*.5]])
-        fname = pot_str + '_fixed_start{1}x{0}'.format(grid[0], grid[1])
     else:
         nangles = 200
         nstarts = 100
         starts = field[1]*np.random.beta(1.5, 1.5, nstarts)
-        fname = pot_str + '_var_start{1}x{0}'.format(grid[0], grid[1])
-        fname = 'pong_knick'
+
     # draw for each start position nangles angles
     angles = max_angle * 2*(np.random.rand(nstarts, nangles) - .5)
 
@@ -66,13 +65,15 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
         for a in angles[i]:
             if pot_str == 'pong':
                 # No forces
-                traj = Const_trajectory(grid, h, np.array([0, s]),
-                                        a, v0, np.array([0., 0.]))
+                traj = Const_trajectory(np.array([0., 0.]),
+                                        grid, h, np.array([0, s]), a, v0,
+                                        kink_dict=kink_dict)
             if pot_str == 'gauss':
                 # Hill in the centre
-                traj = Gaussian_trajectory(grid, h, np.array([0, s]), a, v0,
-                                           amplitude, mu, cov_mat)
-            traj.integrate(write_pixels=save)
+                traj = Gaussian_trajectory(amplitude, mu, cov_mat,
+                                           grid, h, np.array([0, s]), a, v0,
+                                           kink_dict=kink_dict)
+            traj.integrate(write_pixels=fname is not None)
             data[n] = traj.pixels.flatten()
             # smooth if desired
             # tmp = gaussian_filter(traj.pixels, sigma=.7).flatten()
@@ -114,7 +115,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
     # data = data.reshape((nstarts * nangles, grid[1], grid[0]))
     # data = data[:, :, -n_col:].reshape((nstarts * nangles, grid[1] * n_col))
     # # ----
-    if save:
+    if fname is not None:
         size_train = data.shape[0]//4
         size_test = data.shape[0]//2
         train_set = data[:size_train]
@@ -132,7 +133,14 @@ def generate_data(grid, pot_str='pong', fixed_start=False, save=False):
 
 
 if __name__ == '__main__':
-    generate_data([48, 36], pot_str='pong', fixed_start=False, save=True)
+    kds = [{'pos': .7, 'ampl': .3, 'sigma': 0.1},
+           {'pos': .6, 'ampl': .3, 'sigma': 0.1},
+           {'pos': .5, 'ampl': .3, 'sigma': 0.1},
+           {'pos': .4, 'ampl': .3, 'sigma': 0.1},
+           {'pos': .3, 'ampl': .3, 'sigma': 0.1}]
+    for i, d in enumerate(kds):
+        generate_data([48, 36], pot_str='pong', kink_dict=d,
+                      fname='knick{:02d}_var_start36x48'.format(i))
 
     # # check balancing of dataset
     # plt.figure()

@@ -8,7 +8,6 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
-kink = True
 
 def gauss1d(x, mu, sigma):
         mu = np.repeat(np.expand_dims(mu, 1), x.shape[0], axis=1)
@@ -19,7 +18,8 @@ def gauss1d(x, mu, sigma):
 class Trajectory:
     __metaclass__ = ABCMeta
 
-    def __init__(self, grid_size, grid_spacing, pos, angle, v0):
+    def __init__(self, grid_size, grid_spacing, pos, angle, v0,
+                 kink_dict=None):
         # grid size: (n_pxls_x, n_pxls_y) y|_x
         # pos, angle, v0: starting position, angle, velocity
         self.pos = pos
@@ -32,6 +32,12 @@ class Trajectory:
         self.pixels = np.zeros(grid_size[::-1])
         # list for the entire trace
         self.trace = np.empty(1)
+        assert sorted(kink_dict.keys()) == sorted(['pos', 'ampl', 'sigma']), \
+            'Got keys {}'.format(kink_dict.keys())
+        self.kink_dict = kink_dict
+        if self.kink_dict is not None:
+            # kink_pos is given relative to field-xrange
+            self.kink_dict['pos'] *= self.field_size[0]
 
     @abstractmethod
     def force_fct(self, t, r):
@@ -46,8 +52,8 @@ class Trajectory:
         vy = self.v0 * np.sin(self.angle)
         size = self.field_size
 
-        if kink:
-            kink_pos = (np.random.rand()/3 + .333) * self.field_size[0]
+        if self.kink_dict is not None:
+            noise_injected = False
 
         # use ode solver for integration
         r = ode(self.force_fct).set_integrator('vode', method='adams')
@@ -72,12 +78,16 @@ class Trajectory:
             if write_pixels:
                 self.add_to_image(r.y[:2])
 
-            if kink and r.y[0] > kink_pos:
-                # inject random y-momentum in [.33, .66]*field
-                randmom = .5*self.v0*(.2*np.random.randn() +
-                                      2*(np.random.randint(2) - .5))
+            # inject random y-momentum
+            if self.kink_dict is not None and r.y[0] > self.kink_dict['pos'] \
+                    and not noise_injected:
+                # good values for 'amp' and 'sigma': 0.5 and 0.2
+                randmom = self.kink_dict['ampl'] * self.v0 * \
+                    ((-1)**np.random.randint(2) + self.kink_dict['sigma'] *
+                     np.random.randn())
                 r.set_initial_value(r.y + np.array([0, 0, 0, randmom]), r.t)
-                kink_pos = 2*self.field_size[0]
+                # shift kink_pos so that only one kink occurs
+                noise_injected = True
 
             # reflect if particle hits top or bottom
             if r.y[1] > size[1] or r.y[1] < 0:
@@ -154,12 +164,10 @@ class Trajectory:
 
 # class for r^-1 potential
 class Coulomb_trajectory(Trajectory):
-    def __init__(self, grid_size, grid_spacing, pos, angle, v0,
-                 amplitude, location, epsilon):
+    def __init__(self, amplitude, location, epsilon, *args, **kwargs):
         # force parameters: amplitude, location and epsilon (if no infinite
         # potential wanted)
-        super(Coulomb_trajectory, self).__init__(grid_size, grid_spacing, pos,
-                                                 angle, v0)
+        super(Coulomb_trajectory, self).__init__(*args, **kwargs)
         self.loc = np.array(location)
         self.amplitude = amplitude
         self.epsilon = epsilon
@@ -181,9 +189,8 @@ class Coulomb_trajectory(Trajectory):
 
 # class for constant force field
 class Const_trajectory(Trajectory):
-    def __init__(self, grid_size, grid_spacing, pos, angle, v0, gradient):
-        super(Const_trajectory, self).__init__(grid_size, grid_spacing, pos,
-                                               angle, v0)
+    def __init__(self, gradient, *args, **kwargs):
+        super(Const_trajectory, self).__init__(*args, **kwargs)
         self.grad = gradient
 
     def pot_fct(self, x, y):
@@ -195,10 +202,8 @@ class Const_trajectory(Trajectory):
 
 # class for 2d-Gaussian hill
 class Gaussian_trajectory(Trajectory):
-    def __init__(self, grid_size, grid_spacing, pos, angle, v0,
-                 amplitude, mu, cov_mat):
-        super(Gaussian_trajectory, self).__init__(grid_size, grid_spacing, pos,
-                                                  angle, v0)
+    def __init__(self, amplitude, mu, cov_mat, *args, **kwargs):
+        super(Gaussian_trajectory, self).__init__(*args, **kwargs)
         self.amplitude = amplitude
         # store the inverse covariance matrix
         self.inv_covmat = np.linalg.inv(cov_mat)
