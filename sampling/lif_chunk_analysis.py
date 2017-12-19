@@ -9,7 +9,7 @@ import pong_agent
 
 
 # identifier params will be save in the analysis file
-def inf_speed_analysis(identifier_params=None, samples=None):
+def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
     with open('sim.yaml') as config:
         simdict = yaml.load(config)
 
@@ -51,7 +51,6 @@ def inf_speed_analysis(identifier_params=None, samples=None):
         # 'successes' contains numbers of instances for which an agent
         # with infinite speed is within paddle_width of the correct pos.
         # index of list represents number of clamped pixel columns
-        clamp_pos = -2
         inf_success = result_dict['successes']
         pred_error = result_dict['distances']
         pred_error_median = np.percentile(pred_error, 50, axis=0)
@@ -78,4 +77,4 @@ if __name__ == '__main__':
     except Exception as e:
         print('Missing sample file', file=sys.stderr)
         samples = None
-    inf_speed_analysis(samples=samples)
+    inf_speed_analysis(samples)

@@ -36,7 +36,7 @@ def lif_window_expt(win_size, test_imgs, img_shape, rbm, sbs_kwargs,
     return np.array(results)
 
 
-def main(general_dict, sbs_dict, identifiers):
+def main(general_dict, sbs_dict):
     # pass arguments from dictionaries to simulation
     gather_data = general_dict['gather_data']
     n_samples = general_dict['n_samples']
@@ -57,20 +57,21 @@ def main(general_dict, sbs_dict, identifiers):
     del sbs_kwargs['seed']
     sbs_kwargs['sim_setup_kwargs'] = sim_setup_kwargs
 
-    if gather_data:
-        samples = lif_window_expt(winsize, test_set[0][start:end], img_shape,
-                                  rbm, sbs_kwargs, n_samples=n_samples)
+    try:
+        with np.load('samples.npz') as d:
+            samples = d['samples'].astype(float)
+    except Exception:
+        if gather_data:
+            samples = lif_window_expt(
+                winsize, test_set[0][start:end], img_shape, rbm, sbs_kwargs,
+                n_samples=n_samples)
 
-        np.savez_compressed('samples', samples=samples.astype(bool))
-    else:
-        try:
-            with np.load('samples.npz') as d:
-                samples = d['samples'].astype(float)
-        except Exception:
+            np.savez_compressed('samples', samples=samples.astype(bool))
+        else:
             print('Missing sample file', file=sys.stderr)
             samples = None
     # produce analysis file
-    analysis.inf_speed_analysis(identifiers, samples)
+    analysis.inf_speed_analysis(samples)
 
 
 if __name__ == '__main__':
@@ -82,6 +83,5 @@ if __name__ == '__main__':
 
     general_dict = config.pop('general')
     sbs_dict = config.pop('sbs')
-    identifiers = config.pop('identifier')
 
-    main(general_dict, sbs_dict, identifiers)
+    main(general_dict, sbs_dict)

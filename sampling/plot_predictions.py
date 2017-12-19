@@ -35,10 +35,7 @@ def findDiff(d1, d2, path=""):
                     print(" + ", k, " : ", d2[k])
 
 
-def get_performance_data(basefolder, compare_stub):
-    # remove start_idx because we average over it
-    del compare_stub['general']['start_idx']
-
+def get_performance_data(basefolder, identifier_dict):
     # make prediction files from samples
     data_idx = 0
     prediction = 0
@@ -49,12 +46,11 @@ def get_performance_data(basefolder, compare_stub):
         with open(os.path.join(simpath, 'sim.yaml')) as config:
             simdict = yaml.load(config)
             chunk_start = simdict['general'].pop('start_idx')
-            del simdict['folder']
-            del simdict['folderTemplate']
+            sim_identifiers = simdict.pop('identifier')
 
         # only append predictions if it has same parameters
-        if compare_stub != simdict:
-            # findDiff(compare_stub, simdict)
+        if identifier_dict != sim_identifiers:
+            # findDiff(identifier_dict, sim_identifiers)
             continue
 
         general_dict = simdict.pop('general')
@@ -159,7 +155,7 @@ def plot_agent_performance(ax, agent_dict, label=None):
     ax.plot(speeds, succrate, label=label)
 
 
-def main(stub_list, experiment_dict):
+def main(identifier_list, experiment_dict):
     # get indices of data used for simulation
     stub_dict = experiment_dict.pop('stub')
     data_name = stub_dict['general']['data_name']
@@ -170,20 +166,20 @@ def main(stub_list, experiment_dict):
     ax_pe.set_ylim([-.5, 16])
     ax_pe.set_xlabel('Ball position / field length')
     color_cycle = [plt.cm.rainbow(i)
-                   for i in np.linspace(0, 1, len(stub_list))]
+                   for i in np.linspace(0, 1, len(identifier_list))]
     ax_pe.set_prop_cycle(cycler('color', color_cycle))
 
     fig_ap, ax_ap = plt.subplots()
     ax_ap.set_xlabel('Agent speed / ball speed')
     ax_ap.set_ylabel('Success rate')
     ax_ap.set_ylim([0., 1.1])
-    for i, stub_dict in enumerate(stub_list):
+    for i, identifier_dict in enumerate(identifier_list):
         try:
-            label = stub_dict.pop('label')
+            label = identifier_dict.pop('label')
         except KeyError:
             label = 'parameters {}'.format(i)
         data_idx, prediction, agent_result = get_performance_data(
-            os.path.join(simfolder, expt_name), stub_dict)
+            os.path.join(simfolder, expt_name), identifier_dict)
         plot_prediction_error(ax_pe, prediction, data_name, data_idx, label)
         plot_agent_performance(ax_ap, agent_result, label)
 
@@ -203,11 +199,11 @@ if __name__ == '__main__':
 
     # load list of stubs used for selecting data
     with open(sys.argv[2]) as f:
-        stub_list = yaml.load(f)
+        identifier_list = yaml.load(f)
 
     # load yaml-config of experiment
     config_file = os.path.join(simfolder, '01_runs', expt_name)
     with open(config_file) as config:
         experiment_dict = yaml.load(config)
 
-    main(stub_list, experiment_dict)
+    main(identifier_list, experiment_dict)
