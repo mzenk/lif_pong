@@ -9,7 +9,7 @@ import pong_agent
 
 
 # identifier params will be save in the analysis file
-def inf_speed_analysis(identifier_params, samples=None):
+def inf_speed_analysis(identifier_params=None, samples=None):
     with open('sim.yaml') as config:
         simdict = yaml.load(config)
 
@@ -19,6 +19,8 @@ def inf_speed_analysis(identifier_params, samples=None):
     img_shape = tuple(general_dict['img_shape'])
     n_labels = img_shape[0]//3
     n_pxls = np.prod(img_shape)
+    if identifier_params is None:
+        identifier_params = simdict.pop('identifier')
 
     if samples is None:
         anadict = {'n_instances': float('nan'),
@@ -46,9 +48,19 @@ def inf_speed_analysis(identifier_params, samples=None):
         np.savez_compressed('agent_performance', **result_dict)
 
         # save summarized analysis data for this chunk
-        inf_success = float(result_dict['successes'][-2])
+        # 'successes' contains numbers of instances for which an agent
+        # with infinite speed is within paddle_width of the correct pos.
+        # index of list represents number of clamped pixel columns
+        clamp_pos = -2
+        inf_success = result_dict['successes']
+        pred_error = result_dict['distances']
+        pred_error_median = np.percentile(pred_error, 50, axis=0)
+        pred_error_iqr = np.percentile(pred_error, 75, axis=0) - \
+            np.percentile(pred_error, 25, axis=0)
         anadict = {'n_instances': result_dict['n_instances'],
-                   'inf_success': inf_success}
+                   'inf_success': float(inf_success[clamp_pos]),
+                   'pred_error_median': float(pred_error_median[clamp_pos]),
+                   'pred_error_iqr': float(pred_error_iqr[clamp_pos])}
 
     # add clamping-tso parameters for identification
     anadict['start_idx'] = start
@@ -66,4 +78,4 @@ if __name__ == '__main__':
     except Exception as e:
         print('Missing sample file', file=sys.stderr)
         samples = None
-    inf_speed_analysis(samples)
+    inf_speed_analysis(samples=samples)

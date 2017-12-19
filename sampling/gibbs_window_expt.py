@@ -5,13 +5,14 @@ from __future__ import print_function
 import numpy as np
 import yaml
 import sys
+import lif_chunk_analysis as analysis
 import lif_pong.training.rbm as rbm_pkg
 from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict
 from lif_pong.utils import get_windowed_image_index
 
 
 # shouldn't be used with more than a few imgs (due to memory limitations)
-def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500,
+def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
                    clamp_fct=None):
     if clamp_fct is None:
         return rbm.draw_samples(burnin + n_steps, v_init=v_init)[burnin:]
@@ -94,7 +95,7 @@ class Clamp_window(object):
         return self.interval, clamped_idx
 
 
-def main(general_dict, identifiers):
+def main(general_dict):
     # pass arguments from dictionaries to simulation
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
@@ -105,22 +106,35 @@ def main(general_dict, identifiers):
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
     winsize = general_dict['winsize']
+    gather_data = general_dict['gather_data']
+
+    try:
+        binary = general_dict['binary']
+    except KeyError:
+        binary = False
 
     duration = (img_shape[1] + 1) * n_samples
     clamp = Clamp_window(img_shape, n_samples, winsize)
 
-    print('Running gibbs simulation for instances {} to {}'.format(start, end))
-    vis_samples, _ = run_simulation(
-        rbm, duration, test_set[0][start:end], burnin=general_dict['burn_in'],
-        clamp_fct=clamp)
-
-    # compared to the lif-methods, the method returns an array with
-    # shape [n_steps, n_imgs, n_vis]. Hence, swap axes.
-    np.savez_compressed('samples', samples=np.swapaxes(vis_samples, 0, 1))
-
-    # # leave out average pool? (done by plot_predictions)
-    # vis_samples = average_pool(np.swapaxes(vis_samples, 0, 1), n_samples,
-    #                            stride=n_samples)
+    try:
+        with np.load('samples.npz') as d:
+            samples = d['samples'].astype(float)
+    except Exception:
+        if gather_data:
+            print('Running gibbs simulation for instances {} to {}'
+                  ''.format(start, end))
+            vis_samples, _ = run_simulation(
+                rbm, duration, test_set[0][start:end], binary=binary,
+                burnin=general_dict['burn_in'], clamp_fct=clamp)
+            # compared to the lif-methods, the method returns an array with
+            # shape [n_steps, n_imgs, n_vis]. Hence, swap axes.
+            np.savez_compressed('samples',
+                                samples=np.swapaxes(vis_samples, 0, 1))
+        else:
+            print('Missing sample file', file=sys.stderr)
+            samples = None
+    # produce analysis file
+    analysis.inf_speed_analysis(samples)
 
 
 if __name__ == '__main__':
@@ -131,6 +145,5 @@ if __name__ == '__main__':
         config = yaml.load(configfile)
 
     general_dict = config.pop('general')
-    identifiers = config.pop('identifier')
 
-    main(general_dict, identifiers)
+    main(general_dict)

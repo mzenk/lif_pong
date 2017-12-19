@@ -104,7 +104,7 @@ def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=
         successes = np.sum(pred_error < .5*paddle_width, axis=0)
         result = {
             'successes': successes,
-            'pred_error': pred_error,
+            'distances': pred_error,  # for infinite speed equivalent
             'speeds': np.inf,
             'n_instances': len(data_idx)
         }
