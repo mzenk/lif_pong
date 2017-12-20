@@ -86,7 +86,7 @@ def get_performance_data(basefolder, identifier_dict):
             prediction = np.vstack((prediction, tmp_col))
         counter += 1
 
-    print('Merged prediction data of {} chunks'.format(counter))
+    print('Merged prediction data of {} chunks'.format(counter), file=sys.stdout)
     # # save data (averaged samples for label units and last column)?
     # np.savez(os.path.expanduser('~/pong/sampling/predictions'),
     #          last_col=prediction, lab=prediction[..., :12], data_idx=data_idx)

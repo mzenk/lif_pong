@@ -37,7 +37,8 @@ def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
         n_samples = delta_t if t + delta_t <= n_steps else n_steps - t
 
         unclamped_vis = rbm.sample_with_clamped_units(
-            n_samples, clamped_ind, imgs[:, clamped_ind], v_init=v_init)
+            n_samples, clamped_ind, imgs[:, clamped_ind], v_init=v_init,
+            binary=binary)
         if imgs.shape[0] == 1:
             unclamped_vis = np.expand_dims(unclamped_vis, 1)
         unclamped_ind = np.setdiff1d(np.arange(rbm.n_visible), clamped_ind)
@@ -55,6 +56,7 @@ def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
         # if the gibbs chain should be continued
         v_init = vis_samples[-1]
         t += delta_t
+
     return vis_samples, hid_samples
 
 
@@ -123,13 +125,20 @@ def main(general_dict):
         if gather_data:
             print('Running gibbs simulation for instances {} to {}'
                   ''.format(start, end))
-            vis_samples, _ = run_simulation(
+            vis_samples, hid_samples = run_simulation(
                 rbm, duration, test_set[0][start:end], binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp)
+
             # compared to the lif-methods, the method returns an array with
             # shape [n_steps, n_imgs, n_vis]. Hence, swap axes.
+            if binary:
+                samples = np.concatenate((vis_samples, hid_samples), axis=2)
+                samples = samples.astype(bool)
+            else:
+                # too large otherwise
+                samples = vis_samples
             np.savez_compressed('samples',
-                                samples=np.swapaxes(vis_samples, 0, 1))
+                                samples=np.swapaxes(samples, 0, 1))
         else:
             print('Missing sample file', file=sys.stderr)
             samples = None
