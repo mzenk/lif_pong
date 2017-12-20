@@ -125,18 +125,14 @@ def main(general_dict):
         if gather_data:
             print('Running gibbs simulation for instances {} to {}'
                   ''.format(start, end))
-            vis_samples, hid_samples = run_simulation(
+            samples, _ = run_simulation(
                 rbm, duration, test_set[0][start:end], binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp)
 
             # compared to the lif-methods, the method returns an array with
             # shape [n_steps, n_imgs, n_vis]. Hence, swap axes.
             if binary:
-                samples = np.concatenate((vis_samples, hid_samples), axis=2)
                 samples = samples.astype(bool)
-            else:
-                # too large otherwise
-                samples = vis_samples
             np.savez_compressed('samples',
                                 samples=np.swapaxes(samples, 0, 1))
         else:

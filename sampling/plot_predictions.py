@@ -5,7 +5,7 @@ import yaml
 import os
 import numpy as np
 from lif_pong.utils import average_pool, average_helper
-from lif_pong.utils.data_mgmt import make_figure_folder, load_images
+from lif_pong.utils.data_mgmt import make_figure_folder, load_images, make_data_folder
 import pong_agent
 from cycler import cycler
 import matplotlib
@@ -35,10 +35,10 @@ def findDiff(d1, d2, path=""):
                     print(" + ", k, " : ", d2[k])
 
 
-def get_performance_data(basefolder, identifier_dict):
+def merge_chunks(basefolder, identifier_dict, savename):
     # make prediction files from samples
-    data_idx = 0
-    prediction = 0
+    data_idx = None
+    prediction = None
     counter = 0
     folder_list = os.listdir(basefolder)
     for folder in folder_list:
@@ -86,16 +86,45 @@ def get_performance_data(basefolder, identifier_dict):
             prediction = np.vstack((prediction, tmp_col))
         counter += 1
 
-    print('Merged prediction data of {} chunks'.format(counter), file=sys.stdout)
-    # # save data (averaged samples for label units and last column)?
-    # np.savez(os.path.expanduser('~/pong/sampling/predictions'),
-    #          last_col=prediction, lab=prediction[..., :12], data_idx=data_idx)
-    if counter > 0:
+    print('Merged prediction data of {} chunks'.format(counter),
+          file=sys.stdout)
+    if prediction is not None:
+        # save prediction data (faster for re-plotting)
+        np.savez(savename, last_col=prediction, lab=prediction[..., :12],
+                 data_idx=data_idx)
+    else:
+        raise RuntimeError('No matching data could be found.'
+                           'Maybe wrong identifiers.')
+    return prediction, data_idx
+
+
+def get_performance_data(basefolder, identifier_dict):
+    id_string = '_'.join(
+        ['{}'.format(identifier_dict[k]) for k in identifier_dict.keys()])
+    savename = os.path.join(make_data_folder(),
+                            basefolder.split('/')[-1] + id_string)
+    # try to load data
+    try:
+        with np.load(savename + '.npz') as f:
+            prediction = f['last_col']
+            data_idx = f['data_idx']
+        print('Loaded prediction data.')
+    except IOError:
+        prediction, data_idx = merge_chunks(basefolder, identifier_dict,
+                                            savename)
+
+    # load stuff for pong agent from an arbitrary sim folder
+    # (params should be the same for all)
+    simpath = os.path.join(basefolder, os.listdir(basefolder)[0])
+    with open(os.path.join(simpath, 'sim.yaml')) as config:
+        general_dict = yaml.load(config)['general']
+
+    if prediction is not None:
         # compute agent performance
         agent_result = pong_agent.compute_performance(
-            img_shape, general_dict['data_name'], data_idx, prediction)
-    else:
-        raise RuntimeError('No matching data could be found. Check yaml file.')
+            tuple(general_dict['img_shape']), general_dict['data_name'],
+            data_idx, prediction)
+
     return data_idx, prediction, agent_result
 
 

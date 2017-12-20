@@ -65,8 +65,8 @@ def main(general_dict, sbs_dict):
             samples = lif_window_expt(
                 winsize, test_set[0][start:end], img_shape, rbm, sbs_kwargs,
                 n_samples=n_samples)
-
-            np.savez_compressed('samples', samples=samples.astype(bool))
+            if samples is not None:
+                np.savez_compressed('samples', samples=samples.astype(bool))
         else:
             print('Missing sample file', file=sys.stderr)
             samples = None
