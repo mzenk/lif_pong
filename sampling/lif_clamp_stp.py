@@ -9,21 +9,21 @@ from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict
 import lif_pong.training.rbm as rbm_pkg
 
 
-def lif_tso_clamping_expt(test_imgs, img_shape, rbm, calib_file, sbs_kwargs,
+def lif_tso_clamping_expt(test_imgs, img_shape, rbm, sbs_kwargs,
                           clamp_kwargs, n_samples=20):
     # Bring weights and biases into right form
     w, b = rbm.bm_params()
-    sampling_interval = sbs_kwargs['sampling_interval']
+    sampling_interval = sbs_kwargs.pop('sampling_interval')
     # clamp using TSO
     clamp_duration = n_samples * sampling_interval
     duration = clamp_duration * (img_shape[1] + 1)
 
     bm = lifsampl.initialise_network(
-        calib_file, w, b, tso_params=sbs_kwargs['tso_params'])
+        sbs_kwargs.pop('calib_file'), w, b,
+        tso_params=sbs_kwargs.pop('tso_params'))
 
     # add all necessary kwargs to one dictionary
-    kwargs = {k: sbs_kwargs[k] for k in
-              ('dt', 'sim_setup_kwargs', 'burn_in_time')}
+    kwargs = {k: sbs_kwargs[k] for k in sbs_kwargs.keys()}
     for k in clamp_kwargs.keys():
         kwargs[k] = clamp_kwargs[k]
     results = []
@@ -93,7 +93,6 @@ if __name__ == '__main__':
     # simulation parameters
     n_samples = 20
     seed = 7741092
-    calib_file = 'calibrations/dodo_calib.json'
 
     mixing_tso_params = {
         "U": .01,
@@ -130,7 +129,8 @@ if __name__ == '__main__':
         'burn_in_time': 500.,
         'sim_setup_kwargs': sim_setup_kwargs,
         'sampling_interval': 10.,   # samples are taken every tau_refrac [ms]
-        "tso_params": mixing_tso_params
+        'tso_params': mixing_tso_params,
+        'calib_file': 'calibrations/dodo_calib.json'
     }
 
     # load stuff
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     rbm = rbm_pkg.load(get_rbm_dict(data_name + '_crbm'))
 
     samples = lif_tso_clamping_expt(
-        test_set[0][start:end], img_shape, rbm, calib_file, sbs_kwargs,
+        test_set[0][start:end], img_shape, rbm, sbs_kwargs,
         clamp_kwargs, n_samples=n_samples)
 
     # # testing

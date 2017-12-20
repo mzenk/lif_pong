@@ -133,14 +133,16 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
 
 
 if __name__ == '__main__':
-    kds = [{'pos': .7, 'ampl': .3, 'sigma': 0.1},
+    kds = [{'pos': .8, 'ampl': .3, 'sigma': 0.1},
+           {'pos': .7, 'ampl': .3, 'sigma': 0.1},
            {'pos': .6, 'ampl': .3, 'sigma': 0.1},
            {'pos': .5, 'ampl': .3, 'sigma': 0.1},
            {'pos': .4, 'ampl': .3, 'sigma': 0.1},
-           {'pos': .3, 'ampl': .3, 'sigma': 0.1}]
-    for i, d in enumerate(kds):
+           {'pos': .3, 'ampl': .3, 'sigma': 0.1},
+           {'pos': .2, 'ampl': .3, 'sigma': 0.1}]
+    for d in kds:
         generate_data([48, 36], pot_str='pong', kink_dict=d,
-                      fname='knick{:02d}_var_start36x48'.format(i))
+                      fname='knick{:.1f}_var_start36x48'.format(d['pos']))
 
     # # check balancing of dataset
     # plt.figure()

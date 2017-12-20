@@ -7,27 +7,28 @@ from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict
 import lif_pong.training.rbm as rbm_pkg
 
 
-def lif_window_expt(win_size, test_imgs, img_shape, rbm, calib_file,
-                    sbs_kwargs, n_samples=20):
+def lif_window_expt(win_size, test_imgs, img_shape, rbm, sbs_kwargs,
+                    n_samples=20):
     # Bring weights and biases into right form
     w, b = rbm.bm_params()
-    sampling_interval = sbs_kwargs['sampling_interval']
+    sampling_interval = sbs_kwargs.pop('sampling_interval')
     # clamp sliding window
     clamp_duration = n_samples * sampling_interval
     duration = clamp_duration * (img_shape[1] + 1)
 
-    # sample_clamped = partial(lifsampl.sample_network_clamped,
-    #                          calib_file, w, b, duration, **sbs_kwargs)
     bm = lifsampl.initialise_network(
-        calib_file, w, b, tso_params=sbs_kwargs['tso_params'])
-    kwargs = {k: sbs_kwargs[k] for k in ('dt', 'sim_setup_kwargs',
-                                         'burn_in_time')}
+        sbs_kwargs.pop('calib_file'), w, b,
+        tso_params=sbs_kwargs.pop('tso_params'),
+        weight_scaling=sbs_kwargs.pop('weight_scaling'))
     results = []
+
     for img in test_imgs:
         clamp_fct = lifsampl.Clamp_window(
             clamp_duration, img.reshape(img_shape), win_size)
         bm.spike_data = lifsampl.gather_network_spikes_clamped(
-            bm, duration, clamp_fct=clamp_fct, **kwargs)
+            bm, duration, clamp_fct=clamp_fct, **sbs_kwargs)
+        if bm.spike_data is None:
+            return None
         results.append(bm.get_sample_states(sampling_interval))
     return np.array(results)
 
@@ -81,7 +82,6 @@ save_file = pot_str + \
 # simulation parameters
 n_samples = 20
 seed = 7741092
-calib_file = 'calibrations/dodo_calib.json'
 
 mixing_tso_params = {
     "U": .01,
@@ -97,7 +97,9 @@ sbs_kwargs = {
     'burn_in_time': 500.,
     'sim_setup_kwargs': sim_setup_kwargs,
     'sampling_interval': 10.,   # samples are taken every tau_refrac [ms]
-    "tso_params": mixing_tso_params
+    'tso_params': mixing_tso_params,
+    'calib_file': 'calibrations/dodo_calib.json',
+    'weight_scaling': 1.
 }
 
 # load stuff
@@ -109,7 +111,7 @@ end = min(end, len(test_set[0]))
 rbm = rbm_pkg.load(get_rbm_dict(data_name + '_crbm'))
 
 samples = lif_window_expt(
-    win_size, test_set[0][start:end], img_shape, rbm, calib_file, sbs_kwargs,
+    win_size, test_set[0][start:end], img_shape, rbm, sbs_kwargs,
     n_samples=n_samples)
 
 # # testing
