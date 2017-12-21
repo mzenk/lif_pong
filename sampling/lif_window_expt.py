@@ -36,7 +36,7 @@ def lif_window_expt(win_size, test_imgs, img_shape, rbm, sbs_kwargs,
     return np.array(results)
 
 
-def main(general_dict, sbs_dict):
+def main(general_dict, sbs_dict, analysis_dict):
     # pass arguments from dictionaries to simulation
     gather_data = general_dict['gather_data']
     n_samples = general_dict['n_samples']
@@ -71,7 +71,7 @@ def main(general_dict, sbs_dict):
             print('Missing sample file', file=sys.stderr)
             samples = None
     # produce analysis file
-    analysis.inf_speed_analysis(samples)
+    analysis.inf_speed_analysis(samples, **analysis_dict)
 
 
 if __name__ == '__main__':
@@ -83,5 +83,9 @@ if __name__ == '__main__':
 
     general_dict = config.pop('general')
     sbs_dict = config.pop('sbs')
+    try:
+        analysis_dict = config.pop('analysis')
+    except KeyError:
+        analysis_dict = {}
 
-    main(general_dict, sbs_dict)
+    main(general_dict, sbs_dict, analysis_dict)

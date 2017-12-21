@@ -213,10 +213,10 @@ def main(identifier_list, experiment_dict):
         plot_agent_performance(ax_ap, agent_result, label)
 
     ax_pe.legend()
-    fig_pe.savefig(make_figure_folder() + 'pred_error.pdf', transparent=True)
+    fig_pe.savefig(make_figure_folder() + 'pred_error.png', transparent=True)
     ax_ap.plot(ax_ap.get_xlim(), [1, 1], 'k:')
     ax_ap.legend()
-    fig_ap.savefig(make_figure_folder() + 'agent_perf.pdf', transparent=True)
+    fig_ap.savefig(make_figure_folder() + 'agent_perf.png', transparent=True)
 
 
 if __name__ == '__main__':

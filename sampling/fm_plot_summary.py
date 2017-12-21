@@ -9,32 +9,6 @@ import matplotlib.pyplot as plt
 from lif_pong.utils.data_mgmt import make_figure_folder
 
 
-def plot_trec_U(df, figname='paramsweep.png'):
-    df['success_rate'] = df['inf_success'] / df['n_instances']
-
-    sorted_df = df.sort_values(by=['U', 'tau_rec'])
-    n_U = len(sorted_df['U'].unique())
-    n_tau_rec = len(sorted_df['tau_rec'].unique())
-
-    tgrid = np.reshape(sorted_df['tau_rec'].as_matrix(), (n_tau_rec, n_U))
-    ugrid = np.reshape(sorted_df['U'].as_matrix(), (n_tau_rec, n_U))
-    xmin = tgrid.min() - .5*np.diff(tgrid, axis=1)[0, 0]
-    xmax = tgrid.max() + .5*np.diff(tgrid, axis=1)[0, 0]
-    ymin = ugrid.min() - .5*np.diff(ugrid, axis=0)[0, 0]
-    ymax = ugrid.max() + .5*np.diff(ugrid, axis=0)[0, 0]
-    z = np.reshape(sorted_df['success_rate'].as_matrix(), (n_tau_rec, n_U))
-
-    plt.figure()
-    plt.imshow(z, cmap=plt.cm.viridis, interpolation='nearest', origin='lower',
-               extent=[xmin, xmax, ymin, ymax], vmin=0, vmax=1,
-               aspect='auto')
-    plt.xlabel('tau_rec')
-    plt.ylabel('U')
-    plt.colorbar()
-    # alternatively take pcolormesh, but there is some difference about x/y
-    plt.savefig(os.path.join(make_figure_folder(), figname))
-
-
 # if there are two identifiers, produce heatmap
 def plot_infsuccess(df, identifier, figname='paramsweep.png'):
     assert len(identifier) == 2
@@ -51,12 +25,14 @@ def plot_infsuccess(df, identifier, figname='paramsweep.png'):
     xmax = xgrid.max() + .5*dx
     ymin = ygrid.min() - .5*dy
     ymax = ygrid.max() + .5*dy
+    xyratio = float((xmax - xmin) / (ymax - ymin))
     z = np.reshape(sorted_df['success_rate'].as_matrix(), gridshape)
 
+    print('Max: {}, min: {}'.format(np.nanmax(z), np.nanmin(z)))
     plt.figure()
     plt.imshow(z, cmap=plt.cm.viridis, interpolation='nearest', origin='lower',
                extent=[xmin, xmax, ymin, ymax], vmin=0, vmax=1,
-               aspect='auto')
+               aspect=xyratio)
     plt.xlabel(identifier[0])
     plt.ylabel(identifier[1])
     plt.colorbar()
@@ -98,7 +74,7 @@ if 'tau_fac' in result.keys():
 
 # plot heatmap of success rate
 if len(id_params) == 2:
-    plot_infsuccess(result, id_params)
+    plot_infsuccess(result, id_params, figname=expt_name)
 elif 'weight' in result.columns:
     id_params.remove('weight')
     for weight in result['weight'].unique():
