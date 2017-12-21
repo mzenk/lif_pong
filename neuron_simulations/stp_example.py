@@ -32,7 +32,7 @@ dodo_params = {
     "tau_refrac" : 10.,
     "i_offset"   : 0.,
 }
-weight = .3
+weight = .01
 # nest has different weight units (x1000)
 # tau_syn = 1.
 # tau_m = 1.
@@ -116,15 +116,15 @@ for label, p in populations.items():
     p.write_data(filename, annotations={'script_name': __file__})
 
 import numpy as np
-from utils.data_mgmt import make_figure_folder
+from lif_pong.utils.data_mgmt import make_figure_folder
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 mpl.rcParams['font.size'] = 14
 
-figure_filename = 'stp_example.pdf'
+figure_filename = 'stp_example.png'
 fig, axes = plt.subplots(2, 1, figsize=(10, 10))
-for label, alpha in zip(['renewing'], [1., .5]):
+for label, alpha in zip(['renewing', 'depressing'], [1., .5]):
     data = populations[label].get_data().segments[0]
     vmem = data.filter(name='v')[0]
     gsyn = data.filter(name='gsyn_exc')[0]
