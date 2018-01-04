@@ -14,11 +14,11 @@ def plot_infsuccess(df, identifier, figname='paramsweep.png'):
     assert len(identifier) == 2
     df['success_rate'] = df['inf_success'] / df['n_instances']
 
-    sorted_df = df.sort_values(by=identifier[::-1])
+    sorted_df = df.sort_values(by=identifier)
     gridshape = tuple([len(sorted_df[k].unique()) for k in identifier])
 
-    xgrid = np.reshape(sorted_df[identifier[0]].as_matrix(), gridshape)
-    ygrid = np.reshape(sorted_df[identifier[1]].as_matrix(), gridshape)
+    ygrid = np.reshape(sorted_df[identifier[0]].as_matrix(), gridshape)
+    xgrid = np.reshape(sorted_df[identifier[1]].as_matrix(), gridshape)
     dx = np.diff(xgrid, axis=1)[0, 0]
     dy = np.diff(ygrid, axis=0)[0, 0]
     xmin = xgrid.min() - .5*dx
@@ -33,11 +33,58 @@ def plot_infsuccess(df, identifier, figname='paramsweep.png'):
     plt.imshow(z, cmap=plt.cm.viridis, interpolation='nearest', origin='lower',
                extent=[xmin, xmax, ymin, ymax], vmin=0, vmax=1,
                aspect=xyratio)
+    plt.xlabel(identifier[1])
+    plt.ylabel(identifier[0])
+    plt.colorbar()
+
+    plt.savefig(os.path.join(make_figure_folder(), figname))
+
+
+def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
+    assert len(identifier) == 2
+    df['success_rate'] = df['inf_success'] / df['n_instances']
+
+    sorted_df = df.sort_values(by=identifier)
+    # print(sorted_df)
+    # create axis vectors for meshgrid. This code assumes that the differences
+    # between x/y-values are all a multiple of some smallest delta
+    mins = [sorted_df[k].min() for k in identifier]
+    maxs = [sorted_df[k].max() for k in identifier]
+    mindiffs = [np.diff(sorted_df[k].unique()).min() for k in identifier]
+    xvec, yvec = \
+        [np.arange(mins[i], maxs[i] + 2*mindiffs[i],
+                   mindiffs[i]) - .5*mindiffs[i] for i in range(2)]
+    X, Y = np.meshgrid(xvec, yvec)
+
+    # create value array with nans for non-existing data
+    # # doesn't work with numpy 1.11. Also, fails if a combination is missing
+    # C = np.ones((len(yvec), len(xvec))) * np.nan
+    # mask = np.logical_and(np.isin(X + .5*mindiffs[0], sorted_df[identifier[0]]),
+    #                       np.isin(Y + .5*mindiffs[1], sorted_df[identifier[1]]))
+    # C[mask] = sorted_df['success_rate'].as_matrix().reshape(C[mask].shape)
+
+    C = np.ones(len(yvec) * len(xvec)) * np.nan
+    data_xy = sorted_df.loc[:, identifier].as_matrix()
+    # print(data_xy)
+    for i, xy in enumerate(zip((X + .5*mindiffs[0]).flatten(),
+                               (Y + .5*mindiffs[1]).flatten())):
+        occurrence = np.where(np.all(np.isclose(xy, data_xy), axis=1))[0]
+        if len(occurrence) > 0:
+            assert len(occurrence) == 1
+            C[i] = sorted_df['success_rate'].iloc[occurrence[0]]
+    C = C.reshape(len(yvec), len(xvec))
+
+    fig, ax = plt.subplots()
+    im = ax.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
+                       cmap=plt.cm.viridis, vmin=0, vmax=1)
+    aspect = (C.shape[0] - 1)/(C.shape[1] - 1) \
+        * (maxs[0] - mins[0])/(maxs[1] - mins[1])
+    ax.set_aspect(float(aspect))
     plt.xlabel(identifier[0])
     plt.ylabel(identifier[1])
-    plt.colorbar()
-    # alternatively take pcolormesh, but there is some difference about x/y
+    plt.colorbar(im, ax=ax)
     plt.savefig(os.path.join(make_figure_folder(), figname))
+
 
 if len(sys.argv) != 2:
     print('Wrong number of arguments. Please provide the experiment name')
@@ -74,13 +121,13 @@ if 'tau_fac' in result.keys():
 
 # plot heatmap of success rate
 if len(id_params) == 2:
-    plot_infsuccess(result, id_params, figname=expt_name)
+    plot_infsuccess_pcolor(result, id_params, figname=expt_name)
 elif 'weight' in result.columns:
     id_params.remove('weight')
     for weight in result['weight'].unique():
         subdf = result.loc[result.weight == weight, :].copy()
         subdf.pop('weight')
         # plot_trec_U(subdf, figname=expt_name + '_w={}.png'.format(weight))
-        plot_infsuccess(subdf, id_params, figname=expt_name + '_w={}.png'.format(weight))
+        plot_infsuccess_pcolor(subdf, id_params, figname=expt_name + '_w={}.png'.format(weight))
 else:
     print('Don\'t know what to do with the data')
