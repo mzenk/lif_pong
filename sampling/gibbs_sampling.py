@@ -10,8 +10,8 @@ from lif_pong.utils import get_windowed_image_index, average_pool
 
 
 # shouldn't be used with more than a few imgs (due to memory limitations)
-def run_simulation(rbm, n_steps, imgs, v_init=None,
-                   burnin=500, clamp_fct=None):
+def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
+                   clamp_fct=None):
     if clamp_fct is None:
         return rbm.draw_samples(burnin + n_steps, v_init=v_init)[burnin:]
 
@@ -24,8 +24,7 @@ def run_simulation(rbm, n_steps, imgs, v_init=None,
 
     # burnin
     _, clamped_ind = clamp_fct(0)
-    temp = rbm.draw_samples(burnin, v_init=v_init,
-                            clamped=clamped_ind,
+    temp = rbm.draw_samples(burnin, v_init=v_init, clamped=clamped_ind,
                             clamped_val=imgs[:, clamped_ind])
     v_init = temp[-1, ..., :rbm.n_visible]
 
@@ -35,25 +34,27 @@ def run_simulation(rbm, n_steps, imgs, v_init=None,
         delta_t, clamped_ind = clamp_fct(t)
         n_samples = delta_t if t + delta_t <= n_steps else n_steps - t
 
-        # # probably slower
-        # temp = rbm.draw_samples(n_samples, v_init=v_init,
-        #                         clamped=clamped_ind,
-        #                         clamped_val=imgs[:, clamped_ind])
-        #
-        # vis_samples[t:t + n_samples] = temp[..., :rbm.n_visible]
-        # hid_samples[t:t + n_samples] = temp[..., rbm.n_visible:]
-
         unclamped_vis = rbm.sample_with_clamped_units(
-            n_samples, clamped_ind, imgs[:, clamped_ind], v_init=v_init)
+            n_samples, clamped_ind, imgs[:, clamped_ind], v_init=v_init,
+            binary=binary)
         if imgs.shape[0] == 1:
             unclamped_vis = np.expand_dims(unclamped_vis, 1)
         unclamped_ind = np.setdiff1d(np.arange(rbm.n_visible), clamped_ind)
         vis_samples[t:t + n_samples, :, clamped_ind] = imgs[:, clamped_ind]
         vis_samples[t:t + n_samples, :, unclamped_ind] = unclamped_vis
 
+        # # probably slower
+        # temp = rbm.draw_samples(n_samples, v_init=v_init,
+        #                         clamped=clamped_ind,
+        #                         clamped_val=imgs[:, clamped_ind])
+
+        # vis_samples[t:t + n_samples] = temp[..., :rbm.n_visible]
+        # # hid_samples[t:t + n_samples] = temp[..., rbm.n_visible:]
+
         # if the gibbs chain should be continued
-        v_init = vis_samples[-1]
+        v_init = vis_samples[t + n_samples - 1]
         t += delta_t
+
     return vis_samples, hid_samples
 
 

@@ -47,7 +47,6 @@ def merge_chunks(basefolder, identifier_dict, savename):
             simdict = yaml.load(config)
             chunk_start = simdict['general'].pop('start_idx')
             sim_identifiers = simdict.pop('identifier')
-
         # only append predictions if it has same parameters
         if identifier_dict != sim_identifiers:
             # findDiff(identifier_dict, sim_identifiers)
@@ -90,10 +89,11 @@ def merge_chunks(basefolder, identifier_dict, savename):
           file=sys.stdout)
     if prediction is not None:
         # save prediction data (faster for re-plotting)
+        print('Saved as '+savename)
         np.savez(savename, last_col=prediction, lab=prediction[..., :12],
                  data_idx=data_idx)
     else:
-        raise RuntimeError('No matching data could be found.'
+        raise RuntimeError('No matching data could be found. '
                            'Maybe wrong identifiers.')
     return prediction, data_idx
 
@@ -108,7 +108,7 @@ def get_performance_data(basefolder, identifier_dict):
         with np.load(savename + '.npz') as f:
             prediction = f['last_col']
             data_idx = f['data_idx']
-        print('Loaded prediction data.')
+        print('Loaded prediction with shape {}.'.format(prediction.shape))
     except IOError:
         prediction, data_idx = merge_chunks(basefolder, identifier_dict,
                                             savename)
@@ -181,14 +181,11 @@ def plot_agent_performance(ax, agent_dict, label=None):
     # succrate_std = agent_dict['successes_std'] / agent_dict['n_instances']
     # std of binary rv is not very helpfu
     speeds = agent_dict['speeds']
+    print('Maximum success rate: {:.3f}'.format(np.max(succrate)))
     ax.plot(speeds, succrate, label=label)
 
 
-def main(identifier_list, experiment_dict):
-    # get indices of data used for simulation
-    stub_dict = experiment_dict.pop('stub')
-    data_name = stub_dict['general']['data_name']
-
+def main(identifier_list):
     # set up figures
     fig_pe, ax_pe = plt.subplots()
     ax_pe.set_ylabel('Prediction error')
@@ -203,6 +200,14 @@ def main(identifier_list, experiment_dict):
     ax_ap.set_ylabel('Success rate')
     ax_ap.set_ylim([0., 1.1])
     for i, identifier_dict in enumerate(identifier_list):
+        expt_name = identifier_dict.pop('experiment')
+        # load yaml-config of experiment
+        config_file = os.path.join(simfolder, '01_runs', expt_name)
+        with open(config_file) as config:
+            experiment_dict = yaml.load(config)
+        # get indices of data used for simulation
+        stub_dict = experiment_dict.pop('stub')
+        data_name = stub_dict['general']['data_name']
         try:
             label = identifier_dict.pop('label')
         except KeyError:
@@ -213,26 +218,20 @@ def main(identifier_list, experiment_dict):
         plot_agent_performance(ax_ap, agent_result, label)
 
     ax_pe.legend()
-    fig_pe.savefig(make_figure_folder() + 'pred_error.png', transparent=True)
+    fig_pe.savefig(make_figure_folder() + 'pred_error.png')  #, transparent=True)
     ax_ap.plot(ax_ap.get_xlim(), [1, 1], 'k:')
     ax_ap.legend()
-    fig_ap.savefig(make_figure_folder() + 'agent_perf.png', transparent=True)
+    fig_ap.savefig(make_figure_folder() + 'agent_perf.png')  #, transparent=True)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print('Wrong number of arguments. Please provide the experiment name'
-              'and a list of stub_dicts in yaml format.')
+    if len(sys.argv) != 2:
+        print('Wrong number of arguments. Please provide a yaml that specifies'
+              ' which simulations to compare.')
         sys.exit()
-    expt_name = sys.argv[1]
 
-    # load list of stubs used for selecting data
-    with open(sys.argv[2]) as f:
+    # load list of identifiers used for selecting data
+    with open(sys.argv[1]) as f:
         identifier_list = yaml.load(f)
 
-    # load yaml-config of experiment
-    config_file = os.path.join(simfolder, '01_runs', expt_name)
-    with open(config_file) as config:
-        experiment_dict = yaml.load(config)
-
-    main(identifier_list, experiment_dict)
+    main(identifier_list)

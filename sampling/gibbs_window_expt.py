@@ -54,7 +54,7 @@ def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
         # # hid_samples[t:t + n_samples] = temp[..., rbm.n_visible:]
 
         # if the gibbs chain should be continued
-        v_init = vis_samples[-1]
+        v_init = vis_samples[t + n_samples - 1]
         t += delta_t
 
     return vis_samples, hid_samples
@@ -129,12 +129,12 @@ def main(general_dict):
                 rbm, duration, test_set[0][start:end], binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp)
 
+            if binary:
+                samples = samples > .5
             # compared to the lif-methods, the method returns an array with
             # shape [n_steps, n_imgs, n_vis]. Hence, swap axes.
-            if binary:
-                samples = samples.astype(bool)
-            np.savez_compressed('samples',
-                                samples=np.swapaxes(samples, 0, 1))
+            samples = np.swapaxes(samples, 0, 1)
+            np.savez_compressed('samples', samples=samples)
         else:
             print('Missing sample file', file=sys.stderr)
             samples = None

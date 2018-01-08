@@ -45,7 +45,6 @@ def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
     df['success_rate'] = df['inf_success'] / df['n_instances']
 
     sorted_df = df.sort_values(by=identifier)
-    # print(sorted_df)
     # create axis vectors for meshgrid. This code assumes that the differences
     # between x/y-values are all a multiple of some smallest delta
     mins = [sorted_df[k].min() for k in identifier]
@@ -65,7 +64,6 @@ def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
 
     C = np.ones(len(yvec) * len(xvec)) * np.nan
     data_xy = sorted_df.loc[:, identifier].as_matrix()
-    # print(data_xy)
     for i, xy in enumerate(zip((X + .5*mindiffs[0]).flatten(),
                                (Y + .5*mindiffs[1]).flatten())):
         occurrence = np.where(np.all(np.isclose(xy, data_xy), axis=1))[0]
@@ -73,7 +71,7 @@ def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
             assert len(occurrence) == 1
             C[i] = sorted_df['success_rate'].iloc[occurrence[0]]
     C = C.reshape(len(yvec), len(xvec))
-
+    # print(np.nanmax(C))
     fig, ax = plt.subplots()
     im = ax.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
                        cmap=plt.cm.viridis, vmin=0, vmax=1)
@@ -82,7 +80,23 @@ def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
     ax.set_aspect(float(aspect))
     plt.xlabel(identifier[0])
     plt.ylabel(identifier[1])
-    plt.colorbar(im, ax=ax)
+    cbar = plt.colorbar(im, ax=ax)
+    cbar.ax.set_ylabel('Success rate')
+    plt.savefig(os.path.join(make_figure_folder(), figname))
+
+
+def plot_infsuccess_1d(df, identifier, figname='paramsweep.png'):
+    assert len(identifier) == 1
+    df['success_rate'] = df['inf_success'] / df['n_instances']
+
+    sorted_df = df.sort_values(by=identifier)
+
+    xdata = sorted_df[identifier[0]].as_matrix()
+    ydata = sorted_df['success_rate'].as_matrix()
+
+    plt.plot(xdata, ydata)
+    plt.xlabel(identifier[0])
+    plt.ylabel('Success rate')
     plt.savefig(os.path.join(make_figure_folder(), figname))
 
 
@@ -120,7 +134,9 @@ if 'tau_fac' in result.keys():
     result.pop('tau_fac')
 
 # plot heatmap of success rate
-if len(id_params) == 2:
+if len(id_params) == 1:
+    plot_infsuccess_1d(result, id_params, figname=expt_name)
+elif len(id_params) == 2:
     plot_infsuccess_pcolor(result, id_params, figname=expt_name)
 elif 'weight' in result.columns:
     id_params.remove('weight')
