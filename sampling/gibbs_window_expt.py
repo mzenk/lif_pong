@@ -85,9 +85,11 @@ class Clamp_anything(object):
 
 
 class Clamp_window(object):
-    def __init__(self, img_shape, interval, win_size):
+    def __init__(self, img_shape, interval, win_size=None):
         self.interval = interval
         self.img_shape = img_shape
+        if win_size is None:
+            win_size = img_shape[1]
         self.win_size = win_size
 
     def __call__(self, t):
@@ -129,12 +131,13 @@ def main(general_dict):
                 rbm, duration, test_set[0][start:end], binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp)
 
-            if binary:
-                samples = samples > .5
             # compared to the lif-methods, the method returns an array with
             # shape [n_steps, n_imgs, n_vis]. Hence, swap axes.
             samples = np.swapaxes(samples, 0, 1)
-            np.savez_compressed('samples', samples=samples)
+            if binary:
+                np.savez_compressed('samples', samples=samples > .5)
+            else:
+                np.savez_compressed('samples', samples=samples)
         else:
             print('Missing sample file', file=sys.stderr)
             samples = None

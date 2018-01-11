@@ -7,6 +7,7 @@ import matplotlib.animation as animation
 import sys
 from lif_pong.utils import tile_raster_images
 from lif_pong.utils.data_mgmt import make_figure_folder, load_images, get_rbm_dict, get_data_path
+plt.rcParams['animation.ffmpeg_path'] = u'/home/hd/hd_hd/hd_kq433/ffmpeg-3.4.1-64bit-static/ffmpeg'
 
 n_imgs = 2
 sample_file = None
@@ -68,13 +69,15 @@ if show_label:
 # nh = hid_samples.shape[-1]
 # vis_samples = rbm.sample_v_given_h(hid_samples.reshape(-1, nh))[0][:, :n_pixels]
 
-# running average over samples?
-from scipy.ndimage import convolve1d
-kwidth = 20
-kernel = np.ones(kwidth)/kwidth
-avg_samples = convolve1d(vis_samples, kernel, axis=1)
+# # running average over samples?
+# from scipy.ndimage import convolve1d
+# kwidth = 20
+# kernel = np.ones(kwidth)/kwidth
+# avg_samples = convolve1d(vis_samples, kernel, axis=1)
+avg_samples = vis_samples
 
 frames = avg_samples.reshape(-1, *img_shape)
+samples_per_frame = frames.shape[1] / (img_shape[1] + 1)
 if show_label:
     active_lab = np.argmax(lab_samples, axis=2).flatten()
 
@@ -102,6 +105,7 @@ def update_fig(i_frame):
     im.set_data(frame)
     return im, time_text, lab_text
 
+
 fig = plt.figure()
 ax = fig.add_subplot(111)
 im = ax.imshow(np.zeros(img_shape), vmin=0, vmax=1., interpolation='Nearest',
@@ -114,5 +118,5 @@ time_text = ax.text(0.05, 0.01, '', va='bottom', ha='left',
 ani = animation.FuncAnimation(fig, update_fig, frames=zip(range(len(frames)), frames),
                               interval=10., blit=True, repeat=False)
 
-# ani.save(make_figure_folder() + 'samples_U0.001_trec0.mp4')
-plt.show()
+ani.save(make_figure_folder() + 'test.mp4', writer='ffmpeg')
+# plt.show()

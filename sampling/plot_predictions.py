@@ -89,7 +89,7 @@ def merge_chunks(basefolder, identifier_dict, savename):
           file=sys.stdout)
     if prediction is not None:
         # save prediction data (faster for re-plotting)
-        print('Saved as '+savename)
+        print('Saved as '+ savename)
         np.savez(savename, last_col=prediction, lab=prediction[..., :12],
                  data_idx=data_idx)
     else:
@@ -102,7 +102,7 @@ def get_performance_data(basefolder, identifier_dict):
     id_string = '_'.join(
         ['{}'.format(identifier_dict[k]) for k in identifier_dict.keys()])
     savename = os.path.join(make_data_folder(),
-                            basefolder.split('/')[-1] + id_string)
+                            basefolder.split('/')[-1] + '_' + id_string)
     # try to load data
     try:
         with np.load(savename + '.npz') as f:

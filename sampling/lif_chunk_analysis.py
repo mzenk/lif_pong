@@ -61,6 +61,10 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
                    'pred_error_median': float(pred_error_median[clamp_pos]),
                    'pred_error_iqr': float(pred_error_iqr[clamp_pos])}
 
+        if 'wrong_idx' in result_dict.keys():
+            with open('wrong_cases', 'w') as f:
+                f.write(yaml.dump(result_dict['wrong_idx'].tolist()))
+
     # add clamping-tso parameters for identification
     anadict['start_idx'] = start
     for k in identifier_params.keys():

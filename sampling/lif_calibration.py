@@ -57,13 +57,10 @@ def calibration(neuron_params, noise_params, calib_name='calibration',
     sampler.calibrate(calibration)
 
     # Afterwards, we need to save the calibration.
-    if cuba:
-        sampler.write_config(calib_name + "_curr")
-    else:
-        sampler.write_config(calib_name)
+    sampler.write_config(calib_name)
 
     # plot membrane distribution and activation function
-    vmem_dist(calib_name + '.json')
+    sampler.plot_calibration(save=True)
 
 
 def sigma_fct(x, x0, alpha):
@@ -172,6 +169,8 @@ noise_params = {
     'w_inh'    : -55./35 * .0035 # haven't understood yet how V_g is determined
 }
 
+
+# Dodo's params
 dodo_params = {
         "cm"         : .1,
         "tau_m"      : 1.,
@@ -193,12 +192,56 @@ dodo_noise = {
     'w_inh'    : -.0035
 }
 
+# Wei's params (from mixing paper)
+wei_params = {
+        "cm"         : .2,
+        "tau_m"      : .1,
+        "v_thresh"   : -50.,
+        "v_rest"     : -65.,
+        "v_reset"    : -50.01,
+        "tau_refrac" : 10.,
+        "i_offset"   : 0.,
+        "e_rev_E"    : 0.,
+        "e_rev_I"    : -100.,
+        "tau_syn_E"  : 10.,
+        "tau_syn_I"  : 10.,
+    }
+
+wei_noise = {
+    'rate_inh' : 400.,
+    'rate_exc' : 400.,
+    'w_exc'    : .001,
+    'w_inh'    : -.001
+}
+
+wei_curr_params = {
+        "cm"         : .2,
+        "tau_m"      : .1,
+        "e_rev_E"    : 0.,
+        "e_rev_I"    : -100.,
+        "v_thresh"   : -50.,
+        "tau_syn_E"  : 10.,
+        "v_rest"     : -65.,
+        "tau_syn_I"  : 10.,
+        "v_reset"    : -50.01,
+        "tau_refrac" : 10.,
+        "i_offset"   : 0.
+    }
+
+wei_curr_noise = {
+    'rate_inh' : 400.,
+    'rate_exc' : 400.,
+    'w_exc'    : .001,
+    'w_inh'    : -.001
+}
+
 if __name__ == '__main__':
     # calibrate first if necessary
-    # calibration(dodo_params, dodo_noise, 'calibrations/dodo_calib')
+    calibration(wei_params, wei_noise, 'calibrations/wei_calib_400hz',
+                cuba=False)
 
     # # check HCS
     # vmem_dist('calibrations/dodo_calib.json')
 
-    # re-plot activation function
-    plot_calibration('calibrations/dodo_calib.json')
+    # # re-plot activation function
+    # plot_calibration('calibrations/wei_calib_curr.json')

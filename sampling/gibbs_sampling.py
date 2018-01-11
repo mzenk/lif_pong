@@ -83,9 +83,11 @@ class Clamp_anything(object):
 
 
 class Clamp_window(object):
-    def __init__(self, img_shape, interval, win_size):
+    def __init__(self, img_shape, interval, win_size=None):
         self.interval = interval
         self.img_shape = img_shape
+        if win_size is None:
+            win_size = img_shape[1]
         self.win_size = win_size
 
     def __call__(self, t):

@@ -102,11 +102,15 @@ def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=
     if max_speedup == np.inf:
         pred_error = np.abs(predicted_pos - targets.reshape((len(targets), 1)))
         successes = np.sum(pred_error < .5*paddle_width, axis=0)
+        # for inspecting failed cases
+        wrong_idx = data_idx[np.where(
+            pred_error[:, -(leave_uncovered + 1)] > .5*paddle_width)]
         result = {
             'successes': successes,
             'distances': pred_error,  # for infinite speed equivalent
             'speeds': np.inf,
-            'n_instances': len(data_idx)
+            'n_instances': len(data_idx),
+            'wrong_idx': wrong_idx
         }
         return result
 

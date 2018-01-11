@@ -1,7 +1,7 @@
 # Some useful functions
 from __future__ import division
 import numpy as np
-import sys
+from scipy.ndimage import convolve1d
 
 
 # return a weighted average of the interval out_range for each vector in arr
@@ -13,18 +13,23 @@ def average_helper(out_range, arr):
 
 
 # used by save_prediction_data scripts
-def average_pool(arr, width, stride=None, offset=0):
+def average_pool_old(arr, width, stride=None, offset=0):
     # array needs to have shape (n_imgs, n_t, n_pxls)
     if stride is None:
         stride = width
     kernel = np.ones(width) / width
     return np.apply_along_axis(
         np.convolve, 1, arr, kernel, 'valid')[:, int(offset)::int(stride)]
-    # x = .5*(len(kernel) - 1)
-    # filtered = convolve1d(
-    #     arr, kernel, axis=1, mode='constant')[:, np.floor(x):-np.ceil(x)]
-    # print((filtered == filtered1).mean())
-    # doesn't give same result, but should be same and faster -> optimization
+
+
+def average_pool(arr, width, stride=None, offset=0):
+    # array needs to have shape (n_imgs, n_t, n_pxls)
+    if stride is None:
+        stride = width
+    kernel = np.ones(width) / width
+    x = .5*(len(kernel) - 1)
+    convol = convolve1d(arr, kernel, axis=1, mode='constant')
+    return convol[:, offset + int(np.floor(x)):-int(np.ceil(x)):int(stride)]
 
 
 # this is more a reminder how it's done than an actual function
