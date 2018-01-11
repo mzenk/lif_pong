@@ -48,7 +48,8 @@ def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
         # # probably slower
         # temp = rbm.draw_samples(n_samples, v_init=v_init,
         #                         clamped=clamped_ind,
-        #                         clamped_val=imgs[:, clamped_ind])
+        #                         clamped_val=imgs[:, clamped_ind],
+        #                         binary=binary)
 
         # vis_samples[t:t + n_samples] = temp[..., :rbm.n_visible]
         # # hid_samples[t:t + n_samples] = temp[..., rbm.n_visible:]

@@ -30,7 +30,7 @@ class RBM(object):
         self.n_visible = n_visible
 
         if w is None:
-            w = .01*self.np_rng.randn(n_visible, n_hidden)
+            w = .1*self.np_rng.randn(n_visible, n_hidden)
 
         if vbias is None:
             # For best initialization see Hinton's guide; needs to be passed
@@ -677,9 +677,9 @@ class CRBM(RBM):
         self.n_labels = n_labels
 
         if wv is None:
-            wv = .01*self.np_rng.randn(n_inputs, n_hidden)
+            wv = .1*self.np_rng.randn(n_inputs, n_hidden)
         if wl is None:
-            wl = .01*self.np_rng.randn(n_labels, n_hidden)
+            wl = .1*self.np_rng.randn(n_labels, n_hidden)
         # For best initialization see Hinton's guide; needs to be passed
         if input_bias is None:
             input_bias = np.zeros(n_inputs)
@@ -722,22 +722,22 @@ class CRBM(RBM):
         with open(filename, 'wb') as output:
             cPickle.dump(rbm_dict, output, cPickle.HIGHEST_PROTOCOL)
 
-    # For the CDBM I need a special sampling method for the top layer, which
-    # is a CRBM.
-    def sample_v_given_h(self, h_in, beta=1.):
-        if len(h_in.shape) == 1:
-            h_in = np.expand_dims(h_in, 0)
-        if hasattr(beta, "__len__"):
-            # for ast we get an array with 'n_instances' entries
-            beta = np.expand_dims(beta, 1)
+    # # For the CDBM I need a special sampling method for the top layer, which
+    # # is a CRBM.
+    # def sample_v_given_h(self, h_in, beta=1.):
+    #     if len(h_in.shape) == 1:
+    #         h_in = np.expand_dims(h_in, 0)
+    #     if hasattr(beta, "__len__"):
+    #         # for ast we get an array with 'n_instances' entries
+    #         beta = np.expand_dims(beta, 1)
 
-        u_inp = beta * self.dbm_factor[1] * (h_in.dot(self.wv.T) + self.ibias)
-        u_lab = beta * (h_in.dot(self.wl.T) + self.lbias)
-        pi_on = 1./(1 + np.exp(-u_inp))
-        pl_on = 1./(1 + np.exp(-u_lab))
-        p_on = np.hstack((pi_on, pl_on))
-        v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1.
-        return [p_on.squeeze(), v_samples.squeeze()]
+    #     u_inp = beta * self.dbm_factor[1] * (h_in.dot(self.wv.T) + self.ibias)
+    #     u_lab = beta * (h_in.dot(self.wl.T) + self.lbias)
+    #     pi_on = 1./(1 + np.exp(-u_inp))
+    #     pl_on = 1./(1 + np.exp(-u_lab))
+    #     p_on = np.hstack((pi_on, pl_on))
+    #     v_samples = (self.np_rng.rand(*p_on.shape) < p_on)*1.
+    #     return [p_on.squeeze(), v_samples.squeeze()]
 
     def classify(self, v_data, class_prob=False):
         if len(v_data.shape) == 1:

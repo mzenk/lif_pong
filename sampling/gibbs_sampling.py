@@ -46,7 +46,8 @@ def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
         # # probably slower
         # temp = rbm.draw_samples(n_samples, v_init=v_init,
         #                         clamped=clamped_ind,
-        #                         clamped_val=imgs[:, clamped_ind])
+        #                         clamped_val=imgs[:, clamped_ind],
+        #                         binary=binary)
 
         # vis_samples[t:t + n_samples] = temp[..., :rbm.n_visible]
         # # hid_samples[t:t + n_samples] = temp[..., rbm.n_visible:]
@@ -111,7 +112,7 @@ if len(sys.argv) == 6:
 else:
     modifier = ''
 
-save_name = pot_str + '_win{}{}_avg_chunk{:03d}'.format(win_size, modifier,
+save_name = pot_str + '_win{}{}_chunk{:03d}'.format(win_size, modifier,
                                                         start // chunk_size)
 
 img_shape = (36, 48)
@@ -141,14 +142,15 @@ targets = test_set[1][idx]
 
 print('Running gibbs simulation for instances {} to {}'.format(start, end))
 vis_samples, _ = \
-    run_simulation(rbm, duration, chunk, burnin=100, clamp_fct=clamp)
-vis_samples = average_pool(np.swapaxes(vis_samples, 0, 1), n_samples,
-                           stride=n_samples + between_burnin,
-                           offset=between_burnin)
+    run_simulation(rbm, duration, chunk, burnin=100, clamp_fct=clamp, binary=True)
+vis_samples = np.swapaxes(vis_samples, 0, 1)
+# vis_samples = average_pool(vis_samples, n_samples,
+#                            stride=n_samples + between_burnin,
+#                            offset=between_burnin)
 
-# save averaged(!) samples
+# save samples
 np.savez_compressed(make_data_folder() + save_name,
-                    vis=vis_samples, win_size=win_size, data_idx=idx)
+                    samples=vis_samples, win_size=win_size, data_idx=idx)
 
 
 # n_imgs = 2
