@@ -1,11 +1,13 @@
 # testing clamping mechanisms
+# --> this script is not optimized for usability
 import numpy
 import pyNN.nest as sim
 import numpy as np
 from scipy.optimize import curve_fit
 import cPickle
-from utils.data_mgmt import make_figure_folder, make_data_folder, get_data_path
+from lif_pong.utils.data_mgmt import make_figure_folder, make_data_folder, get_data_path
 from stp_theory import compute_ru_envelope, r_theory
+from neuron_parameters import *
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -13,10 +15,13 @@ import sbs
 from sbs.cutils import generate_states
 
 
-def setup_samplers(n_neurons, neuron_params, noise_params):
+def setup_samplers(n_neurons, neuron_params, noise_params, cuba=False):
     # setup populations
-    coba_lif = sim.IF_cond_exp(**neuron_params)
-    population = sim.Population(n_neurons, coba_lif)
+    if cuba:
+        neuron_model = sim.IF_curr_exp(**neuron_params)
+    else:
+        neuron_model = sim.IF_cond_exp(**neuron_params)
+    population = sim.Population(n_neurons, neuron_model)
     exc_source = sim.Population(
         n_neurons, sim.SpikeSourcePoisson(rate=noise_params['rate_exc']))
     inh_source = sim.Population(
@@ -31,7 +36,7 @@ def setup_samplers(n_neurons, neuron_params, noise_params):
                               connector=sim.OneToOneConnector(),
                               receptor_type='inhibitory',
                               synapse_type=sim.StaticSynapse())
-    proj_inh.set(weight=-noise_params['w_inh'])
+    proj_inh.set(weight=-2*(cuba - 0.5)*np.abs(noise_params['w_inh']))
     return population, exc_source, inh_source, proj_exc, proj_inh
 
 
@@ -69,21 +74,24 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
         - spike sources -> LIF neurons (all2all, tso): synweight (scalar/array)
     '''
     sim.setup(timestep=dt, spike_precision="on_grid", quit_on_end=False)
-
+    cuba = 'e_rev_E' not in neuron_params.keys()
     # setup samplers
     population, exc_source, inh_source, exc_proj, inh_proj = \
-        setup_samplers(n_neurons, neuron_params, noise_params)
+        setup_samplers(n_neurons, neuron_params, noise_params, cuba)
     projections = {}
     projections['exc'] = exc_proj
     projections['inh'] = inh_proj
     # set resting potential according to bias
-    sampler_config = sbs.db.SamplerConfiguration.load(config_file)
-    sampler = sbs.samplers.LIFsampler(sampler_config, sim_name='pyNN.nest')
-    v_p05, alpha = sampler.calibration.fit.v_p05, sampler.calibration.fit.alpha
-    population.set(v_rest=v_p05 + alpha*bias)
+    sampler_config = sbs.db.SamplerConfiguration.load(calib_file)
+    calib_fit = sampler_config.calibration.fit
+    population.set(v_rest=calib_fit.v_p05 + calib_fit.alpha*bias)
+    print('Set v_rest to {}'.format(population.get('v_rest')))
 
     if store_vmem:
-        population.record(['v', 'gsyn_exc', 'spikes'])
+        if cuba:
+            population.record(['v', 'spikes'])
+        else:
+            population.record(['v', 'gsyn_exc', 'gsyn_inh', 'spikes'])
     else:
         population.record(['spikes'])
 
@@ -118,6 +126,8 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
     else:
         exc_weights = np.maximum(synweight, np.zeros_like(synweight))
         inh_weights = np.maximum(-synweight, np.zeros_like(synweight))
+    if cuba:
+        inh_weights *= -1.
 
     projections['ext_exc'] = sim.Projection(spike_source, population,
                                             connector=sim.AllToAllConnector(),
@@ -140,11 +150,20 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
     with open(make_data_folder() + savename + '.pkl', 'w') as f:
         if store_vmem:
             vmem = population.get_data().segments[0].filter(name='v')[0]
-            gsyn = population.get_data().segments[0].filter(name='gsyn_exc')[0]
-            cPickle.dump({'vmem': vmem, 'gsyn': gsyn, 'samples': samples,
-                          'weights': synweight*accum_corr_exc/tso_params['U'],
-                          'bias': bias},
-                         f)
+            if not cuba:
+                gexc = population.get_data().segments[0].filter(name='gsyn_exc')[0]
+                ginh = population.get_data().segments[0].filter(name='gsyn_inh')[0]
+
+                cPickle.dump({'vmem': vmem, 'gsyn_exc': gexc, 'gsyn_inh': ginh,
+                              'samples': samples,
+                              'weights': synweight*accum_corr_exc/tso_params['U'],
+                              'bias': bias},
+                             f)
+            else:
+                cPickle.dump({'vmem': vmem, 'samples': samples,
+                              'weights': synweight*accum_corr_exc/tso_params['U'],
+                              'bias': bias},
+                             f)
         else:
             cPickle.dump({'samples': samples, 'bias': bias,
                           'weights': synweight*accum_corr_exc/tso_params['U']}, f)
@@ -193,6 +212,8 @@ def plot_w_vs_activation(filenames):
         plt.plot(weights, p_on[i], '.', label=fn)
         # fit
         fit_mask = np.logical_and(p_on[i] > .05, p_on[i] < .95)
+        assert np.any(fit_mask), \
+            'Range of data: [{}, {}]'.format(p_on.min(), p_on.max())
         x_fit = weights[fit_mask]
         y_fit = p_on[i][fit_mask]
         p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
@@ -222,6 +243,8 @@ def plot_activation_fct(data_file, config_file):
     plt.plot(v_rests, sigma_fct(v_rests, *sbs_popt), label='sbs')
     # fit
     fit_mask = np.logical_and(p_on > .05, p_on < .95)
+    assert np.any(fit_mask), \
+        'Range of data: [{}, {}]'.format(p_on.min(), p_on.max())
     x_fit = v_rests[fit_mask]
     y_fit = p_on[fit_mask]
     p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
@@ -266,6 +289,8 @@ def plot_bias_comparison(data_files, biases=None, savename=None):
         p_on = samples.mean(axis=0)
         # fit
         fit_mask = np.logical_and(p_on > .05, p_on < .95)
+        assert np.any(fit_mask), \
+            'Range of data: [{}, {}]'.format(p_on.min(), p_on.max())
         x_fit = weights[fit_mask]
         y_fit = p_on[fit_mask]
         p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
@@ -364,8 +389,9 @@ def plot_time_evolution(data_file, tso_params=None, kwargs=None):
                  label='Weight {}'.format(i))
 
         if tso_params is not None and kwargs is not None:
-            correction = 1./(1 - np.exp(-kwargs['spike_interval'] /
-                                        dodo_params['tau_syn_E']))
+            tau_syn = 10.
+            print('Assumed tau_syn = {} ms'.format(tau_syn))
+            correction = 1./(1 - np.exp(-kwargs['spike_interval'] / tau_syn))
             assert np.all(weights/np.mean(weights) == 1)
             r_theo = \
                 r_theory(1 + np.arange(len(kwargs['spike_times'])),
@@ -384,23 +410,39 @@ def plot_vg_traces(data_files, duration):
         with open(get_data_path('neuron_clamping') + fn, 'r') as f:
             d = cPickle.load(f)
             vmem = d['vmem']
-            gsyn = d['gsyn']
+            try:
+                gexc = d['gsyn_exc']
+                ginh = d['gsyn_inh']
+            except KeyError:
+                print('No conductance data found.')
+                gexc = np.zeros_like(vmem)
+                ginh = np.zeros_like(vmem)
             samples = d['samples']
             weights = d['weights']
-        fig, ax = plt.subplots(3, 1, figsize=(10, 15))
+        fig, ax = plt.subplots(4, 1, figsize=(10, 15))
         t = np.linspace(0, duration, len(vmem))
         ax[0].plot(t, vmem, label=weights, alpha=.7)
-        ax[1].plot(t, gsyn, label=weights, alpha=.7)
-        ax[2].imshow(samples.T, interpolation='Nearest', cmap='gray',
+        ax[1].plot(t, gexc, label=weights, alpha=.7)
+        ax[2].plot(t, ginh, label=weights, alpha=.7)
+        ax[3].imshow(samples.T, interpolation='Nearest', cmap='gray',
                      extent=(0, duration, 0, samples.shape[1]), aspect='auto')
-        ax[0].set_ylim([-54, -52])
+        lower_lim = vmem[vmem.shape[0]//4:].min().magnitude
+        upper_lim = vmem.max().magnitude
+        lower_lim -= .05*(upper_lim - lower_lim)
+        upper_lim += .05*(upper_lim - lower_lim)
+        ax[0].set_ylim([lower_lim, upper_lim])
+        try :
+            labels = ['{:.2f}'.format(w) for w in weights]
+        except TypeError:
+            labels = ['{:.2f}'.format(weights)]
+        ax[0].legend(labels)
+        ax[1].legend(labels)
+        ax[2].legend(labels)
         ax[0].set_ylabel('v_mem')
-        ax[0].legend(['{:.2f}'.format(w) for w in weights])
-        ax[1].legend(['{:.2f}'.format(w) for w in weights])
-        ax[1].set_ylabel('g_syn')
-        ax[2].set_ylabel('neuron index')
-        ax[2].set_xlabel('time')
-
+        ax[1].set_ylabel('g_syn (exc)')
+        ax[2].set_ylabel('g_syn (inh)')
+        ax[3].set_ylabel('neuron index')
+        ax[3].set_xlabel('time')
         plt.savefig(make_figure_folder() + 'traces{}.png'.format(i))
 
 
@@ -412,6 +454,8 @@ def save_calib_fit(data_file):
     p_on = samples.mean(axis=0)
     # fit
     fit_mask = np.logical_and(p_on > .05, p_on < .95)
+    assert np.any(fit_mask), \
+        'Range of data: [{}, {}]'.format(p_on.min(), p_on.max())
     x_fit = weights[fit_mask]
     y_fit = p_on[fit_mask]
     p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
@@ -429,28 +473,10 @@ def gaussian(x, mu=0., sigma=1.):
 
 if __name__ == '__main__':
     mpl.rcParams['font.size'] = 14
-    # lif-sampling framework --- dodo_params
-    config_file = '../sampling/calibrations/dodo_calib.json'
-    dodo_params = {
-        "cm"         : .1,
-        "tau_m"      : 1.,
-        "e_rev_E"    : 0.,
-        "e_rev_I"    : -90.,
-        "v_thresh"   : -52.,
-        "tau_syn_E"  : 10.,
-        "v_rest"     : -65.,
-        "tau_syn_I"  : 10.,
-        "v_reset"    : -53.,
-        "tau_refrac" : 10.,
-        "i_offset"   : 0.,
-    }
-
-    dodo_noise = {
-        'rate_inh' : 2000.,
-        'rate_exc' : 2000.,
-        'w_exc'    : .001,
-        'w_inh'    : -.0035
-    }
+    # Parameters
+    config_file = '../sampling/calibrations/wei_curr_calib.json'
+    neuron_params = wei_curr_params
+    noise_params = wei_curr_noise
 
     clamp_tso_params = {
         "U": .002,
@@ -461,7 +487,7 @@ if __name__ == '__main__':
 
     renewing_tso_params = {
         "U": 1.,
-        "tau_rec": dodo_params['tau_syn_E'],
+        "tau_rec": neuron_params['tau_syn_E'],
         "tau_fac": 0.,
         "weight": 0.*1000.
     }
@@ -469,39 +495,35 @@ if __name__ == '__main__':
     # === Run experiments =============================
     # # simple run
     # duration = 2000
-    # n_neurons = 4
-    # weights = np.linspace(.1, .3, n_neurons)
-    # clamping_expt(n_neurons, duration, dodo_params, dodo_noise, config_file,
+    # n_neurons = 1
+    # weights = np.linspace(-.1, .1, n_neurons)
+    # clamping_expt(n_neurons, duration, neuron_params, noise_params, config_file,
     #               synweight=weights, tso_params=renewing_tso_params,
     #               savename='renewing', store_vmem=True)
 
-    # # calibrate for zero bias:
-    # duration = 5e4
-    # n_neurons = 200
-    # savename = 'nu1_calib_data'
-    # weights = np.linspace(-.05, .05, n_neurons)
-    # import time
-    # start = time.time()
-    # clamping_expt(n_neurons, duration, dodo_params, dodo_noise, config_file,
-    #               synweight=weights, tso_params=renewing_tso_params,
-    #               savename=savename)
-    # end = time.time()
-    # print((end - start)/60)
-    # save_calib_fit(savename)
+    # calibrate for zero bias:
+    duration = 1e5
+    n_neurons = 200
+    savename = 'wei_calib_data'
+    weights = np.linspace(-.008, .008, n_neurons)
+    clamping_expt(n_neurons, duration, neuron_params, noise_params, config_file,
+                  synweight=weights, tso_params=renewing_tso_params,
+                  savename=savename)
+    save_calib_fit(savename)
 
     # duration = 5e4
     # n_neurons = 200
     # biases = np.linspace(-5, 1, 20)
     # for i, b in enumerate(biases):
     #     weights = np.linspace(-.05, .07, n_neurons)
-    #     clamping_expt(n_neurons, duration, dodo_params, dodo_noise, config_file,
+    #     clamping_expt(n_neurons, duration, neuron_params, noise_params, config_file,
     #                   synweight=weights, tso_params=renewing_tso_params,
-    #                   bias=b, spike_interval=1., savename='short_dt{}'.format(i))
+    #                   bias=b, spike_interval=1., savename='wei_biases{}'.format(i))
 
     # duration = 1e4
-    # n_neurons = 4
-    # leak_potentials = np.linspace(-70., -50., n_neurons)
-    # get_calibration(leak_potentials, duration, dodo_params, dodo_noise)
+    # n_neurons = 100
+    # leak_potentials = np.linspace(-50.1, -49.9, n_neurons)
+    # get_calibration(leak_potentials, duration, neuron_params, noise_params)
 
     # # activity for depressing synapse
     # n_neurons = 300
@@ -509,7 +531,7 @@ if __name__ == '__main__':
     # spike_interval = 1.
     # wrange = np.linspace(.01, .1, 10)
     # for i, w in enumerate(wrange):
-    #         clamping_expt(n_neurons, duration, dodo_params, dodo_noise,
+    #         clamping_expt(n_neurons, duration, neuron_params, noise_params,
     #                       config_file, synweight=w,
     #                       tso_params=clamp_tso_params,
     #                       spike_interval=spike_interval,
@@ -518,40 +540,40 @@ if __name__ == '__main__':
     # === Plot a figure =============================
 
     # # plot voltage and conductance traces
-    # plot_vg_traces(['renewing.pkl', 'depressing.pkl'], 2000.)
+    # plot_vg_traces(['renewing.pkl'], 2000.)
 
     # analysis of time evolution --- under construction
     # analyse_sweep(['wscan_depr{}.pkl'.format(i) for i in range(20)], n_avg=30)
 
-    # # t vs p_on given synaptic weight
-    filenames = ['wscan_depr{}.pkl'.format(i) for i in range(10)]
-    with np.load('calibrations/dt1ms_calib.npz') as d:
-        wp05 = d['wp05']
-        alpha = d['alpha']
+    # # # t vs p_on given synaptic weight
+    # filenames = ['wscan_depr{}.pkl'.format(i) for i in range(10)]
+    # with np.load('calibrations/dt1ms_calib.npz') as d:
+    #     wp05 = d['wp05']
+    #     alpha = d['alpha']
     # d = np.load('calibrations/nu1_calib_data_fit.npz')
     # wp05 = d['popt'][0]
     # alpha = d['popt'][1]
     # d.close()
     # print(4*alpha + wp05)
-    exp_kwargs = {
-        'spike_times': numpy.arange(.1, 2000, 1.),
-        'spike_interval': 1.,
-        'wp05': wp05,
-        'alpha': alpha
-    }
-    plot_time_evolution(filenames, clamp_tso_params, exp_kwargs)
-
-    # # weight vs p_on
-    # filenames = ['nu1_calib_data.pkl']
-    # plot_w_vs_activation(filenames)
+    # exp_kwargs = {
+    #     'spike_times': numpy.arange(.1, 2000, 1.),
+    #     'spike_interval': 1.,
+    #     'wp05': wp05,
+    #     'alpha': alpha
+    # }
+    # plot_time_evolution(filenames, clamp_tso_params, exp_kwargs)
 
     # # activation fct w/o external input
     # fn = 'calibration.pkl'
     # plot_activation_fct(fn, config_file)
     # plot_vmem_dist(fn)
 
+    # weight vs p_on
+    filenames = ['wei_calib_data.pkl']
+    plot_w_vs_activation(filenames)
+
     # # bias expt
-    # filenames = ['short_dt_bias{}.pkl'.format(i) for i in range(20)]
+    # filenames = ['wei_biases{}.pkl'.format(i) for i in range(20)]
     # b1, fp1, fc1 = plot_bias_comparison(filenames)
     # filenames = ['bias{}.pkl'.format(i) for i in range(20)]
     # b2, fp2, fc2 = plot_bias_comparison(filenames)
