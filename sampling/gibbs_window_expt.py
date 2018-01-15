@@ -128,8 +128,10 @@ def main(general_dict):
         if gather_data:
             print('Running gibbs simulation for instances {} to {}'
                   ''.format(start, end))
+            clamped_imgs = test_set[0][start:end]
+            # clamped_imgs = (test_set[0][start:end] > .5)*1.
             samples, _ = run_simulation(
-                rbm, duration, test_set[0][start:end], binary=binary,
+                rbm, duration, clamped_imgs, binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp)
 
             # compared to the lif-methods, the method returns an array with

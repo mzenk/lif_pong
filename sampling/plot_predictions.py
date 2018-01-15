@@ -52,37 +52,53 @@ def merge_chunks(basefolder, identifier_dict, savename):
             # findDiff(identifier_dict, sim_identifiers)
             continue
 
-        general_dict = simdict.pop('general')
-        n_samples = general_dict['n_samples']
-        img_shape = tuple(general_dict['img_shape'])
-        n_labels = img_shape[0]//3
-        n_pxls = np.prod(img_shape)
+        # # first version: compute predictions from samples. since the analysis
+        # # should have done this already it is better to just load the prediction
+        # # file (see below)
+        # general_dict = simdict.pop('general')
+        # n_samples = general_dict['n_samples']
+        # img_shape = tuple(general_dict['img_shape'])
+        # n_labels = img_shape[0]//3
+        # n_pxls = np.prod(img_shape)
+        # try:
+        #     with np.load(os.path.join(simpath, 'samples.npz')) as d:
+        #         chunk_samples = d['samples'].astype(float)
+        #         if 'data_idx' in d.keys():
+        #             chunk_idx = d['data_idx']
+        #         else:
+        #             chunk_idx = np.arange(
+        #                 chunk_start, chunk_start + len(chunk_samples))
+        # except IOError:
+        #     print('File not found: ' + folder + '/samples.npz',
+        #           file=sys.stderr)
+        #     continue
+
+        # chunk_vis = chunk_samples[..., :n_pxls + n_labels]
+        # # average pool on each chunk, then compute prediction
+        # chunk_vis = average_pool(chunk_vis, n_samples, n_samples)
+
+        # tmp = chunk_vis[..., :-n_labels].reshape(
+        #     chunk_vis.shape[:-1] + img_shape)[..., -1]
+
+
         try:
-            with np.load(os.path.join(simpath, 'samples.npz')) as d:
-                chunk_samples = d['samples'].astype(float)
+            with np.load(os.path.join(simpath, 'prediction.npz')) as d:
+                tmp = d['last_col'].astype(float)
                 if 'data_idx' in d.keys():
                     chunk_idx = d['data_idx']
                 else:
                     chunk_idx = np.arange(
-                        chunk_start, chunk_start + len(chunk_samples))
+                        chunk_start, chunk_start + len(tmp))
         except IOError:
-            print('File not found: ' + folder + '/samples.npz',
-                  file=sys.stderr)
+            print('No prediction file found in ' + folder, file=sys.stderr)
             continue
-
-        chunk_vis = chunk_samples[..., :n_pxls + n_labels]
-        # average pool on each chunk, then compute prediction
-        chunk_vis = average_pool(chunk_vis, n_samples, n_samples)
-
-        tmp_col = chunk_vis[..., :-n_labels].reshape(
-            chunk_vis.shape[:-1] + img_shape)[..., -1]
 
         if counter == 0:
             data_idx = chunk_idx
-            prediction = tmp_col
+            prediction = tmp
         else:
             data_idx = np.hstack((data_idx, chunk_idx))
-            prediction = np.vstack((prediction, tmp_col))
+            prediction = np.vstack((prediction, tmp))
         counter += 1
 
     print('Merged prediction data of {} chunks'.format(counter),
@@ -128,8 +144,8 @@ def get_performance_data(basefolder, identifier_dict):
     return data_idx, prediction, agent_result
 
 
-def evaluate_prediction(prediction, targets, n_pos, use_labels=False,
-                        lab2pxl=3):
+def compute_prediction_error(prediction, targets, n_pos, use_labels=False,
+                             lab2pxl=3):
     if use_labels:
         raise NotImplementedError
 
@@ -148,31 +164,20 @@ def evaluate_prediction(prediction, targets, n_pos, use_labels=False,
 
     # compute percentiles of prediction error
     dist = np.abs(predicted_pos - target_pos.reshape((len(target_pos), 1)))
-    dist_median = np.percentile(dist, 50, axis=0)
-    dist_quartile_lower = np.percentile(dist, 25, axis=0)
-    dist_quartile_upper = np.percentile(dist, 75, axis=0)
-    return dist_median, dist_quartile_lower, dist_quartile_upper
-
+    return dist
 
 # copied and adapted from prediction_quality.py; ugly but no time for more
-def plot_prediction_error(ax, prediction, data_name, data_idx, label=None,
-                          x_data=None):
-    n_pxlrows = prediction.shape[2]
-    n_frames = prediction.shape[1]
+def plot_prediction_error(ax, pred_error, label=None, x_data=None):
+    n_frames = pred_error.shape[1]
     if x_data is None:
         x_data = np.linspace(0, 1, n_frames)
 
-    # load data and compute groundtruth
-    _, _, test_set = load_images(data_name)
-    test_data = test_set[0][data_idx]
-
-    targets = test_data.reshape((len(test_data), n_pxlrows, -1))[..., -1]
-
-    median, lower_quart, upper_quart = \
-        evaluate_prediction(prediction, targets, n_pxlrows)
+    median = np.percentile(pred_error, 50, axis=0)
+    lower_quart = np.percentile(pred_error, 25, axis=0)
+    upper_quart = np.percentile(pred_error, 75, axis=0)
 
     # add prediction error curve to plot
-    ax.plot(x_data, median, '.-')
+    ax.plot(x_data, median, '.-', alpha=.7)
     ax.fill_between(x_data, lower_quart, upper_quart, alpha=.3, label=label)
 
 
@@ -184,6 +189,12 @@ def plot_agent_performance(ax, agent_dict, label=None):
     print('Maximum success rate: {:.3f}'.format(np.max(succrate)))
     ax.plot(speeds, succrate, label=label)
 
+def plot_prediction_error_dist(ax, pred_error, dist_pos=-1, label=None):
+    pe_hist, bin_edges = np.histogram(pred_error[:, dist_pos], bins='auto')
+    print(pe_hist.sum())
+    ax.bar(bin_edges[:-1], pe_hist, width=bin_edges[1] - bin_edges[0],
+           alpha=.4, label=label + '@col={}'.format(dist_pos%pred_error.shape[1]))
+
 
 def main(identifier_list):
     # set up figures
@@ -191,9 +202,13 @@ def main(identifier_list):
     ax_pe.set_ylabel('Prediction error')
     ax_pe.set_ylim([-.5, 16])
     ax_pe.set_xlabel('Ball position / field length')
-    color_cycle = [plt.cm.rainbow(i)
-                   for i in np.linspace(0, 1, len(identifier_list))]
-    ax_pe.set_prop_cycle(cycler('color', color_cycle))
+    # color_cycle = [plt.cm.rainbow(i)
+    #                for i in np.linspace(0, 1, len(identifier_list))]
+    # ax_pe.set_prop_cycle(cycler('color', color_cycle))
+
+    fig_pd, ax_pd = plt.subplots()
+    ax_pd.set_ylabel('Abundance')
+    ax_pd.set_xlabel('Prediction error')
 
     fig_ap, ax_ap = plt.subplots()
     ax_ap.set_xlabel('Agent speed / ball speed')
@@ -201,6 +216,10 @@ def main(identifier_list):
     ax_ap.set_ylim([0., 1.1])
     for i, identifier_dict in enumerate(identifier_list):
         expt_name = identifier_dict.pop('experiment')
+        if 'dist_pos' in identifier_dict.keys():
+            dist_pos = identifier_dict.pop('dist_pos')
+        else:
+            dist_pos = None
         # load yaml-config of experiment
         config_file = os.path.join(simfolder, '01_runs', expt_name)
         with open(config_file) as config:
@@ -214,11 +233,25 @@ def main(identifier_list):
             label = 'parameters {}'.format(i)
         data_idx, prediction, agent_result = get_performance_data(
             os.path.join(simfolder, expt_name), identifier_dict)
-        plot_prediction_error(ax_pe, prediction, data_name, data_idx, label)
+
+        # load data and compute prediction errors
+        n_pxlrows = prediction.shape[2]
+        _, _, test_set = load_images(data_name)
+        test_data = test_set[0][data_idx]
+        targets = test_data.reshape((len(test_data), n_pxlrows, -1))[..., -1]
+        pred_error = compute_prediction_error(prediction, targets, n_pxlrows)
+
+        plot_prediction_error(ax_pe, pred_error, label)
+        if dist_pos is not None:
+            plot_prediction_error_dist(ax_pd, pred_error, dist_pos, label)
         plot_agent_performance(ax_ap, agent_result, label)
 
     ax_pe.legend()
     fig_pe.savefig(make_figure_folder() + 'pred_error.png')  #, transparent=True)
+    
+    ax_pd.legend()
+    fig_pd.savefig(make_figure_folder() + 'pred_error_dist.png')  #, transparent=True)
+
     ax_ap.plot(ax_ap.get_xlim(), [1, 1], 'k:')
     ax_ap.legend()
     fig_ap.savefig(make_figure_folder() + 'agent_perf.png')  #, transparent=True)

@@ -2,27 +2,30 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import sys
+import argparse
 from lif_pong.utils import tile_raster_images
 from lif_pong.utils.data_mgmt import make_figure_folder, load_images, get_rbm_dict, get_data_path
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 plt.rcParams['animation.ffmpeg_path'] = u'/home/hd/hd_hd/hd_kq433/ffmpeg-3.4.1-64bit-static/ffmpeg'
 
-n_imgs = 2
-sample_file = None
-if len(sys.argv) >= 2:
-    sample_file = sys.argv[1]
-if len(sys.argv) == 3:
-    n_imgs = int(sys.argv[2])
+parser = argparse.ArgumentParser(description='Script for visualizing samples')
+parser.add_argument('sample_file', help='Valid path to the sample file')
+parser.add_argument('-n', '--n_imgs', dest='n_imgs', default=3, type=int,
+                    help='How many images to show in video sequence')
+parser.add_argument('-s', '--save_as', dest='savename', default='test',
+                    help='Name of the resulting video file')
+args = parser.parse_args()
 
 show_label = False
 # # testing
 # img_shape = (2, 2)
 # n_pixels = np.prod(img_shape)
 # n_labels = 0
-# # sample_file = get_data_path('lif_clamp_stp') + 'test.npz'
-# sample_file = '/wang/users/mzenk/cluster_home/experiment/simulations/TestSweep/0.001_2000.0/samples.npz'
+# # args.sample_file = get_data_path('lif_clamp_stp') + 'test.npz'
+# args.sample_file = '/wang/users/mzenk/cluster_home/experiment/simulations/TestSweep/0.001_2000.0/samples.npz'
 # # MNIST
 # img_shape = (28, 28)
 # n_pixels = np.prod(img_shape)
@@ -30,7 +33,7 @@ show_label = False
 # f = gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb')
 # _, _, test_set = np.load(f)
 # f.close()
-# sample_file = get_data_path('playground') + \
+# args.sample_file = get_data_path('playground') + \
 #     'test_bias_neurons.npz'
 # Pong
 img_shape = (36, 48)
@@ -38,14 +41,10 @@ n_pixels = np.prod(img_shape)
 n_labels = img_shape[0] // 3
 data_name = 'pong_var_start{}x{}'.format(*img_shape)
 _, _, test_set = load_images(data_name)
-if sample_file is None:
-    print('no sample file give. load default.')
-    sample_file = get_data_path('lif_clamp_stp') + \
-        'pong_test_chunk000.npz'
 
-with np.load(sample_file) as d:
+with np.load(args.sample_file) as d:
     # samples.shape: ([n_instances], n_samples, n_units)
-    samples = d['samples'].astype(float)[:n_imgs]
+    samples = d['samples'].astype(float)[:args.n_imgs]
     if len(samples.shape) == 2:
         samples = np.expand_dims(samples, 0)
     if 'data_idx' in d.keys():
@@ -101,7 +100,7 @@ def update_fig(i_frame):
     # if show_label:
     #     lab_text.set_text('Active label: {}'.format(active_lab[idx]))
     time_text.set_text('{:4d}/{} (img {})'.format(i % n_samples, n_samples,
-                                                  (i // n_samples) % n_imgs))
+                                                  (i // n_samples) % args.n_imgs))
     im.set_data(frame)
     return im, time_text, lab_text
 
@@ -118,5 +117,5 @@ time_text = ax.text(0.05, 0.01, '', va='bottom', ha='left',
 ani = animation.FuncAnimation(fig, update_fig, frames=zip(range(len(frames)), frames),
                               interval=10., blit=True, repeat=False)
 
-ani.save(make_figure_folder() + 'test.mp4', writer='ffmpeg')
+ani.save(make_figure_folder() + args.savename + '.mp4', writer='ffmpeg')
 # plt.show()
