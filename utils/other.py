@@ -26,6 +26,8 @@ def average_pool(arr, width, stride=None, offset=0):
     # array needs to have shape (n_imgs, n_t, n_pxls)
     if stride is None:
         stride = width
+    if width == 1:
+        return arr[offset::int(stride)]
     kernel = np.ones(width) / width
     x = .5*(len(kernel) - 1)
     convol = convolve1d(arr, kernel, axis=1, mode='constant')

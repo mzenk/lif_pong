@@ -71,7 +71,7 @@ def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
             assert len(occurrence) == 1
             C[i] = sorted_df['success_rate'].iloc[occurrence[0]]
     C = C.reshape(len(yvec), len(xvec))
-    print('Max.: '.format(np.nanmax(C)))
+    print('Max.: {}'.format(np.nanmax(C)))
     fig, ax = plt.subplots()
     im = ax.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
                        cmap=plt.cm.viridis, vmin=0, vmax=1)

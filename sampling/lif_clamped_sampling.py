@@ -27,6 +27,8 @@ def sample_network(config_file, weights, biases, duration, dt=.1,
     network = initialise_network(config_file, weights, biases, tso_params)
     if sim_setup_kwargs is None:
         sim_setup_kwargs = {}
+    if 'spike_precision' not in sim_setup_kwargs.keys():
+        sim_setup_kwargs['spike_precision'] = 'on_grid'
 
     network.gather_spikes(duration=duration, dt=dt, burn_in_time=burn_in_time,
                           sim_setup_kwargs=sim_setup_kwargs)
@@ -47,6 +49,8 @@ def sample_network_clamped(
         sampling_interval=10.):
     if sim_setup_kwargs is None:
         sim_setup_kwargs = {}
+    if 'spike_precision' not in sim_setup_kwargs.keys():
+        sim_setup_kwargs['spike_precision'] = 'on_grid'
     network = initialise_network(config_file, weights, biases, tso_params)
 
     network.spike_data = gather_network_spikes_clamped(
@@ -108,6 +112,8 @@ def gather_network_spikes_clamped(
     log.info("Gathering spike data...")
     if sim_setup_kwargs is None:
         sim_setup_kwargs = {}
+    if 'spike_precision' not in sim_setup_kwargs.keys():
+        sim_setup_kwargs['spike_precision'] = 'on_grid'
 
     if off_thresh is None:
         off_thresh = on_thresh
@@ -186,6 +192,8 @@ def gather_network_spikes_clamped_bn(
     log.info("Gathering spike data...")
     if sim_setup_kwargs is None:
         sim_setup_kwargs = {}
+    if 'spike_precision' not in sim_setup_kwargs.keys():
+        sim_setup_kwargs['spike_precision'] = 'on_grid'
 
     sim.setup(timestep=dt, **sim_setup_kwargs)
 
@@ -294,6 +302,8 @@ def gather_network_spikes_clamped_sf(
     log.info("Gathering spike data...")
     if sim_setup_kwargs is None:
         sim_setup_kwargs = {}
+    if 'spike_precision' not in sim_setup_kwargs.keys():
+        sim_setup_kwargs['spike_precision'] = 'on_grid'
 
     sim.setup(timestep=dt, **sim_setup_kwargs)
 
@@ -338,10 +348,21 @@ def gather_network_spikes_clamped_sf(
             weights *= 1 - np.exp(-spike_interval/tau_syn)
 
     # Create connections
-    connections = []
+    exc_connections = []
+    inh_connections = []
     for i in range(nv):
-        connections.append((i, i, weights[i]))
-    bn_connector = sim.FromListConnector(connections, column_names=['weight'])
+        exc_connections.append((i, i, weights[i]))
+        inh_connections.append((i, i, -np.abs(weights[i])))
+
+    bn_connector_exc = sim.FromListConnector(
+        exc_connections, column_names=['weight'])
+    # in contrast to COBA, CUBA needs negative inhibitory weights
+    if '_curr_' in str(population.celltype):
+        log.info('Using negative inhibitory weights for CUBA.')
+        bn_connector_inh = sim.FromListConnector(
+            inh_connections, column_names=['weight'])
+    else:
+        bn_connector_inh = bn_connector_exc
 
     if clamp_tso_params is None:
         bn_synapse = sim.StaticSynapse(weight=0.)
@@ -353,12 +374,12 @@ def gather_network_spikes_clamped_sf(
     bn_projections = {}
     # make excitatory AND inhibitory connections
     bn_projections['exc'] = sim.Projection(exc_bias_neurons, population[:nv],
-                                           connector=bn_connector,
+                                           connector=bn_connector_exc,
                                            receptor_type='excitatory',
                                            synapse_type=bn_synapse)
 
     bn_projections['inh'] = sim.Projection(inh_bias_neurons, population[:nv],
-                                           connector=bn_connector,
+                                           connector=bn_connector_inh,
                                            receptor_type='inhibitory',
                                            synapse_type=bn_synapse)
 
