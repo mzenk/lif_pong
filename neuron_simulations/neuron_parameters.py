@@ -21,7 +21,7 @@ tutorial_noise = {
 }
 
 # parameters from Mihai's thesis
-sample_params = {
+mihai_params = {
         "cm"         : .1,
         "tau_m"      : 20.,
         "e_rev_E"    : 0.,
@@ -35,7 +35,7 @@ sample_params = {
         "i_offset"   : 0.,
 }
 
-noise_params = {
+mihai_noise = {
     'rate_inh' : 5000.,
     'rate_exc' : 5000.,
     'w_exc'    : .0035,

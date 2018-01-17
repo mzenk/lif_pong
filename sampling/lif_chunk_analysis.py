@@ -28,12 +28,12 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
     else:
         # make prediction files from samples
         chunk_vis = samples[..., :n_pxls + n_labels]
-        chunk_vis = average_pool(chunk_vis, n_samples, n_samples)
-        chunk_idxs = np.arange(start, start + len(chunk_vis))
+        chunk_pred = average_pool(chunk_vis, n_samples, n_samples)
+        chunk_idxs = np.arange(start, start + len(chunk_pred))
 
-        last_col = chunk_vis[..., :-n_labels].reshape(
-            chunk_vis.shape[:-1] + img_shape)[..., -1]
-        lab = chunk_vis[..., -n_labels:]
+        last_col = chunk_pred[..., :-n_labels].reshape(
+            chunk_pred.shape[:-1] + img_shape)[..., -1]
+        lab = chunk_pred[..., -n_labels:]
 
         print('Saving prediction data of {} instances'.format(len(last_col)))
         # save data (averaged samples for label units and last column)
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     # if this is called as an independent analysis script load samples first
     try:
         with np.load('samples.npz') as d:
-            samples = d['samples'].astype(float)
+            samples = d['samples']
     except Exception as e:
         print('Missing sample file', file=sys.stderr)
         samples = None

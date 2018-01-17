@@ -7,30 +7,22 @@ from scipy.ndimage import convolve1d
 # return a weighted average of the interval out_range for each vector in arr
 # from skimage.measure import block_reduce could help here (and below)
 def average_helper(out_range, arr):
-    arr[np.all(arr == 0, axis=1)] = 1.
+    arrf = arr.astype(float)
+    arrf[np.all(arr == 0, axis=1)] = 1.
     return np.average(
-        np.tile(range(out_range), (len(arr), 1)), weights=arr, axis=1)
-
-
-# used by save_prediction_data scripts
-def average_pool_old(arr, width, stride=None, offset=0):
-    # array needs to have shape (n_imgs, n_t, n_pxls)
-    if stride is None:
-        stride = width
-    kernel = np.ones(width) / width
-    return np.apply_along_axis(
-        np.convolve, 1, arr, kernel, 'valid')[:, int(offset)::int(stride)]
+        np.tile(range(out_range), (len(arrf), 1)), weights=arrf, axis=1)
 
 
 def average_pool(arr, width, stride=None, offset=0):
     # array needs to have shape (n_imgs, n_t, n_pxls)
+    arrf = arr.astype(float)
     if stride is None:
         stride = width
     if width == 1:
-        return arr[offset::int(stride)]
+        return arrf[offset::int(stride)]
     kernel = np.ones(width) / width
     x = .5*(len(kernel) - 1)
-    convol = convolve1d(arr, kernel, axis=1, mode='constant')
+    convol = convolve1d(arrf, kernel, axis=1, mode='constant')
     return convol[:, offset + int(np.floor(x)):-int(np.ceil(x)):int(stride)]
 
 

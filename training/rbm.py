@@ -397,7 +397,7 @@ class RBM(object):
 
     def train(self, train_data, n_epochs=5, batch_size=10, lrate=.01,
               cd_steps=1, persistent=False, cast=False, valid_set=None,
-              momentum=0, weight_cost=1e-5, log_name=None):
+              momentum=0, weight_cost=1e-5, log_name=None, log_isl=False):
         # initializations
         n_instances = train_data.shape[0]
         n_batches = int(np.ceil(n_instances/batch_size))
@@ -529,12 +529,13 @@ class RBM(object):
 
             # run monitoring after epoch
             start_time = time.time()
-            self.monitor_progress(train_data, valid_set, logger)
+            self.monitor_progress(train_data, valid_set, logger, isl=log_isl)
             monitoring_time += time.time() - start_time
+            # save rbm state after every epoch (for later inspection)
+            self.save('temp_rbm{:03d}'.format(epoch_index))
         print('Monitoring took {:.1f} min'.format(monitoring_time/60.))
-        return
 
-    def monitor_progress(self, train_set, valid_set, logger):
+    def monitor_progress(self, train_set, valid_set, logger, isl=False):
         # logger.info('LL-estimate with AIS: {:.3f}'.format(
         #     self.run_ais(valid_set, logger)))
         subset_ind = self.np_rng.choice(
@@ -542,13 +543,15 @@ class RBM(object):
         logger.info('log-PL of training subset: {:.3f}'.format(
             self.compute_logpl(train_set[subset_ind])))
         if valid_set is not None:
-            subset_ind = self.np_rng.choice(
-                valid_set.shape[0], min(5000, valid_set.shape[0]), False)
             logger.info('log-PL of validation set: {:.3f}'.format(
                 self.compute_logpl(valid_set)))
-            logger.info('LL-estimate with ISL: {:.3f}'.format(
-                self.estimate_loglik_isl(
-                    1e4, valid_set[subset_ind])))
+            logger.info('Free energy difference: {:.4f}'.format(
+                self.free_energy_diff(train_set, valid_set)))
+            if isl:
+                subset_ind = self.np_rng.choice(
+                    valid_set.shape[0], min(5000, valid_set.shape[0]), False)
+                logger.info('LL-estimate with ISL: {:.3f}'.format(
+                    self.estimate_loglik_isl(1e4, valid_set[subset_ind])))
 
     # free energy difference between training subset and validation set
     def free_energy_diff(self, train_set, valid_set):
@@ -722,6 +725,10 @@ class CRBM(RBM):
         with open(filename, 'wb') as output:
             cPickle.dump(rbm_dict, output, cPickle.HIGHEST_PROTOCOL)
 
+    def to_rbm(self):
+        return RBM(self, self.n_inputs, self.n_hidden,
+                   w=self.wv, vbias=self.ibias, hbias=self.hbias)
+
     # # For the CDBM I need a special sampling method for the top layer, which
     # # is a CRBM.
     # def sample_v_given_h(self, h_in, beta=1.):
@@ -777,7 +784,7 @@ class CRBM(RBM):
                                               clamped_ind=clamped_ind,
                                               clamped_val=bin_labels)
 
-    def monitor_progress(self, train_set, valid_set, logger):
+    def monitor_progress(self, train_set, valid_set, logger, isl=False):
         train_vis = train_set[:, :self.n_inputs]
         train_lab = train_set[:, self.n_inputs:]
         valid_vis = valid_set[:, :self.n_inputs]
@@ -791,9 +798,11 @@ class CRBM(RBM):
             labels = np.argmax(valid_lab, axis=1)
             logger.info('Correct classifications on validation set: '
                         '{:.3f}'.format(np.average(prediction == labels)))
-
-            subset_ind = self.np_rng.choice(
-                valid_vis.shape[0], min(2000, valid_vis.shape[0]), False)
-            # compare to LL-estimate
-            logger.info('LL-estimate with ISL: {:.3f}'.format(
-                self.estimate_loglik_isl(1e4, valid_vis[subset_ind])))
+            logger.info('Free energy difference: {:.4f}'.format(
+                self.free_energy_diff(train_set, valid_set)))
+            if isl:
+                subset_ind = self.np_rng.choice(
+                    valid_vis.shape[0], min(2000, valid_vis.shape[0]), False)
+                # compare to LL-estimate
+                logger.info('LL-estimate with ISL: {:.3f}'.format(
+                    self.estimate_loglik_isl(1e4, valid_vis[subset_ind])))

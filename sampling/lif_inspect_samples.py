@@ -6,7 +6,7 @@ import argparse
 from lif_pong.utils import tile_raster_images
 from lif_pong.utils.data_mgmt import make_figure_folder, load_images, get_rbm_dict, get_data_path
 import matplotlib
-matplotlib.use('Agg')
+qmatplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 plt.rcParams['animation.ffmpeg_path'] = u'/home/hd/hd_hd/hd_kq433/ffmpeg-3.4.1-64bit-static/ffmpeg'
@@ -76,14 +76,14 @@ if show_label:
 avg_samples = vis_samples
 
 frames = avg_samples.reshape(-1, *img_shape)
-samples_per_frame = frames.shape[1] / (img_shape[1] + 1)
 if show_label:
     active_lab = np.argmax(lab_samples, axis=2).flatten()
 
 # # plot images for quick inspection
-# tiled_samples = tile_raster_images(sample_imgs[::50],
+# samples_per_frame = vis_samples.shape[1] / (img_shape[1] + 1)
+# tiled_samples = tile_raster_images(frames[-samples_per_frame:],
 #                                    img_shape=img_shape,
-#                                    tile_shape=(4, 5),
+#                                    tile_shape=(int(samples_per_frame/5), 5),
 #                                    tile_spacing=(1, 1),
 #                                    scale_rows_to_unit_interval=False,
 #                                    output_pixel_vals=False)
