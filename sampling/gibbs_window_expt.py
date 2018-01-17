@@ -123,7 +123,7 @@ def main(general_dict):
 
     try:
         with np.load('samples.npz') as d:
-            samples = d['samples'].astype(float)
+            samples = d['samples']
     except Exception:
         if gather_data:
             print('Running gibbs simulation for instances {} to {}'

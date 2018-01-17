@@ -91,7 +91,7 @@ def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=
         groundtruth = test_set[1]
     else:
         groundtruth = test_set[0].reshape((-1,) + img_shape)[..., -1]
-    targets = average_helper(n_pos, groundtruth)[data_idx]
+    targets = average_helper(n_pos, groundtruth[data_idx])
 
     predicted_pos = np.zeros((n_instances, n_frames))
     for i in range(n_instances):

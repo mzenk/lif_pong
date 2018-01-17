@@ -71,7 +71,7 @@ def main(general_dict, sbs_dict, analysis_dict):
             print('Missing sample file', file=sys.stderr)
             samples = None
     # produce analysis file
-    analysis.inf_speed_analysis(samples, **analysis_dict)
+    analysis.inf_speed_analysis(samples.astype(float), **analysis_dict)
 
 
 if __name__ == '__main__':

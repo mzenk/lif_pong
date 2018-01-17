@@ -107,7 +107,7 @@ def main(general_dict, sbs_dict, clamp_dict, analysis_dict):
 
     try:
         with np.load('samples.npz') as d:
-            samples = d['samples'].astype(float)
+            samples = d['samples']
     except Exception:
         # ensures that only experiments that didn't produce data are repeated
         if gather_data:
