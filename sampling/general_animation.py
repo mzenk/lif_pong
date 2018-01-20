@@ -4,6 +4,7 @@ import numpy as np
 import sys
 import os
 import yaml
+from scipy.ndimage import convolve1d
 from lif_pong.utils.data_mgmt import get_data_path, make_figure_folder
 from lif_pong.utils import average_helper
 from pong_agent import Pong_agent
@@ -145,11 +146,12 @@ def main(config_dict):
         samples = d['samples'][data_idx]
         vis_samples = samples[..., :np.prod(img_shape) + img_shape[0]//3].astype(float)
     # maybe average like in lif_inspect_samples
-    # ...
+    kernel = np.ones(clamp_interval)/clamp_interval
+    vis_samples = convolve1d(vis_samples, kernel, axis=1)
 
     for i in range(len(vis_samples)):
         print('Making animation {} of {}'.format(i + 1, len(vis_samples)))                                   
-        make_animation(save_name, img_shape, win_size, vis_samples[i],
+        make_animation(save_name + '_{}'.format(i), img_shape, win_size, vis_samples[i],
                        paddle_len=3, clamp_interval=clamp_interval)
 
 

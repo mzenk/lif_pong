@@ -3,10 +3,11 @@ from __future__ import division
 from __future__ import print_function
 import numpy as np
 import argparse
+from scipy.ndimage import convolve1d
 from lif_pong.utils import tile_raster_images
 from lif_pong.utils.data_mgmt import make_figure_folder, load_images, get_rbm_dict, get_data_path
 import matplotlib
-qmatplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 plt.rcParams['animation.ffmpeg_path'] = u'/home/hd/hd_hd/hd_kq433/ffmpeg-3.4.1-64bit-static/ffmpeg'
@@ -69,7 +70,6 @@ if show_label:
 # vis_samples = rbm.sample_v_given_h(hid_samples.reshape(-1, nh))[0][:, :n_pixels]
 
 # # running average over samples?
-# from scipy.ndimage import convolve1d
 # kwidth = 20
 # kernel = np.ones(kwidth)/kwidth
 # avg_samples = convolve1d(vis_samples, kernel, axis=1)

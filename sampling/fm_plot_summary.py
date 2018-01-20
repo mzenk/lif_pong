@@ -64,14 +64,18 @@ def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
 
     C = np.ones(len(yvec) * len(xvec)) * np.nan
     data_xy = sorted_df.loc[:, identifier].as_matrix()
-    for i, xy in enumerate(zip((X + .5*mindiffs[0]).flatten(),
-                               (Y + .5*mindiffs[1]).flatten())):
+    X_params_flat = (X + .5*mindiffs[0]).flatten()
+    Y_params_flat = (Y + .5*mindiffs[1]).flatten()
+    for i, xy in enumerate(zip(X_params_flat, Y_params_flat)):
         occurrence = np.where(np.all(np.isclose(xy, data_xy), axis=1))[0]
         if len(occurrence) > 0:
             assert len(occurrence) == 1
             C[i] = sorted_df['success_rate'].iloc[occurrence[0]]
+
+    max_idx = np.nanargmax(C)
+    print('Maximum {0} at ({3}, {4}) = ({1}, {2})'.format(
+        C[max_idx], X_params_flat[max_idx], Y_params_flat[max_idx], *identifier))
     C = C.reshape(len(yvec), len(xvec))
-    print('Max.: {}'.format(np.nanmax(C)))
     fig, ax = plt.subplots()
     im = ax.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
                        cmap=plt.cm.viridis, vmin=0, vmax=1)
@@ -93,8 +97,9 @@ def plot_infsuccess_1d(df, identifier, figname='paramsweep.png'):
 
     xdata = sorted_df[identifier[0]].as_matrix()
     ydata = sorted_df['success_rate'].as_matrix()
-
-    plt.plot(xdata, ydata)
+    print("Maximum {} at {} = {}".format(ydata.max(), identifier[0],
+                                         xdata[np.argmax(ydata)]))
+    plt.plot(xdata, ydata, '.:')
     plt.xlabel(identifier[0])
     plt.ylabel('Success rate')
     plt.savefig(os.path.join(make_figure_folder(), figname))

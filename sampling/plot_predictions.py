@@ -248,9 +248,10 @@ def main(identifier_list):
 
     ax_pe.legend()
     fig_pe.savefig(make_figure_folder() + 'pred_error.png')  #, transparent=True)
-    
-    ax_pd.legend()
-    fig_pd.savefig(make_figure_folder() + 'pred_error_dist.png')  #, transparent=True)
+
+    if dist_pos is not None:
+        ax_pd.legend()
+        fig_pd.savefig(make_figure_folder() + 'pred_error_dist.png')  #, transparent=True)
 
     ax_ap.plot(ax_ap.get_xlim(), [1, 1], 'k:')
     ax_ap.legend()
