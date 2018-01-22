@@ -9,40 +9,10 @@ import matplotlib.pyplot as plt
 from lif_pong.utils.data_mgmt import make_figure_folder
 
 
-# if there are two identifiers, produce heatmap
-def plot_infsuccess(df, identifier, figname='paramsweep.png'):
-    assert len(identifier) == 2
-    df['success_rate'] = df['inf_success'] / df['n_instances']
-
-    sorted_df = df.sort_values(by=identifier)
-    gridshape = tuple([len(sorted_df[k].unique()) for k in identifier])
-
-    ygrid = np.reshape(sorted_df[identifier[0]].as_matrix(), gridshape)
-    xgrid = np.reshape(sorted_df[identifier[1]].as_matrix(), gridshape)
-    dx = np.diff(xgrid, axis=1)[0, 0]
-    dy = np.diff(ygrid, axis=0)[0, 0]
-    xmin = xgrid.min() - .5*dx
-    xmax = xgrid.max() + .5*dx
-    ymin = ygrid.min() - .5*dy
-    ymax = ygrid.max() + .5*dy
-    xyratio = float((xmax - xmin) / (ymax - ymin))
-    z = np.reshape(sorted_df['success_rate'].as_matrix(), gridshape)
-
-    print('Max: {}, min: {}'.format(np.nanmax(z), np.nanmin(z)))
-    plt.figure()
-    plt.imshow(z, cmap=plt.cm.viridis, interpolation='nearest', origin='lower',
-               extent=[xmin, xmax, ymin, ymax], vmin=0, vmax=1,
-               aspect=xyratio)
-    plt.xlabel(identifier[1])
-    plt.ylabel(identifier[0])
-    plt.colorbar()
-
-    plt.savefig(os.path.join(make_figure_folder(), figname))
-
-
 def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
     assert len(identifier) == 2
-    df['success_rate'] = df['inf_success'] / df['n_instances']
+    df['mean_prederr'] = df['cum_prederr_sum'] / df['n_instances']
+    df['std_prederr'] = (df['cum_prederr_sqres'] / df['n_instances']).apply(np.sqrt)
 
     sorted_df = df.sort_values(by=identifier)
     # create axis vectors for meshgrid. This code assumes that the differences
@@ -60,9 +30,10 @@ def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
     # C = np.ones((len(yvec), len(xvec))) * np.nan
     # mask = np.logical_and(np.isin(X + .5*mindiffs[0], sorted_df[identifier[0]]),
     #                       np.isin(Y + .5*mindiffs[1], sorted_df[identifier[1]]))
-    # C[mask] = sorted_df['success_rate'].as_matrix().reshape(C[mask].shape)
+    # C[mask] = sorted_df['mean_prederr'].as_matrix().reshape(C[mask].shape)
 
     C = np.ones(len(yvec) * len(xvec)) * np.nan
+    C_std = np.ones(len(yvec) * len(xvec)) * np.nan
     data_xy = sorted_df.loc[:, identifier].as_matrix()
     X_params_flat = (X + .5*mindiffs[0]).flatten()
     Y_params_flat = (Y + .5*mindiffs[1]).flatten()
@@ -70,39 +41,57 @@ def plot_infsuccess_pcolor(df, identifier, figname='paramsweep.png'):
         occurrence = np.where(np.all(np.isclose(xy, data_xy), axis=1))[0]
         if len(occurrence) > 0:
             assert len(occurrence) == 1
-            C[i] = sorted_df['success_rate'].iloc[occurrence[0]]
+            C[i] = sorted_df['mean_prederr'].iloc[occurrence[0]]
+            C_std[i] = sorted_df['std_prederr'].iloc[occurrence[0]]
 
-    max_idx = np.nanargmax(C)
-    print('Maximum {0} at ({3}, {4}) = ({1}, {2})'.format(
-        C[max_idx], X_params_flat[max_idx], Y_params_flat[max_idx], *identifier))
+    min_idx = np.nanargmin(C)
+    print('Minimum {0} +- {1} at ({4}, {5}) = ({2}, {3})'.format(
+        C[min_idx], C_std[min_idx],
+        X_params_flat[min_idx], Y_params_flat[min_idx], *identifier))
     C = C.reshape(len(yvec), len(xvec))
-    fig, ax = plt.subplots()
-    im = ax.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
-                       cmap=plt.cm.viridis, vmin=0, vmax=1)
+    C_std = C_std.reshape(len(yvec), len(xvec))
+
+    # save mean
+    fig_mean, ax_mean = plt.subplots()
+    im = ax_mean.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
+                            cmap=plt.cm.viridis)
     aspect = (C.shape[0] - 1)/(C.shape[1] - 1) \
         * (maxs[0] - mins[0])/(maxs[1] - mins[1])
-    ax.set_aspect(float(aspect))
+    ax_mean.set_aspect(float(aspect))
     plt.xlabel(identifier[0])
     plt.ylabel(identifier[1])
-    cbar = plt.colorbar(im, ax=ax)
-    cbar.ax.set_ylabel('Success rate')
-    plt.savefig(os.path.join(make_figure_folder(), figname))
+    cbar_m = plt.colorbar(im, ax=ax_mean)
+    cbar_m.ax.set_ylabel('Mean cum. prediction error')
+    fig_mean.savefig(os.path.join(make_figure_folder(), figname) + '.png')
+
+    # save std
+    fig_std, ax_std = plt.subplots()
+    im = ax_std.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C_std), C_std),
+                            cmap=plt.cm.viridis)
+    ax_std.set_aspect(float(aspect))
+    plt.xlabel(identifier[0])
+    plt.ylabel(identifier[1])
+    cbar_s = plt.colorbar(im, ax=ax_std)
+    cbar_s.ax.set_ylabel('Std. of cum. prediction error')
+    fig_std.savefig(os.path.join(make_figure_folder(), figname + '_std') + '.png')
 
 
 def plot_infsuccess_1d(df, identifier, figname='paramsweep.png'):
     assert len(identifier) == 1
-    df['success_rate'] = df['inf_success'] / df['n_instances']
+    df['mean_prederr'] = df['cum_prederr_sum'] / df['n_instances']
+    df['std_prederr'] = (df['cum_prederr_sqres'] / df['n_instances']).apply(np.sqrt)
 
     sorted_df = df.sort_values(by=identifier)
 
     xdata = sorted_df[identifier[0]].as_matrix()
-    ydata = sorted_df['success_rate'].as_matrix()
-    print("Maximum {} at {} = {}".format(ydata.max(), identifier[0],
-                                         xdata[np.argmax(ydata)]))
-    plt.plot(xdata, ydata, '.:')
+    ydata = sorted_df['mean_prederr'].as_matrix()
+    yerr = sorted_df['std_prederr'].as_matrix()
+    print("Minimum {} at {} = {}".format(ydata.min(), identifier[0],
+                                         xdata[np.argmin(ydata)]))
+    plt.errorbar(xdata, ydata, yerr=yerr, fmt='.:')
     plt.xlabel(identifier[0])
-    plt.ylabel('Success rate')
-    plt.savefig(os.path.join(make_figure_folder(), figname))
+    plt.ylabel('Mean cum. prediction error')
+    plt.savefig(os.path.join(make_figure_folder(), figname + '.png'))
 
 
 if len(sys.argv) != 2:
@@ -148,7 +137,7 @@ elif 'weight' in result.columns:
     for weight in result['weight'].unique():
         subdf = result.loc[result.weight == weight, :].copy()
         subdf.pop('weight')
-        # plot_trec_U(subdf, figname=expt_name + '_w={}.png'.format(weight))
-        plot_infsuccess_pcolor(subdf, id_params, figname=expt_name + '_w={}.png'.format(weight))
+        # plot_trec_U(subdf, figname=expt_name + '_w={}'.format(weight))
+        plot_infsuccess_pcolor(subdf, id_params, figname=expt_name + '_w={}'.format(weight))
 else:
     print('Don\'t know what to do with the data')

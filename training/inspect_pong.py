@@ -6,7 +6,6 @@ from lif_pong.utils.data_mgmt import load_images, get_rbm_dict, make_figure_fold
 import matplotlib as mpl
 mpl.use('agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 mpl.rcParams['font.size'] = 12
 
@@ -29,7 +28,7 @@ def plot_data(data, show_idx, img_shape, tile_shape=(5, 5)):
 
 # Load data -- Pong
 img_shape = (36, 48)
-data_name = 'gauss_var_start36x48'
+data_name = 'knick_pos0.5_ampl0.6_var_start36x48'
 train_set, _, test_set = load_images(data_name)
 # # Load data -- MNIST
 # import gzip

@@ -53,13 +53,22 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
         # index of list represents number of clamped pixel columns
         inf_success = result_dict['successes']
         pred_error = result_dict['distances']
-        pred_error_median = np.percentile(pred_error, 50, axis=0)
-        pred_error_iqr = np.percentile(pred_error, 75, axis=0) - \
-            np.percentile(pred_error, 25, axis=0)
+
+        # better quantity (which doesn't involve agent speed): integrated
+        # prediction error. save the mean and squared resid. of this quantity
+        # (median is not suited for chunk-wise application because not linear)
+        # here it is assumed that the prediction positions are equidistant
+        # and only relevant up to clamp_pos
+        cum_prederr = pred_error[:, :clamp_pos].sum(axis=1)
+        cum_prederr_sum = np.sum(cum_prederr, axis=0)
+        cum_prederr_sqres = np.var(cum_prederr, axis=0) * result_dict['n_instances']
+        # # normalize with field size?
+        # cum_prederr_sqres *= 1./img_shape[1] * len(cum_prederr)
+        # cum_prederr_sum *= 1./img_shape[1] * len(cum_prederr)
         anadict = {'n_instances': result_dict['n_instances'],
                    'inf_success': float(inf_success[clamp_pos]),
-                   'pred_error_median': float(pred_error_median[clamp_pos]),
-                   'pred_error_iqr': float(pred_error_iqr[clamp_pos])}
+                   'cum_prederr_sum': float(cum_prederr_sum),
+                   'cum_prederr_sqres': float(cum_prederr_sqres)}
 
         if 'wrong_idx' in result_dict.keys():
             with open('wrong_cases', 'w') as f:

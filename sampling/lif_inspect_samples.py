@@ -18,6 +18,8 @@ parser.add_argument('-n', '--n_imgs', dest='n_imgs', default=3, type=int,
                     help='How many images to show in video sequence')
 parser.add_argument('-s', '--save_as', dest='savename', default='test',
                     help='Name of the resulting video file')
+parser.add_argument('--average', dest='avg', default=False,
+                    help='Flag for displaying a box-time averaged version')
 args = parser.parse_args()
 
 show_label = False
@@ -69,13 +71,13 @@ if show_label:
 # nh = hid_samples.shape[-1]
 # vis_samples = rbm.sample_v_given_h(hid_samples.reshape(-1, nh))[0][:, :n_pixels]
 
-# # running average over samples?
-# kwidth = 20
-# kernel = np.ones(kwidth)/kwidth
-# avg_samples = convolve1d(vis_samples, kernel, axis=1)
-avg_samples = vis_samples
+if args.avg:
+    # running average over samples
+    kwidth = 20
+    kernel = np.ones(kwidth)/kwidth
+    vis_samples = convolve1d(vis_samples, kernel, axis=1)
 
-frames = avg_samples.reshape(-1, *img_shape)
+frames = vis_samples.reshape(-1, *img_shape)
 if show_label:
     active_lab = np.argmax(lab_samples, axis=2).flatten()
 

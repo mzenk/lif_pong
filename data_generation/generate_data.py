@@ -1,6 +1,7 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
+import os
 from trajectory import Gaussian_trajectory, Const_trajectory
 from scipy.ndimage import convolve1d
 from lif_pong.utils.data_mgmt import make_data_folder
@@ -125,7 +126,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
         test_set = data[-size_test:]
         test_labels = labels[-size_test:]
 
-        np.savez_compressed(make_data_folder('datasets', True) + fname,
+        np.savez_compressed(os.path.join(make_data_folder('datasets', True), fname),
                             ((train_set, train_labels),
                              (valid_set, valid_labels),
                              (test_set, test_labels)))
@@ -133,16 +134,15 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
 
 
 if __name__ == '__main__':
-    kds = [{'pos': .8, 'ampl': .3, 'sigma': 0.1},
-           {'pos': .7, 'ampl': .3, 'sigma': 0.1},
-           {'pos': .6, 'ampl': .3, 'sigma': 0.1},
-           {'pos': .5, 'ampl': .3, 'sigma': 0.1},
-           {'pos': .4, 'ampl': .3, 'sigma': 0.1},
-           {'pos': .3, 'ampl': .3, 'sigma': 0.1},
-           {'pos': .2, 'ampl': .3, 'sigma': 0.1}]
-    for d in kds:
-        generate_data([48, 36], pot_str='pong', kink_dict=d,
-                      fname='knick{:.1f}_var_start36x48'.format(d['pos']))
+    # first dataset had random pos between 1/3 and 2/3 and ampl=.5, sigma=.2
+    knick_ampls = np.arange(.1, .8, .1)
+    knick_pos = np.arange(.2, .8, .1)
+    for a in knick_ampls:
+        for p in knick_pos:
+            d = {'pos': p, 'ampl': a, 'sigma': 0.1}
+            generate_data([48, 36], pot_str='pong', kink_dict=d,
+                          fname='knick_pos{:.1f}_ampl{:.1f}_var_start36x48'
+                          ''.format(d['pos'], d['ampl']))
 
     # # check balancing of dataset
     # plt.figure()

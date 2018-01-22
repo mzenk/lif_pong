@@ -100,13 +100,10 @@ class Clamp_window(object):
         return self.interval, clamped_idx
 
 
-def main(general_dict):
+def main(general_dict, test_set, rbm):
     # pass arguments from dictionaries to simulation
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
-    # load data
-    _, _, test_set = load_images(general_dict['data_name'])
-    rbm = rbm_pkg.load(get_rbm_dict(general_dict['rbm_name']))
     rbm.set_seed(general_dict['seed'])
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
@@ -145,7 +142,7 @@ def main(general_dict):
             print('Missing sample file', file=sys.stderr)
             samples = None
     # produce analysis file
-    analysis.inf_speed_analysis(samples)
+    return analysis.inf_speed_analysis(samples)
 
 
 if __name__ == '__main__':
@@ -156,5 +153,7 @@ if __name__ == '__main__':
         config = yaml.load(configfile)
 
     general_dict = config.pop('general')
+    _, _, test_set = load_images(general_dict['data_name'])
+    rbm = rbm_pkg.load(get_rbm_dict(general_dict['rbm_name']))
 
-    main(general_dict)
+    main(general_dict, test_set, rbm)

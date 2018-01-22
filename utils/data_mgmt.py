@@ -14,15 +14,18 @@ def make_data_folder(name=None, shared_data=False):
 
     # if data is used across project save in shared_data folder
     if shared_data:
-        data_path = os.path.expanduser('~/Projects/lif_pong/shared_data/')
+        if 'nemo' in socket.gethostname():
+            data_path = os.path.expanduser('~/git_repos/lif_pong/shared_data/')
+        else:
+            data_path = os.path.expanduser('~/Projects/lif_pong/shared_data/')
     else:
         data_path = 'data/'
 
     if name is None:
-        data_path += '{}_data/'.format(script_name)
+        data_path = os.path.join(data_path, '{}_data'.format(script_name))
     else:
         assert type(name) is str
-        data_path += name + '/'
+        data_path = os.path.join(data_path, name)
 
     if not os.path.exists(data_path):
         os.makedirs(data_path)

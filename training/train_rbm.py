@@ -5,12 +5,53 @@ import numpy as np
 from rbm import RBM, CRBM
 from rbm import load as load_rbm
 import sys
+import os
 import yaml
 import cPickle
 import logging
 from lif_pong.utils.data_mgmt import load_images
 from lif_pong.utils import to_1_of_c
+import lif_pong.sampling.gibbs_window_expt as winexpt
 
+
+def run_window_expt(rbm, test_set):
+    n_instances = 100  #len(test_set[0])
+    chunksize = 50
+    # iterate over chunks and sum the analysis quantities
+    cum_prederr_sum = 0
+    cum_prederr_sqres = 0
+    for i in range(0, n_instances, chunksize):
+        d = {
+            'data_name': general_dict['data_name'],
+            'seed': 828384,
+            'n_samples' : 20,
+            'winsize': general_dict['img_shape'][1],
+            'img_shape' : general_dict['img_shape'],
+            'binary' : True,
+            'gather_data' : True,
+            'burn_in': 100,
+            'start_idx': i,
+            'chunksize': chunksize
+        }
+        # save a fake sim.yaml
+        simdict = {'general': d, 'identifier': {'dummy': 42}}
+        with open('sim.yaml', 'w') as f:
+            f.write(yaml.dump(simdict))
+
+        analysis_dict = winexpt.main(d, test_set, rbm)
+        # Samples-file would be reloaded after the first chunk -> remove it
+        os.remove('samples.npz')
+        print(analysis_dict)
+        cum_prederr_sum += analysis_dict['cum_prederr_sum']
+        cum_prederr_sqres += analysis_dict['cum_prederr_sqres']
+    # clean up
+    os.remove('prediction.npz')
+    os.remove('agent_performance.npz')
+    os.remove('analysis')
+    os.remove('wrong_cases')
+    os.remove('sim.yaml')
+    return cum_prederr_sum/n_instances, np.sqrt(cum_prederr_sqres/n_instances)
+    
 
 def analyse_quality(rbm, train_set, test_set):
     train_data = train_set[0]
@@ -41,23 +82,28 @@ def analyse_quality(rbm, train_set, test_set):
         test_rate = (rbm.classify(test_data) == test_labels).mean()
         logger.info('Classification rate on train/test set: '
                     '{:.3f} / {:.3f}'.format(train_rate, test_rate))
-        vislab_train = np.concatenate(
-            (train_set[0], to_1_of_c(train_labels, rbm.n_labels)), axis=1)
-        vislab_test = np.concatenate(
-            (test_set[0], to_1_of_c(test_labels, rbm.n_labels)), axis=1)
         result_dict.update({'classrate_test': float(test_rate),
                             'classrate_train': float(train_rate)})
 
     # compute ais
     if hasattr(rbm, 'n_labels'):
-        train_data = vislab_train
-        test_data = vislab_test
+        train_data = np.concatenate(
+            (train_set[0], to_1_of_c(train_labels, rbm.n_labels)), axis=1)
+        test_data = np.concatenate(
+            (test_set[0], to_1_of_c(test_labels, rbm.n_labels)), axis=1)
     logger.info('Starting with AIS run...')
     loglik_test, loglik_train = \
         rbm.run_ais(test_data, logger, train_data=train_data, n_runs=100)
 
     result_dict.update({'loglik_test': float(loglik_test),
                         'loglik_train': float(loglik_train)})
+
+    # evaluate on prediction task
+    logger.info('Starting Window experiment evaluation...')
+    cum_prederr_mean, cum_prederr_std = run_window_expt(rbm, test_set)
+    result_dict.update({'cum_prederr_mean': float(cum_prederr_mean),
+                        'cum_prederr_std': float(cum_prederr_std)})
+
     return result_dict
 
 
