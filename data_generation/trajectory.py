@@ -85,7 +85,10 @@ class Trajectory:
                 randmom = self.kink_dict['ampl'] * self.v0 * \
                     ((-1)**np.random.randint(2) + self.kink_dict['sigma'] *
                      np.random.randn())
-                r.set_initial_value(r.y + np.array([0, 0, 0, randmom]), r.t)
+                v_new = r.y[2:] + np.array([0, randmom])
+                # normalize again so that pixels are still bright enough
+                v_new /= np.linalg.norm(v_new) * self.v0
+                r.set_initial_value(np.hstack((r.y[:2], v_new)), r.t)
                 # shift kink_pos so that only one kink occurs
                 noise_injected = True
 
