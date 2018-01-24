@@ -74,7 +74,7 @@ def test():
     plt.savefig('figures/test.png')
 
 
-def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=2.,
+def compute_performance(img_shape, test_set, data_idx, prediction, max_speedup=2.,
                         use_labels=False, paddle_width=3, leave_uncovered=1):
     if use_labels:
         n_pos = img_shape[0] // 3
@@ -83,8 +83,6 @@ def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=
 
     n_instances = prediction.shape[0]
     n_frames = prediction.shape[1]
-    # load targets and prediction data
-    _, _, test_set = load_images(data_name)
 
     # compare vis_prediction dataset pixels
     if use_labels:
@@ -149,12 +147,9 @@ def compute_performance(img_shape, data_name, data_idx, prediction, max_speedup=
     return result
 
 
-def compute_baseline_performance(img_shape, data_name, data_idx, max_speedup=2.,
+def compute_baseline_performance(img_shape, test_set, data_idx, max_speedup=2.,
                                  paddle_width=3, leave_uncovered=1):
     n_pos = img_shape[0]
-
-    # load targets and prediction data
-    _, _, test_set = load_images(data_name)
 
     # compute baseline prediction
     imgs = test_set[0].reshape((-1,) + img_shape)[data_idx]
@@ -165,7 +160,7 @@ def compute_baseline_performance(img_shape, data_name, data_idx, max_speedup=2.,
 
     # quick and dirty save
     np.savez('prediction', last_col=bl_preds, data_idx=data_idx)
-    return compute_performance(img_shape, data_name, data_idx, bl_preds,
+    return compute_performance(img_shape, test_set, data_idx, bl_preds,
                                max_speedup=max_speedup, 
                                paddle_width=paddle_width,
                                leave_uncovered=leave_uncovered)
@@ -182,12 +177,12 @@ if __name__ == '__main__':
     general_dict = config.pop('general')
     agent_kwargs = config.pop('agent_kwargs')
     img_shape = tuple(general_dict['img_shape'])
-    data_name = general_dict['data_name']
+    _, _, test_set = load_images(general_dict['data_name'])
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
     data_idx = np.arange(start, end)
 
-    result = compute_baseline_performance(img_shape, data_name, data_idx,
+    result = compute_baseline_performance(img_shape, test_set, data_idx,
                                           **agent_kwargs)
     np.savez('agent_performance', **result)
     

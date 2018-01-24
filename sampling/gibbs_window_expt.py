@@ -13,7 +13,7 @@ from lif_pong.utils import get_windowed_image_index
 
 # shouldn't be used with more than a few imgs (due to memory limitations)
 def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
-                   clamp_fct=None):
+                   clamp_fct=None, continuous=True):
     if clamp_fct is None:
         return rbm.draw_samples(burnin + n_steps, v_init=v_init)[burnin:]
 
@@ -55,7 +55,10 @@ def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
         # # hid_samples[t:t + n_samples] = temp[..., rbm.n_visible:]
 
         # if the gibbs chain should be continued
-        v_init = vis_samples[t + n_samples - 1]
+        if continuous:
+            v_init = vis_samples[t + n_samples - 1]
+        else:
+            v_init = None
         t += delta_t
 
     return vis_samples, hid_samples
@@ -110,10 +113,16 @@ def main(general_dict, test_set, rbm):
     winsize = general_dict['winsize']
     gather_data = general_dict['gather_data']
 
-    try:
+    if 'binary' in general_dict.keys():
         binary = general_dict['binary']
-    except KeyError:
+    else:
         binary = False
+
+    # mainly for testing
+    if 'continuous' in general_dict.keys():
+        continuous = general_dict['continuous']
+    else:
+        continuous = True
 
     duration = (img_shape[1] + 1) * n_samples
     clamp = Clamp_window(img_shape, n_samples, winsize)
@@ -129,7 +138,8 @@ def main(general_dict, test_set, rbm):
             # clamped_imgs = (test_set[0][start:end] > .5)*1.
             samples, _ = run_simulation(
                 rbm, duration, clamped_imgs, binary=binary,
-                burnin=general_dict['burn_in'], clamp_fct=clamp)
+                burnin=general_dict['burn_in'], clamp_fct=clamp,
+                continuous=continuous)
 
             # compared to the lif-methods, the method returns an array with
             # shape [n_steps, n_imgs, n_vis]. Hence, swap axes.

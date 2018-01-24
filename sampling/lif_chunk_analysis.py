@@ -5,6 +5,7 @@ import numpy as np
 import yaml
 import sys
 from lif_pong.utils import average_pool
+from lif_pong.utils.data_mgmt import load_images
 import pong_agent
 
 
@@ -17,6 +18,7 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
     n_samples = general_dict['n_samples']
     start = general_dict['start_idx']
     img_shape = tuple(general_dict['img_shape'])
+    _, _, test_set = load_images(general_dict['data_name'])
     n_labels = img_shape[0]//3
     n_pxls = np.prod(img_shape)
     if identifier_params is None:
@@ -42,8 +44,7 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
 
         # compute agent performance
         result_dict = pong_agent.compute_performance(
-            img_shape, general_dict['data_name'], chunk_idxs, last_col,
-            max_speedup=np.inf)
+            img_shape, test_set, chunk_idxs, last_col, max_speedup=np.inf)
         print('Saving agent performance data...')
         np.savez_compressed('agent_performance', **result_dict)
 
@@ -59,16 +60,13 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
         # (median is not suited for chunk-wise application because not linear)
         # here it is assumed that the prediction positions are equidistant
         # and only relevant up to clamp_pos
-        cum_prederr = pred_error[:, :clamp_pos].sum(axis=1)
-        cum_prederr_sum = np.sum(cum_prederr, axis=0)
-        cum_prederr_sqres = np.var(cum_prederr, axis=0) * result_dict['n_instances']
-        # # normalize with field size?
-        # cum_prederr_sqres *= 1./img_shape[1] * len(cum_prederr)
-        # cum_prederr_sum *= 1./img_shape[1] * len(cum_prederr)
+        cum_prederr = pred_error[:, :clamp_pos].sum(axis=1) / img_shape[1]
+        cum_prederr_sum = np.sum(cum_prederr, axis=0) 
+        cum_prederr_sqsum = np.sum(cum_prederr**2, axis=0)
         anadict = {'n_instances': result_dict['n_instances'],
                    'inf_success': float(inf_success[clamp_pos]),
                    'cum_prederr_sum': float(cum_prederr_sum),
-                   'cum_prederr_sqres': float(cum_prederr_sqres)}
+                   'cum_prederr_sqsum': float(cum_prederr_sqsum)}
 
         if 'wrong_idx' in result_dict.keys():
             with open('wrong_cases', 'w') as f:
