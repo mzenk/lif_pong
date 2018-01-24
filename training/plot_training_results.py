@@ -8,33 +8,34 @@ import yaml
 import matplotlib.pyplot as plt
 from lif_pong.utils.data_mgmt import make_figure_folder
 
+
 def plot_for_param(param_name, df_avg, df_std):
-    # plot for the specified parameter all quantities in (train, test)-pairs
+    # plot for the specified parameter all quantities in (train, valid)-pairs
     x_data = df_avg[param_name]
-    # assume we have only the keys 
-    keys = ['classrate', 'loglik']
-    rate_fig, rate_ax = plt.subplots()
-    ll_fig, ll_ax = plt.subplots()
+    # assume we have only the keys
+    keys = ['classrate', 'loglik', 'cum_prederr_mean']
+    fig, axarr = plt.subplots(1, 3, figsize=(15, 6), sharex=True)
+    axarr[0].set_xlabel(param_name)
     ax_dict = {}
-    ax_dict[keys[0]] = rate_ax
-    ax_dict[keys[1]] = ll_ax
+    ax_dict[keys[0]] = axarr[0]
+    ax_dict[keys[1]] = axarr[1]
+    ax_dict[keys[2]] = axarr[2]
     for k in keys:
-        trainy_data = df_avg[k+'_train'].as_matrix()
-        testy_data = df_avg[k+'_test'].as_matrix()
-        trainy_err = df_std[k+'_train'].as_matrix()
-        testy_err = df_std[k+'_test'].as_matrix()
-        ax_dict[k].errorbar(x_data, trainy_data, yerr=trainy_err,
-            fmt='.', alpha=0.7, label='train')
-        ax_dict[k].errorbar(x_data, testy_data, yerr=testy_err,
-            fmt='.', alpha=0.7, label='test')
-        ax_dict[k].set_xlabel(param_name)
+        if k + '_train' in df_avg:
+            trainy_data = df_avg[k+'_train'].as_matrix()
+            trainy_err = df_std[k+'_train'].as_matrix()
+            ax_dict[k].errorbar(x_data, trainy_data, yerr=trainy_err,
+                                fmt='.', alpha=0.7, label='train')
+        if k + '_valid' in df_avg:
+            validy_data = df_avg[k+'_valid'].as_matrix()
+            validy_err = df_std[k+'_valid'].as_matrix()
+            ax_dict[k].errorbar(x_data, validy_data, yerr=validy_err,
+                                fmt='.', alpha=0.7, label='valid')
         ax_dict[k].set_ylabel(k)
         ax_dict[k].legend()
 
-    rate_fig.savefig(os.path.join(make_figure_folder(),
-        param_name + '_crates.png'))
-    ll_fig.savefig(os.path.join(make_figure_folder(),
-        param_name + '_logliks.png'))
+    fig.savefig(os.path.join(make_figure_folder(),
+                             param_name + '.png'))
 
 
 if len(sys.argv) != 2:
@@ -57,13 +58,21 @@ with open(os.path.join(collectfolder, expt_name)) as f:
 id_params = stubdict['identifier'].keys()
 
 # print the 10 best parameters
-# sort for test crate and ll
-sorted_prederr = df.sort_values(by='cum_prederr_mean', ascending=True)
-sorted_loglik = df.sort_values(by='loglik_test', ascending=False)
-print('Top 10 sorted by window expt performance on test set:')
-print(sorted_prederr.iloc[:10, :])
-print('Top 10 sorted by test set LL-estimate:')
-print(sorted_loglik.iloc[:10, :])
+# sort for valid crate and ll
+if 'cum_prederr_mean_valid' in df:
+    sorted_prederr = df.sort_values(by='cum_prederr_mean_valid', ascending=True)
+    print('Top 10 sorted by window expt performance on validation set:')
+    print(sorted_prederr.iloc[:10, :])
+
+if 'loglik_valid' in df:
+    sorted_loglik = df.sort_values(by='loglik_valid', ascending=False)
+    print('Top 10 sorted by validation set LL-estimate:')
+    print(sorted_loglik.iloc[:10, :])
+
+if 'classrate_valid' in df:
+    sorted_loglik = df.sort_values(by='classrate_valid', ascending=False)
+    print('Top 10 sorted by validation set classification rate:')
+    print(sorted_loglik.iloc[:10, :])
 
 # plot average and std with respect to each parameter
 for param in id_params:

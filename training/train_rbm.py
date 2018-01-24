@@ -14,12 +14,18 @@ from lif_pong.utils import to_1_of_c
 import lif_pong.sampling.gibbs_window_expt as winexpt
 
 
-def run_window_expt(rbm, test_set):
-    n_instances = 100  #len(test_set[0])
+def run_window_expt(rbm, data_set):
+    n_instances = len(data_set[0])
     chunksize = 50
     # iterate over chunks and sum the analysis quantities
     cum_prederr_sum = 0
-    cum_prederr_sqres = 0
+    cum_prederr_sqsum = 0
+    # move sim.yaml because it would be overwritten
+    try:
+        os.rename('sim.yaml', 'sim.yaml.backup')
+    except OSError:
+        print('No sim.yaml found in folder.', file=sys.stderr)
+
     for i in range(0, n_instances, chunksize):
         d = {
             'data_name': general_dict['data_name'],
@@ -38,30 +44,38 @@ def run_window_expt(rbm, test_set):
         with open('sim.yaml', 'w') as f:
             f.write(yaml.dump(simdict))
 
-        analysis_dict = winexpt.main(d, test_set, rbm)
+        analysis_dict = winexpt.main(d, data_set, rbm)
         # Samples-file would be reloaded after the first chunk -> remove it
         os.remove('samples.npz')
         print(analysis_dict)
         cum_prederr_sum += analysis_dict['cum_prederr_sum']
-        cum_prederr_sqres += analysis_dict['cum_prederr_sqres']
+        cum_prederr_sqsum += analysis_dict['cum_prederr_sqsum']
     # clean up
     os.remove('prediction.npz')
     os.remove('agent_performance.npz')
     os.remove('analysis')
     os.remove('wrong_cases')
     os.remove('sim.yaml')
-    return cum_prederr_sum/n_instances, np.sqrt(cum_prederr_sqres/n_instances)
+    # restore sim.yaml
+    try:
+        os.rename('sim.yaml.backup', 'sim.yaml')
+    except OSError:
+        print('No backup found in folder.', file=sys.stderr)
+
+    cum_prederr_std = np.sqrt(cum_prederr_sqsum/n_instances - 
+                              (cum_prederr_sum/n_instances)**2)
+    return cum_prederr_sum/n_instances, cum_prederr_std
     
 
-def analyse_quality(rbm, train_set, test_set):
+def analyse_quality(rbm, train_set, valid_set):
     train_data = train_set[0]
-    test_data = test_set[0]
+    valid_data = valid_set[0]
     if len(train_set[1].shape) == 1:
         train_labels = train_set[1]
-        test_labels = test_set[1]
+        valid_labels = valid_set[1]
     else:
         train_labels = np.argmax(train_set[1], axis=1)
-        test_labels = np.argmax(test_set[1], axis=1)
+        valid_labels = np.argmax(valid_set[1], axis=1)
 
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
@@ -79,30 +93,30 @@ def analyse_quality(rbm, train_set, test_set):
     if hasattr(rbm, 'n_labels'):
         # compute classification rates
         train_rate = (rbm.classify(train_data) == train_labels).mean()
-        test_rate = (rbm.classify(test_data) == test_labels).mean()
-        logger.info('Classification rate on train/test set: '
-                    '{:.3f} / {:.3f}'.format(train_rate, test_rate))
-        result_dict.update({'classrate_test': float(test_rate),
+        valid_rate = (rbm.classify(valid_data) == valid_labels).mean()
+        logger.info('Classification rate on train/valid set: '
+                    '{:.3f} / {:.3f}'.format(train_rate, valid_rate))
+        result_dict.update({'classrate_valid': float(valid_rate),
                             'classrate_train': float(train_rate)})
 
-    # compute ais
-    if hasattr(rbm, 'n_labels'):
-        train_data = np.concatenate(
-            (train_set[0], to_1_of_c(train_labels, rbm.n_labels)), axis=1)
-        test_data = np.concatenate(
-            (test_set[0], to_1_of_c(test_labels, rbm.n_labels)), axis=1)
-    logger.info('Starting with AIS run...')
-    loglik_test, loglik_train = \
-        rbm.run_ais(test_data, logger, train_data=train_data, n_runs=100)
+    # # compute ais
+    # if hasattr(rbm, 'n_labels'):
+    #     train_data = np.concatenate(
+    #         (train_set[0], to_1_of_c(train_labels, rbm.n_labels)), axis=1)
+    #     valid_data = np.concatenate(
+    #         (valid_set[0], to_1_of_c(valid_labels, rbm.n_labels)), axis=1)
+    # logger.info('Starting with AIS run...')
+    # loglik_valid, loglik_train = \
+    #     rbm.run_ais(valid_data, logger, train_data=train_data, n_runs=100)
 
-    result_dict.update({'loglik_test': float(loglik_test),
-                        'loglik_train': float(loglik_train)})
+    # result_dict.update({'loglik_valid': float(loglik_valid),
+    #                     'loglik_train': float(loglik_train)})
 
     # evaluate on prediction task
-    logger.info('Starting Window experiment evaluation...')
-    cum_prederr_mean, cum_prederr_std = run_window_expt(rbm, test_set)
-    result_dict.update({'cum_prederr_mean': float(cum_prederr_mean),
-                        'cum_prederr_std': float(cum_prederr_std)})
+    logger.info('Starting Window experiment evaluation on validation set...')
+    cum_prederr_mean, cum_prederr_std = run_window_expt(rbm, valid_set)
+    result_dict.update({'cum_prederr_mean_valid': float(cum_prederr_mean),
+                        'cum_prederr_std_valid': float(cum_prederr_std)})
 
     return result_dict
 
@@ -110,7 +124,7 @@ def analyse_quality(rbm, train_set, test_set):
 def main(data, img_shape, rbm_params, hyper_params, log_params,
          identifier_dict, save_file):
     n_pixels = np.prod(img_shape)
-    train_set, valid_set, test_set = data
+    train_set, valid_set, _ = data
     assert n_pixels == train_set[0].shape[1]
 
     try:
@@ -164,9 +178,9 @@ def main(data, img_shape, rbm_params, hyper_params, log_params,
         my_rbm.train(train_data, valid_set=valid_data, **kwargs)
         my_rbm.save(save_file)
 
-    # make an analysis file here (e.g. test set classification rate)
+    # make an analysis file here (e.g. valid set classification rate)
     analysis_dict = identifier_dict.copy()
-    result_dict = analyse_quality(my_rbm, train_set, test_set)
+    result_dict = analyse_quality(my_rbm, train_set, valid_set)
     analysis_dict.update(result_dict)
 
     with open('analysis', 'w') as f:
