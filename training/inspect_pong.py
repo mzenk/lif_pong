@@ -28,8 +28,8 @@ def plot_data(data, show_idx, img_shape, tile_shape=(5, 5)):
 
 # Load data -- Pong
 img_shape = (36, 48)
-data_name = 'knick_pos0.5_ampl0.6_var_start36x48'
-train_set, _, test_set = load_images(data_name)
+data_name = 'pong_var_start36x48'
+train_set, valid_set, test_set = load_images(data_name)
 # # Load data -- MNIST
 # import gzip
 # img_shape = (28, 28)
@@ -38,15 +38,15 @@ train_set, _, test_set = load_images(data_name)
 
 assert np.prod(img_shape) == train_set[0].shape[1]
 
-print('Number of samples: {}, {}'.format(train_set[0].shape[0],
-                                         test_set[0].shape[0]))
+print('Number of samples in train/valid/test set: {}, {}, {}'.format(
+    len(train_set[0]), len(valid_set[0]), len(test_set[0])))
 
 # inspect data
+data_set = train_set
 np.random.seed(42)
-idx = np.random.choice(np.arange(len(train_set[0])),
-                       size=min(25, len(train_set[0])), replace=False)
-plot_data(train_set, idx, img_shape)
-print(train_set[0].shape)
+idx = np.random.choice(np.arange(len(data_set[0])),
+                       size=min(25, len(data_set[0])), replace=False)
+print(data_set[0].shape)
 
 # # inspect label placement
 # imgs = train_set[0].reshape((train_set[0].shape[0], img_shape[0], img_shape[1]))

@@ -36,14 +36,11 @@ def lif_window_expt(win_size, test_imgs, img_shape, rbm, sbs_kwargs,
     return np.array(results)
 
 
-def main(general_dict, sbs_dict, analysis_dict):
+def main(data_set, rbm, general_dict, sbs_dict, analysis_dict):
     # pass arguments from dictionaries to simulation
     gather_data = general_dict['gather_data']
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
-    # load data
-    _, _, test_set = load_images(general_dict['data_name'])
-    rbm = rbm_pkg.load(get_rbm_dict(general_dict['rbm_name']))
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
     winsize = general_dict['winsize']
@@ -63,7 +60,7 @@ def main(general_dict, sbs_dict, analysis_dict):
     except Exception:
         if gather_data:
             samples = lif_window_expt(
-                winsize, test_set[0][start:end], img_shape, rbm, sbs_kwargs,
+                winsize, data_set[0][start:end], img_shape, rbm, sbs_kwargs,
                 n_samples=n_samples)
             if samples is not None:
                 np.savez_compressed('samples', samples=samples.astype(bool))
@@ -71,7 +68,8 @@ def main(general_dict, sbs_dict, analysis_dict):
             print('Missing sample file', file=sys.stderr)
             samples = None
     # produce analysis file
-    analysis.inf_speed_analysis(samples.astype(float), **analysis_dict)
+    analysis.inf_speed_analysis(samples.astype(float), data_set=data_set,
+                                **analysis_dict)
 
 
 if __name__ == '__main__':
@@ -88,4 +86,7 @@ if __name__ == '__main__':
     except KeyError:
         analysis_dict = {}
 
-    main(general_dict, sbs_dict, analysis_dict)
+    # load data
+    _, _, test_set = load_images(general_dict['data_name'])
+    rbm = rbm_pkg.load(get_rbm_dict(general_dict['rbm_name']))
+    main(test_set, rbm, general_dict, sbs_dict, analysis_dict)

@@ -103,7 +103,7 @@ class Clamp_window(object):
         return self.interval, clamped_idx
 
 
-def main(general_dict, test_set, rbm):
+def main(data_set, rbm, general_dict, analysis_dict):
     # pass arguments from dictionaries to simulation
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
@@ -134,8 +134,8 @@ def main(general_dict, test_set, rbm):
         if gather_data:
             print('Running gibbs simulation for instances {} to {}'
                   ''.format(start, end))
-            clamped_imgs = test_set[0][start:end]
-            # clamped_imgs = (test_set[0][start:end] > .5)*1.
+            clamped_imgs = data_set[0][start:end]
+            # clamped_imgs = (data_set[0][start:end] > .5)*1.
             samples, _ = run_simulation(
                 rbm, duration, clamped_imgs, binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp,
@@ -152,7 +152,8 @@ def main(general_dict, test_set, rbm):
             print('Missing sample file', file=sys.stderr)
             samples = None
     # produce analysis file
-    return analysis.inf_speed_analysis(samples)
+    return analysis.inf_speed_analysis(samples, data_set=data_set,
+                                       **analysis_dict)
 
 
 if __name__ == '__main__':
@@ -165,5 +166,9 @@ if __name__ == '__main__':
     general_dict = config.pop('general')
     _, _, test_set = load_images(general_dict['data_name'])
     rbm = rbm_pkg.load(get_rbm_dict(general_dict['rbm_name']))
+    try:
+        analysis_dict = config.pop('analysis')
+    except KeyError:
+        analysis_dict = {}
 
-    main(general_dict, test_set, rbm)
+    main(test_set, rbm, general_dict, analysis_dict)

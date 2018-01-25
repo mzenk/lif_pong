@@ -222,7 +222,7 @@ if 'tau_fac' in result.keys():
 # plot heatmap of success rate
 if len(id_params) == 1:
     plot_cumerr_1d(result, id_params, figname=expt_name)
-    plot_inferror_1d(result, id_params, figname=expt_name + 'inferr')
+    plot_inferror_1d(result, id_params, figname=expt_name + '_inferr')
 else:
     response = raw_input(">>> There are more than two identifiers. Plot 1d or 2d?\n")
     if response == '1d':

@@ -80,7 +80,6 @@ def merge_chunks(basefolder, identifier_dict, savename):
         # tmp = chunk_vis[..., :-n_labels].reshape(
         #     chunk_vis.shape[:-1] + img_shape)[..., -1]
 
-
         try:
             with np.load(os.path.join(simpath, 'prediction.npz')) as d:
                 tmp = d['last_col'].astype(float)
@@ -105,7 +104,7 @@ def merge_chunks(basefolder, identifier_dict, savename):
           file=sys.stdout)
     if prediction is not None:
         # save prediction data (faster for re-plotting)
-        print('Saved as '+ savename)
+        print('Saved as ' + savename)
         np.savez(savename, last_col=prediction, lab=prediction[..., :12],
                  data_idx=data_idx)
     else:

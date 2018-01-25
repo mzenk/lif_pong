@@ -10,7 +10,8 @@ import pong_agent
 
 
 # identifier params will be save in the analysis file
-def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
+def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2,
+                       data_set=None):
     with open('sim.yaml') as config:
         simdict = yaml.load(config)
 
@@ -18,7 +19,9 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
     n_samples = general_dict['n_samples']
     start = general_dict['start_idx']
     img_shape = tuple(general_dict['img_shape'])
-    _, _, test_set = load_images(general_dict['data_name'])
+    if data_set is None:
+        # take test set as default
+        _, _, data_set = load_images(general_dict['data_name'])
     n_labels = img_shape[0]//3
     n_pxls = np.prod(img_shape)
     if identifier_params is None:
@@ -44,7 +47,7 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
 
         # compute agent performance
         result_dict = pong_agent.compute_performance(
-            img_shape, test_set, chunk_idxs, last_col, max_speedup=np.inf)
+            img_shape, data_set, chunk_idxs, last_col, max_speedup=np.inf)
         print('Saving agent performance data...')
         np.savez_compressed('agent_performance', **result_dict)
 
@@ -61,7 +64,7 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
         # here it is assumed that the prediction positions are equidistant
         # and only relevant up to clamp_pos
         cum_prederr = pred_error[:, :clamp_pos].sum(axis=1) / img_shape[1]
-        cum_prederr_sum = np.sum(cum_prederr, axis=0) 
+        cum_prederr_sum = np.sum(cum_prederr, axis=0)
         cum_prederr_sqsum = np.sum(cum_prederr**2, axis=0)
         anadict = {'n_instances': result_dict['n_instances'],
                    'inf_success': float(inf_success[clamp_pos]),
@@ -79,6 +82,7 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2):
     with open('analysis', 'w') as f:
         f.write(yaml.dump(anadict))
     return anadict
+
 
 if __name__ == '__main__':
     # if this is called as an independent analysis script load samples first

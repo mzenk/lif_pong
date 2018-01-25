@@ -70,14 +70,11 @@ def test(test_imgs, img_shape, rbm, sbs_kwargs,
     return np.array(results)
 
 
-def main(general_dict, sbs_dict, clamp_dict, analysis_dict):
+def main(data_set, rbm, general_dict, sbs_dict, clamp_dict, analysis_dict):
     # pass arguments from dictionaries to simulation
     gather_data = general_dict['gather_data']
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
-    # load data
-    _, _, test_set = load_images(general_dict['data_name'])
-    rbm = rbm_pkg.load(get_rbm_dict(general_dict['rbm_name']))
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
 
@@ -112,7 +109,7 @@ def main(general_dict, sbs_dict, clamp_dict, analysis_dict):
         # ensures that only experiments that didn't produce data are repeated
         if gather_data:
             samples = lif_tso_clamping_expt(
-                test_set[0][start:end], img_shape, rbm, sbs_kwargs,
+                data_set[0][start:end], img_shape, rbm, sbs_kwargs,
                 clamp_kwargs, n_samples=n_samples)
             if samples is not None:
                 np.savez_compressed('samples', samples=samples.astype(bool))
@@ -122,7 +119,7 @@ def main(general_dict, sbs_dict, clamp_dict, analysis_dict):
 
     # also possible: perform analysis on chunk right here
     # analysis can be replaced
-    analysis.inf_speed_analysis(samples, **analysis_dict)
+    analysis.inf_speed_analysis(samples, data_set=data_set, **analysis_dict)
 
 
 if __name__ == '__main__':
@@ -140,4 +137,8 @@ if __name__ == '__main__':
     except KeyError:
         analysis_dict = {}
 
-    main(general_dict, sbs_dict, clamp_dict, analysis_dict)
+    # load data
+    _, _, test_set = load_images(general_dict['data_name'])
+    rbm = rbm_pkg.load(get_rbm_dict(general_dict['rbm_name']))
+
+    main(test_set, rbm, general_dict, sbs_dict, clamp_dict, analysis_dict)

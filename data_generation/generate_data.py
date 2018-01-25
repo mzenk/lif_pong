@@ -135,7 +135,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
 
 if __name__ == '__main__':
     # first dataset had random pos between 1/3 and 2/3 and ampl=.5, sigma=.2
-    knick_ampls = np.arange(.1, .8, .1)
+    knick_ampls = np.arange(.1, .9, .1)
     knick_pos = np.arange(.2, .9, .1)
     for a in knick_ampls:
         for p in knick_pos:

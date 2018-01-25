@@ -26,15 +26,16 @@ def run_window_expt(rbm, data_set):
     except OSError:
         print('No sim.yaml found in folder.', file=sys.stderr)
 
+    counter = 0
     for i in range(0, n_instances, chunksize):
         d = {
             'data_name': general_dict['data_name'],
             'seed': 828384,
-            'n_samples' : 20,
+            'n_samples': 20,
             'winsize': general_dict['img_shape'][1],
-            'img_shape' : general_dict['img_shape'],
-            'binary' : True,
-            'gather_data' : True,
+            'img_shape': general_dict['img_shape'],
+            'binary': True,
+            'gather_data': True,
             'burn_in': 100,
             'start_idx': i,
             'chunksize': chunksize
@@ -44,12 +45,18 @@ def run_window_expt(rbm, data_set):
         with open('sim.yaml', 'w') as f:
             f.write(yaml.dump(simdict))
 
-        analysis_dict = winexpt.main(d, data_set, rbm)
-        # Samples-file would be reloaded after the first chunk -> remove it
-        os.remove('samples.npz')
-        print(analysis_dict)
+        try:
+            # Samples-file would be reloaded after the first chunk -> put away
+            os.remove('samples.npz')
+        except OSError:
+            if i > 0:
+                print('Error: No samples.npz found. Check if result is valid.',
+                      file=sys.stderr)
+        analysis_dict = winexpt.main(data_set, rbm, d, {})
+
         cum_prederr_sum += analysis_dict['cum_prederr_sum']
         cum_prederr_sqsum += analysis_dict['cum_prederr_sqsum']
+        counter += analysis_dict['n_instances']
     # clean up
     os.remove('prediction.npz')
     os.remove('agent_performance.npz')
@@ -62,6 +69,7 @@ def run_window_expt(rbm, data_set):
     except OSError:
         print('No backup found in folder.', file=sys.stderr)
 
+    assert counter == n_instances
     cum_prederr_std = np.sqrt(cum_prederr_sqsum/n_instances - 
                               (cum_prederr_sum/n_instances)**2)
     return cum_prederr_sum/n_instances, cum_prederr_std
@@ -99,24 +107,25 @@ def analyse_quality(rbm, train_set, valid_set):
         result_dict.update({'classrate_valid': float(valid_rate),
                             'classrate_train': float(train_rate)})
 
-    # # compute ais
-    # if hasattr(rbm, 'n_labels'):
-    #     train_data = np.concatenate(
-    #         (train_set[0], to_1_of_c(train_labels, rbm.n_labels)), axis=1)
-    #     valid_data = np.concatenate(
-    #         (valid_set[0], to_1_of_c(valid_labels, rbm.n_labels)), axis=1)
-    # logger.info('Starting with AIS run...')
-    # loglik_valid, loglik_train = \
-    #     rbm.run_ais(valid_data, logger, train_data=train_data, n_runs=100)
+    # compute ais
+    if hasattr(rbm, 'n_labels'):
+        train_data = np.concatenate(
+            (train_set[0], to_1_of_c(train_labels, rbm.n_labels)), axis=1)
+        valid_data = np.concatenate(
+            (valid_set[0], to_1_of_c(valid_labels, rbm.n_labels)), axis=1)
+    logger.info('Starting with AIS run...')
+    loglik_valid, loglik_train = \
+        rbm.run_ais(valid_data, logger, train_data=train_data, n_runs=100)
 
-    # result_dict.update({'loglik_valid': float(loglik_valid),
-    #                     'loglik_train': float(loglik_train)})
+    result_dict.update({'loglik_valid': float(loglik_valid),
+                        'loglik_train': float(loglik_train)})
 
     # evaluate on prediction task
     logger.info('Starting Window experiment evaluation on validation set...')
     cum_prederr_mean, cum_prederr_std = run_window_expt(rbm, valid_set)
     result_dict.update({'cum_prederr_mean_valid': float(cum_prederr_mean),
                         'cum_prederr_std_valid': float(cum_prederr_std)})
+    logger.info('Finished analysis')
 
     return result_dict
 
