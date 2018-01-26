@@ -68,13 +68,14 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.png'):
     # save std
     fig_std, ax_std = plt.subplots()
     im = ax_std.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C_std), C_std),
-                            cmap=plt.cm.viridis)
+                           cmap=plt.cm.viridis)
     ax_std.set_aspect(float(aspect))
     plt.xlabel(identifier[0])
     plt.ylabel(identifier[1])
     cbar_s = plt.colorbar(im, ax=ax_std)
     cbar_s.ax.set_ylabel('Std. of cum. prediction error')
-    fig_std.savefig(os.path.join(make_figure_folder(), figname + '_std') + '.png')
+    fig_std.savefig(os.path.join(make_figure_folder(), figname + '_std.png'))
+
 
 def plot_inferror_pcolor(df, identifier, figname='paramsweep.png'):
     assert len(identifier) == 2
@@ -141,10 +142,10 @@ def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
     ydata = sorted_df['mean_cum_prederr'].as_matrix()
     # take standard deviation or error of mean?
     ystd = sorted_df['std_cum_prederr'].as_matrix()
-    yerr = (sorted_df['std_cum_prederr'] / 
+    yerr = (sorted_df['std_cum_prederr'] /
             df['n_instances'].apply(np.sqrt)).as_matrix()
     print("Minimum {:.2f} at {} = {}".format(ydata.min(), identifier[0],
-                                         xdata[np.argmin(ydata)]))
+                                             xdata[np.argmin(ydata)]))
     if fig is None:
         fig, ax = plt.subplots()
         savefig = True
@@ -161,7 +162,7 @@ def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
 
 
 def plot_inferror_1d(df, identifier, fig=None, ax=None, label=None,
-                       figname='paramsweep.png'):
+                     figname='paramsweep.png'):
     assert len(identifier) == 1
     df['error_rate'] = 1 - df['inf_success'] / df['n_instances']
 
@@ -221,7 +222,7 @@ if 'tau_fac' in result.keys():
 
 # plot heatmap of success rate
 if len(id_params) == 1:
-    plot_cumerr_1d(result, id_params, figname=expt_name)
+    plot_cumerr_1d(result, id_params, figname=expt_name + '_cumerr')
     plot_inferror_1d(result, id_params, figname=expt_name + '_inferr')
 else:
     response = raw_input(">>> There are more than two identifiers. Plot 1d or 2d?\n")
@@ -234,13 +235,17 @@ else:
 
     plot_params = []
     while len(plot_params) != n_plotparams:
-        response = raw_input(
-            '>>> Which id-parameters do you want as axes? Options:\n' +
-            '\n'.join(['{}: {}'.format(i, param)
-                       for i, param in enumerate(id_params)]) + '\n') 
-        plot_params = [id_params[int(s)] for s in response.split(',')]
-        if len(plot_params) != n_plotparams:
-            print('>>> Wrong number of parameters. There are {} axes'.format(n_plotparams))
+        if n_plotparams == 2 and len(id_params) == 2:
+            plot_params = id_params
+        else:
+            response = raw_input(
+                '>>> Which id-parameters do you want as axes? Options:\n' +
+                '\n'.join(['{}: {}'.format(i, param)
+                           for i, param in enumerate(id_params)]) + '\n')
+            plot_params = [id_params[int(s)] for s in response.split(',')]
+            if len(plot_params) != n_plotparams:
+                print('>>> Wrong number of parameters.'
+                      ' There are {} axes'.format(n_plotparams))
 
     id_dict = {}
     slice_param = None
@@ -255,10 +260,10 @@ else:
 
         val_list = result[param].unique()
         response = raw_input(
-            '>>> Which value should \"{}\" have? Options:\n'.format(param) + 
+            '>>> Which value should \"{}\" have? Options:\n'.format(param) +
             '\n'.join(['{}: {}'.format(i, val)
                        for i, val in enumerate(val_list)]) + slice_option + '\n')
-        
+
         # dialogue for slicing (plot several parameters as different lines)
         if response == 's':
             slice_param = param
@@ -295,10 +300,10 @@ else:
 
     if slice_param is None:
         if n_plotparams == 1:
-            plot_cumerr_1d(subdf, plot_params, figname=expt_name)
+            plot_cumerr_1d(subdf, plot_params, figname=expt_name + '_cumerr')
             plot_inferror_1d(subdf, plot_params, figname=expt_name + '_inferr')
         if n_plotparams == 2:
-            plot_cumerr_pcolor(subdf, plot_params, figname=expt_name)
+            plot_cumerr_pcolor(subdf, plot_params, figname=expt_name + '_cumerr')
             plot_inferror_pcolor(subdf, plot_params, figname=expt_name + '_inferr')
     else:
         fig, ax = plt.subplots()
@@ -313,7 +318,7 @@ else:
                 plot_inferror_1d(slicedf, plot_params, fig_is, ax_is, label=label)
         ax.legend()
         fig.savefig(os.path.join(make_figure_folder(), expt_name +
-                                '_slice_{}.png'.format(slice_param)))
+                                 '_slice_{}_cumerr.png'.format(slice_param)))
         ax_is.legend()
         fig_is.savefig(os.path.join(make_figure_folder(), expt_name +
                                     '_slice_{}_inferr.png'.format(slice_param)))

@@ -1,6 +1,7 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
+import os
 from lif_pong.utils import tile_raster_images, to_1_of_c
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict, make_figure_folder
 import matplotlib as mpl
@@ -10,8 +11,14 @@ import matplotlib.pyplot as plt
 mpl.rcParams['font.size'] = 12
 
 
-def plot_data(data, show_idx, img_shape, tile_shape=(5, 5)):
-    samples = tile_raster_images(train_set[0][idx],
+def plot_data(data_set, show_idx, img_shape, tile_shape=(5, 5), binary=False):
+    if binary:
+        data = (data_set[0][idx] > .4)*1.
+        name_mod = '_bin'
+    else:
+        data = data_set[0][idx]
+        name_mod = ''
+    samples = tile_raster_images(data,
                                  img_shape=img_shape,
                                  tile_shape=(4, 4),
                                  tile_spacing=(1, 1),
@@ -23,12 +30,13 @@ def plot_data(data, show_idx, img_shape, tile_shape=(5, 5)):
     plt.gca().get_xaxis().set_visible(False)
     plt.gca().get_yaxis().set_visible(False)
     plt.tight_layout()
-    plt.savefig(make_figure_folder() + data_name + '_samples.png')
+    plt.savefig(os.path.join(make_figure_folder(),
+                             data_name + '_samples' + name_mod + '.png'))
 
 
 # Load data -- Pong
 img_shape = (36, 48)
-data_name = 'pong_var_start36x48'
+data_name = 'knick_pos0.5_ampl0.5_var_start36x48'
 train_set, valid_set, test_set = load_images(data_name)
 # # Load data -- MNIST
 # import gzip
@@ -42,11 +50,11 @@ print('Number of samples in train/valid/test set: {}, {}, {}'.format(
     len(train_set[0]), len(valid_set[0]), len(test_set[0])))
 
 # inspect data
-data_set = train_set
+data_set = test_set
 np.random.seed(42)
 idx = np.random.choice(np.arange(len(data_set[0])),
                        size=min(25, len(data_set[0])), replace=False)
-print(data_set[0].shape)
+plot_data(data_set, idx, img_shape, binary=True)
 
 # # inspect label placement
 # imgs = train_set[0].reshape((train_set[0].shape[0], img_shape[0], img_shape[1]))

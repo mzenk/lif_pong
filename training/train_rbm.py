@@ -70,10 +70,10 @@ def run_window_expt(rbm, data_set):
         print('No backup found in folder.', file=sys.stderr)
 
     assert counter == n_instances
-    cum_prederr_std = np.sqrt(cum_prederr_sqsum/n_instances - 
+    cum_prederr_std = np.sqrt(cum_prederr_sqsum/n_instances -
                               (cum_prederr_sum/n_instances)**2)
     return cum_prederr_sum/n_instances, cum_prederr_std
-    
+
 
 def analyse_quality(rbm, train_set, valid_set):
     train_data = train_set[0]

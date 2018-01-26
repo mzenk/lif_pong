@@ -13,9 +13,12 @@ from lif_pong.utils import get_windowed_image_index
 
 # shouldn't be used with more than a few imgs (due to memory limitations)
 def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
-                   clamp_fct=None, continuous=True):
+                   clamp_fct=None, continuous=True, bin_imgs=False):
     if clamp_fct is None:
         return rbm.draw_samples(burnin + n_steps, v_init=v_init)[burnin:]
+    if bin_imgs:
+        imgs = (imgs > .5)*1.
+        assert np.all(np.logical_or(imgs == 1, imgs == 0))
 
     if len(imgs.shape) == 1:
         # special case for one image
@@ -124,6 +127,11 @@ def main(data_set, rbm, general_dict, analysis_dict):
     else:
         continuous = True
 
+    if 'bin_imgs' in general_dict.keys():
+        bin_imgs = general_dict['bin_imgs']
+    else:
+        bin_imgs = False
+
     duration = (img_shape[1] + 1) * n_samples
     clamp = Clamp_window(img_shape, n_samples, winsize)
 
@@ -139,7 +147,7 @@ def main(data_set, rbm, general_dict, analysis_dict):
             samples, _ = run_simulation(
                 rbm, duration, clamped_imgs, binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp,
-                continuous=continuous)
+                continuous=continuous, bin_imgs=bin_imgs)
 
             # compared to the lif-methods, the method returns an array with
             # shape [n_steps, n_imgs, n_vis]. Hence, swap axes.

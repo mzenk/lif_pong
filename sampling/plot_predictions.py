@@ -109,7 +109,8 @@ def merge_chunks(basefolder, identifier_dict, savename):
                  data_idx=data_idx)
     else:
         raise RuntimeError('No matching data could be found. '
-                           'Maybe wrong identifiers.')
+                           'Maybe wrong identifiers.\n' +
+                           ',\n'.join(['{}={}'.format(k, identifier_dict[k]) for k in identifier_dict.keys()]))
     return prediction, data_idx
 
 

@@ -25,12 +25,18 @@ def lif_tso_clamping_expt(test_imgs, img_shape, rbm, sbs_kwargs,
 
     # add all necessary kwargs to one dictionary
     kwargs = {k: sbs_kwargs[k] for k in sbs_kwargs.keys()}
+    try:
+        winsize = clamp_kwargs.pop('winsize')
+    except KeyError:
+        winsize = None
+
     for k in clamp_kwargs.keys():
         kwargs[k] = clamp_kwargs[k]
     results = []
     for img in test_imgs:
         kwargs['clamp_fct'] = \
-            lifsampl.Clamp_window(clamp_duration, img.reshape(img_shape))
+            lifsampl.Clamp_window(clamp_duration, img.reshape(img_shape),
+                                  win_size=winsize)
         bm.spike_data = lifsampl.gather_network_spikes_clamped_sf(
             bm, duration, rbm.n_inputs, **kwargs)
         results.append(bm.get_sample_states(sampling_interval))
@@ -92,6 +98,8 @@ def main(data_set, rbm, general_dict, sbs_dict, clamp_dict, analysis_dict):
         'clamp_tso_params': clamp_dict['tso_params'],
         'wp_fit_params': wp_fit_params
     }
+    if 'winsize' in clamp_dict.keys():
+        clamp_kwargs['winsize'] = clamp_dict['winsize']
 
     sim_setup_kwargs = {
         'rng_seeds_seed': sbs_dict['seed'],
