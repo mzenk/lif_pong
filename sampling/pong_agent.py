@@ -18,7 +18,7 @@ class Pong_agent(object):
         self.pos_range = [0., max_pos]
         self.paddle_len = paddle_len
         self.max_step = max_step
-        self.pos = 0.
+        self.pos = .5*max_pos
 
     def update_pos(self, prediction):
         # buggy?

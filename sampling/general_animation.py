@@ -5,7 +5,7 @@ import sys
 import os
 import yaml
 from scipy.ndimage import convolve1d
-from lif_pong.utils.data_mgmt import get_data_path, make_figure_folder
+from lif_pong.utils.data_mgmt import make_figure_folder, load_images
 from lif_pong.utils import average_helper
 from pong_agent import Pong_agent
 import matplotlib
@@ -22,7 +22,6 @@ class Pong_updater(object):
         self.points = points
         self.img_shape = img_shape
         self.n_labels = 12  # remove hard-coded version later
-        self.show_labels = False
 
         # for overlay
         self.win_size = win_size
@@ -88,20 +87,13 @@ class Pong_updater(object):
                 rgb_pixels = np.hstack((rgb_pixels,
                                         np.expand_dims(paddle_pxls, 1)))
 
-            # visualize labels as well
-            if self.show_labels:
-                labelsrep = np.repeat(labels, img_shape[0] // self.n_labels)
-                labelsrgb = np.tile(np.expand_dims(labelsrep, 1), (1, 3))
-                rgb_pixels = np.hstack((rgb_pixels,
-                                        np.expand_dims(labelsrgb, 1)))
-
             self.image.set_data(rgb_pixels)
             self.points.set_data(pixels[:, -1], np.arange(img_shape[0]) - .5)
             return self.image, self.points
 
 
 def make_animation(fig_name, img_shape, win_size, vis_samples, paddle_len=0,
-                   clamp_interval=1, anim_interval=10.):
+                   clamp_interval=1, anim_interval=10., target=None):
     # set up figure
     fig = plt.figure()
     width = .7
@@ -123,6 +115,8 @@ def make_animation(fig_name, img_shape, win_size, vis_samples, paddle_len=0,
     # ex. for adding dynamic text; must be inside bounding box to be updated
     # lab_text = ax.text(0.95, 0.01, '', va='bottom', ha='right',
     #                    transform=ax.transAxes, color='green')
+    if target is not None:
+        ax2.plot([0, 1.1], [target, target], '-', color='C1', linewidth=2)
 
     # Produce animation
     frames = zip(range(len(vis_samples)), vis_samples)
@@ -135,24 +129,32 @@ def make_animation(fig_name, img_shape, win_size, vis_samples, paddle_len=0,
 
 
 def main(config_dict):
-    data_path = config_dict['data_path']
+    data_path = config_dict['sample_data']
     img_shape = tuple(config_dict['img_shape'])
     clamp_interval = config_dict['n_samples']
     win_size = config_dict['win_size']
-    data_idx = config_dict['data_idx']
+    n_imgs = config_dict['n_imgs']
+    if 'data_name' in config_dict.keys() and 'start_idx' in config_dict.keys():
+        # for target visualization
+        _, _, test_set = load_images(config_dict['data_name'])
+        start_idx = config_dict['start_idx']
+        targets = test_set[0].reshape((-1,) + img_shape)[..., -1]
+        targets = average_helper(img_shape[0], targets[start_idx:start_idx + n_imgs])
+    else:
+        targets = [None]*n_imgs
     save_name = os.path.join(make_figure_folder(), config_dict['save_name'])
 
     with np.load(data_path) as d:
-        samples = d['samples'][data_idx]
+        samples = d['samples'][:n_imgs]
         vis_samples = samples[..., :np.prod(img_shape) + img_shape[0]//3].astype(float)
     # maybe average like in lif_inspect_samples
     kernel = np.ones(clamp_interval)/clamp_interval
     vis_samples = convolve1d(vis_samples, kernel, axis=1)
 
     for i in range(len(vis_samples)):
-        print('Making animation {} of {}'.format(i + 1, len(vis_samples)))                                   
+        print('Making animation {} of {}'.format(i + 1, len(vis_samples)))
         make_animation(save_name + '_{}'.format(i), img_shape, win_size, vis_samples[i],
-                       paddle_len=3, clamp_interval=clamp_interval)
+                       paddle_len=3, clamp_interval=clamp_interval, target=targets[i])
 
 
 

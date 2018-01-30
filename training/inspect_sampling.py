@@ -5,11 +5,12 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from lif_pong.utils import tile_raster_images
-from lif_pong.utils.data_mgmt import load_rbm, load_images, make_figure_folder
+from lif_pong.utils.data_mgmt import load_images, get_rbm_dict, make_figure_folder
+import rbm as rbm_pkg
 
 
-def plot_samples(rbm, n_samples, img_shape):
-    samples = testrbm.draw_samples(n_samples*100)
+def plot_samples(rbm, n_tiles, img_shape):
+    samples = testrbm.draw_samples(n_tiles*100)
     tiled_samples = tile_raster_images(samples[::100, :np.prod(img_shape)],
                                        img_shape=img_shape,
                                        tile_shape=(10, 10),
@@ -28,9 +29,10 @@ def plot_samples(rbm, n_samples, img_shape):
 # img_shape = (28, 28)
 
 img_shape = (36, 48)
-data_name = 'pong_var_start{}x{}'.format(*img_shape)
-testrbm = load_rbm(data_name + '_crbm_bin')
-_, _, test_set = load_images(data_name)
+rbm_name = 'gauss_crbm_new'
+# data_name = 'pong_var_start{}x{}'.format(*img_shape)
+# _, _, test_set = load_images(data_name)
+testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
 n_pixels = np.prod(img_shape)
 
 plot_samples(testrbm, 100, img_shape)
@@ -104,12 +106,12 @@ plot_samples(testrbm, 100, img_shape)
 # plt.imshow(tiled_clamped, interpolation='Nearest', cmap='gray')
 # plt.savefig('./figures/clamped_labels.png')
 
-# classification performance
-test_data = test_set[0]
-if len(test_set[1].shape) == 2:
-    test_targets = np.argmax(test_set[1], axis=1)
-else:
-    test_targets = test_set[1]
-prediction = testrbm.classify(test_data)
-crate = 100 * np.average(prediction == test_targets)
-print('Correct predictions: {:.2f} %'.format(crate))
+# # classification performance
+# test_data = test_set[0]
+# if len(test_set[1].shape) == 2:
+#     test_targets = np.argmax(test_set[1], axis=1)
+# else:
+#     test_targets = test_set[1]
+# prediction = testrbm.classify(test_data)
+# crate = 100 * np.average(prediction == test_targets)
+# print('Correct predictions: {:.2f} %'.format(crate))

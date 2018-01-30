@@ -8,7 +8,7 @@ import rbm as rbm_pkg
 import matplotlib as mpl
 mpl.use('agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+# from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 mpl.rcParams['font.size'] = 12
 
@@ -23,9 +23,10 @@ def plot_receptive_fields(rbm, hidden_idx, img_shape, tile_shape=(4, 4),
                                        output_pixel_vals=False)
     fig, ax = plt.subplots()
     im = ax.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.1)
-    plt.colorbar(im, cax=cax)
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes("right", size="5%", pad=0.1)
+    # plt.colorbar(im, cax=cax)
+    plt.colorbar(im)
     ax.set_title(title)
     ax.tick_params(left='off', right='off', bottom='off',
                    labelleft='off', labelright='off', labelbottom='off')
@@ -60,20 +61,11 @@ def plot_histograms(rbm, name='histo'):
 
 # Load data -- Pong
 img_shape = (36, 48)
-data_name = 'gauss_var_start{}x{}'.format(*img_shape)
-train_set, _, test_set = load_images(data_name)
-testrbm = rbm_pkg.load(get_rbm_dict(data_name + '_crbm'))
-# # Load data -- MNIST
-# import gzip
-# img_shape = (28, 28)
-# with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
-#     train_set, _, test_set = np.load(f)
-# testrbm = load_rbm('mnist_disc500_rbm')
-
-assert np.prod(img_shape) == train_set[0].shape[1]
-
-print('Number of samples: {}, {}'.format(train_set[0].shape[0],
-                                         test_set[0].shape[0]))
+rbm_name = 'gauss_crbm_new'
+# data_name = 'gauss_var_start{}x{}'.format(*img_shape)
+# train_set, _, test_set = load_images(data_name)
+# assert np.prod(img_shape) == train_set[0].shape[1]
+testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
 
 # RBM-specific plots
 rand_ind = np.random.randint(testrbm.n_hidden, size=16)

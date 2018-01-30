@@ -30,8 +30,12 @@ def sample_network(config_file, weights, biases, duration, dt=.1,
     if 'spike_precision' not in sim_setup_kwargs.keys():
         sim_setup_kwargs['spike_precision'] = 'on_grid'
 
+    v_reset =  network.samplers[0].neuron_parameters.v_reset
+    v_init = np.random.randint(2, size=len(biases))*(-v_reset) + v_reset
+
+
     network.gather_spikes(duration=duration, dt=dt, burn_in_time=burn_in_time,
-                          sim_setup_kwargs=sim_setup_kwargs)
+                          sim_setup_kwargs=sim_setup_kwargs, initial_vmem=v_init)
 
     if len(network.biases_theo) < 7:
         log.info("DKL joint: {}".format(
@@ -96,7 +100,7 @@ def initialise_network(config_file, weights, biases, tso_params=None,
 
 
 def gather_network_spikes_clamped(
-        network, duration, dt=0.1, burn_in_time=0., create_kwargs=None,
+        network, duration, dt=0.1, burn_in_time=500., create_kwargs=None,
         sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None,
         on_thresh=.5, off_thresh=None):
     """
@@ -130,8 +134,10 @@ def gather_network_spikes_clamped(
                                              **create_kwargs)
 
     population.record("spikes")
-    if initial_vmem is not None:
-        population.initialize(v=initial_vmem)
+    if initial_vmem is None:
+        v_reset =  network.samplers[0].neuron_parameters.v_reset
+        v_init = np.random.randint(2, size=len(network.samplers))*(-v_reset) + v_reset
+    population.initialize(v=v_init)
 
     callbacks = get_callbacks(sim, {
             "duration": duration,
@@ -176,7 +182,7 @@ def gather_network_spikes_clamped(
 
 
 def gather_network_spikes_clamped_bn(
-        network, duration, nv, dt=0.1, burn_in_time=0., create_kwargs=None,
+        network, duration, nv, dt=0.1, burn_in_time=500., create_kwargs=None,
         sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None,
         clamp_tso_params=None, wp_fit_params=None):
     """
@@ -236,8 +242,10 @@ def gather_network_spikes_clamped_bn(
     bn_projections = {'exc': exc_bn_proj, 'inh': inh_bn_proj}
 
     population.record("spikes")
-    if initial_vmem is not None:
-        population.initialize(v=initial_vmem)
+    if initial_vmem is None:
+        v_reset =  network.samplers[0].neuron_parameters.v_reset
+        v_init = np.random.randint(2, size=len(network.samplers))*(-v_reset) + v_reset
+    population.initialize(v=v_init)
 
     callbacks = get_callbacks(sim, {
             "duration": duration,
@@ -285,7 +293,7 @@ def gather_network_spikes_clamped_bn(
 
 # Clamping implemented with bias neurons that fire at 1kHz whenever unit "on"
 def gather_network_spikes_clamped_sf(
-        network, duration, nv, dt=0.1, burn_in_time=0., create_kwargs=None,
+        network, duration, nv, dt=0.1, burn_in_time=500., create_kwargs=None,
         sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None,
         clamp_tso_params=None, wp_fit_params=None, on_thresh=.5,
         off_thresh=None):
@@ -398,8 +406,10 @@ def gather_network_spikes_clamped_sf(
     #     log.info('Setting weights took {}s'.format(time.time() - start))
 
     population.record("spikes")
-    if initial_vmem is not None:
-        population.initialize(v=initial_vmem)
+    if initial_vmem is None:
+        v_reset =  network.samplers[0].neuron_parameters.v_reset
+        v_init = np.random.randint(2, size=len(network.samplers))*(-v_reset) + v_reset
+    population.initialize(v=v_init)
 
     callbacks = get_callbacks(sim, {
             "duration": duration,
