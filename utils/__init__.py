@@ -1,1 +1,1 @@
-from other import *
+from .other import *

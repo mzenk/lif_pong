@@ -134,15 +134,15 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
 
 
 if __name__ == '__main__':
-    # first dataset had random pos between 1/3 and 2/3 and ampl=.5, sigma=.2
-    knick_ampls = np.arange(.1, .9, .1)
-    knick_pos = np.arange(.2, .9, .1)
-    for a in knick_ampls:
-        for p in knick_pos:
-            d = {'pos': p, 'ampl': a, 'sigma': 0.1}
-            generate_data([48, 36], pot_str='pong', kink_dict=d,
-                          fname='knick_pos{:.1f}_ampl{:.1f}_var_start36x48'
-                          ''.format(d['pos'], d['ampl']))
+    # # first dataset had random pos between 1/3 and 2/3 and ampl=.5, sigma=.2
+    # knick_ampls = np.arange(.1, .9, .1)
+    # knick_pos = np.arange(.2, .9, .1)
+    # for a in knick_ampls:
+    #     for p in knick_pos:
+    #         d = {'pos': p, 'ampl': a, 'sigma': 0.1}
+    #         generate_data([48, 36], pot_str='pong', kink_dict=d,
+    #                       fname='knick_pos{:.1f}_ampl{:.1f}_var_start36x48'
+    #                       ''.format(d['pos'], d['ampl']))
 
     # # check balancing of dataset
     # plt.figure()
@@ -173,26 +173,27 @@ if __name__ == '__main__':
     #         np.sum(initial_histo, axis=0), width=1)
     # plt.savefig('angle_histo.png')
 
-    # # testing
-    # grid = np.array([48, 36])
-    # h = 1./grid[0]
-    # field = grid * h
-    # v0 = .5
+    # testing
+    grid = np.array([48, 36])
+    h = 1./grid[0]
+    field = grid * h
+    v0 = .5
 
-    # start_pos = np.array([0, field[1]/2])
-    # ang = 30.
-    # # coul_ampl = 1.
-    # # coul_args = (coul_ampl, [field[0]/3, field[1]/2], 2*coul_ampl/v0**2)
-    # # const_args = ([0., 1.],)
-    # # amplitude = .4
-    # # mu = field * [.5, .5]
-    # # cov_mat = np.diag([.1, .05] * field)
-    # # test = Gaussian_trajectory(grid, h, start_pos, ang, v0, amplitude, mu, cov_mat)
-    # test = Const_trajectory(grid, h, start_pos, ang, v0, np.array([0, 0]))
-    # test.integrate(write_pixels=True)
-    # fig = plt.figure()
+    start_pos = np.array([0, field[1]/2])
+    ang = 30.
+    # coul_ampl = 1.
+    # coul_args = (coul_ampl, [field[0]/3, field[1]/2], 2*coul_ampl/v0**2)
+    # const_args = ([0., 1.],)
+    # amplitude = .4
+    # mu = field * [.5, .5]
+    # cov_mat = np.diag([.1, .05] * field)
+    # test = Gaussian_trajectory(grid, h, start_pos, ang, v0, amplitude, mu, cov_mat)
+    test = Const_trajectory(np.array([0., 0.]), grid, h, start_pos, ang, v0)
+    test.integrate(write_pixels=False)
+    fig = plt.figure()
     # test.draw_trajectory(fig, potential=True)
-    # # imshow has the origin at the top left
-    # plt.imshow(test.pixels, interpolation='Nearest', cmap='Blues',
-    #            origin='lower', extent=(0, field[0], 0, field[1]), alpha=0.5)
-    # plt.savefig('test_trajectory.png')
+    # imshow has the origin at the top left
+    linewidth = 6
+    plt.imshow(test.to_image(linewidth), interpolation='Nearest', cmap='Blues',
+               extent=(0, field[0], 0, field[1]))
+    plt.savefig('test_trajectory.png')

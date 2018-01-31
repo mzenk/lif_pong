@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-
+import pdb
 
 def gauss1d(x, mu, sigma):
         mu = np.repeat(np.expand_dims(mu, 1), x.shape[0], axis=1)
@@ -32,8 +32,9 @@ class Trajectory:
         self.pixels = np.zeros(grid_size[::-1])
         # list for the entire trace
         self.trace = np.empty(1)
-        assert sorted(kink_dict.keys()) == sorted(['pos', 'ampl', 'sigma']), \
-            'Got keys {}'.format(kink_dict.keys())
+        if kink_dict is not None:
+            assert sorted(kink_dict.keys()) == sorted(['pos', 'ampl', 'sigma']), \
+                'Got keys {}'.format(kink_dict.keys())
         self.kink_dict = kink_dict
         if self.kink_dict is not None:
             # kink_pos is given relative to field-xrange
@@ -64,7 +65,7 @@ class Trajectory:
         # small enough to work with reflecting boundaries
         t1 = 10*(size[0] + size[1])/2/self.v0
         dt = .001*(size[0] + size[1])/2/self.v0
-        curr_pos = np.zeros((1 + int(t1 / dt), 2))
+        pos_list = []
         i = 0
         self.add_to_image(self.pos)
         while r.t < t1:
@@ -74,7 +75,7 @@ class Trajectory:
             # overshoot
             if r.y[0] > size[0] or r.y[0] < 0:
                 break
-            curr_pos[i] = r.y[:2]
+            pos_list.append(r.y[:2])
             if write_pixels:
                 self.add_to_image(r.y[:2])
 
@@ -97,10 +98,9 @@ class Trajectory:
                 r.set_initial_value(r.y*np.array([1, 1, 1, -1]), r.t)
             i += 1
 
-        self.trace = curr_pos[~np.all(curr_pos == 0, axis=1), :]
+        self.trace = np.array(pos_list)
         # normalize pixels
         self.pixels /= np.max(self.pixels)
-        return 0
 
     def draw_trajectory(self, fig, potential=False):
         if self.trace.shape == (1,):
@@ -163,6 +163,39 @@ class Trajectory:
 
         # # combine them to grid
         # self.pixels += gy.T.dot(gx)
+
+    def to_image(self, linewidth=1.):
+        gridsize = np.round(self.field_size / self.grid_spacing).astype(int)
+        # need to add pixels on top/bottom to fit the linewidth inside
+        # if linewidth/2 is not an integer, the excess pieces are cut away
+        extra_y = int(.5*linewidth)
+        gridx = np.arange(.5*self.grid_spacing, self.field_size[0], self.grid_spacing)
+        gridy = np.arange(.5*self.grid_spacing - extra_y*self.grid_spacing,
+                           self.field_size[1] + extra_y*self.grid_spacing,
+                           self.grid_spacing)
+
+        print(gridx)
+        # pixels have usual image axis convention
+        pixelarr = np.zeros((len(gridy), len(gridx)))
+        # probably not most efficient way
+        print(self.trace[:10])
+        # pdb.set_trace()
+        for i, y in enumerate(gridy):
+            for j, x in enumerate(gridx):
+                min_dist = np.min(np.linalg.norm(self.trace - [x,y], axis=1))
+                # print(min_dist)
+                pixelarr[i, j] = soft_assignment(min_dist, .5*linewidth*self.grid_spacing)
+
+        print(pixelarr.mean())
+        return pixelarr[::-1]
+
+
+def hard_assignment(dist, threshold):
+    return 1.*(dist <= threshold)
+
+
+def soft_assignment(dist, threshold, order=2.):
+    return  np.power((threshold - dist)/threshold, 1./order)
 
 
 # class for r^-1 potential
