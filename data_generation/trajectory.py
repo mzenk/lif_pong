@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-import pdb
+
 
 def gauss1d(x, mu, sigma):
         mu = np.repeat(np.expand_dims(mu, 1), x.shape[0], axis=1)
@@ -48,7 +48,7 @@ class Trajectory:
     def pot_fct(self, x, y):
         pass
 
-    def integrate(self, write_pixels=True):
+    def integrate(self, write_pixels=False):
         vx = self.v0 * np.cos(self.angle)
         vy = self.v0 * np.sin(self.angle)
         size = self.field_size
@@ -165,28 +165,25 @@ class Trajectory:
         # self.pixels += gy.T.dot(gx)
 
     def to_image(self, linewidth=1.):
-        gridsize = np.round(self.field_size / self.grid_spacing).astype(int)
         # need to add pixels on top/bottom to fit the linewidth inside
         # if linewidth/2 is not an integer, the excess pieces are cut away
         extra_y = int(.5*linewidth)
-        gridx = np.arange(.5*self.grid_spacing, self.field_size[0], self.grid_spacing)
+        gridx = np.arange(.5*self.grid_spacing, self.field_size[0],
+                          self.grid_spacing)
         gridy = np.arange(.5*self.grid_spacing - extra_y*self.grid_spacing,
-                           self.field_size[1] + extra_y*self.grid_spacing,
-                           self.grid_spacing)
+                          self.field_size[1] + extra_y*self.grid_spacing,
+                          self.grid_spacing)
 
-        print(gridx)
         # pixels have usual image axis convention
         pixelarr = np.zeros((len(gridy), len(gridx)))
-        # probably not most efficient way
-        print(self.trace[:10])
-        # pdb.set_trace()
+        # very inefficient solution but one that works
         for i, y in enumerate(gridy):
             for j, x in enumerate(gridx):
-                min_dist = np.min(np.linalg.norm(self.trace - [x,y], axis=1))
+                min_dist = np.min(np.linalg.norm(self.trace - [x, y], axis=1))
                 # print(min_dist)
-                pixelarr[i, j] = soft_assignment(min_dist, .5*linewidth*self.grid_spacing)
+                pixelarr[i, j] = soft_assignment(
+                    min_dist, .5*linewidth*self.grid_spacing)
 
-        print(pixelarr.mean())
         return pixelarr[::-1]
 
 
@@ -195,7 +192,10 @@ def hard_assignment(dist, threshold):
 
 
 def soft_assignment(dist, threshold, order=2.):
-    return  np.power((threshold - dist)/threshold, 1./order)
+    if dist > threshold:
+        return 0
+    else:
+        return np.power((threshold - dist)/threshold, 1./order)
 
 
 # class for r^-1 potential

@@ -2,6 +2,8 @@ from __future__ import division
 from __future__ import print_function
 import numpy as np
 import os
+# import sys
+# import yaml
 from trajectory import Gaussian_trajectory, Const_trajectory
 from scipy.ndimage import convolve1d
 from lif_pong.utils.data_mgmt import make_data_folder
@@ -27,7 +29,7 @@ def pool_vector(vec, width, stride, mode='default'):
 
 
 def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
-                  fname=None):
+                  linewidth=1., fname=None):
     # c = potential scale; h = grid spacing for pixeled image
     # actually, distinguishing grid and field may be unnecessary since we don't
     # care about physics here, i.e. realistic length scales
@@ -41,6 +43,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
         # potential parameters
         amplitude = .4
         mu = field * [.5, .5]
+        # the units are wrong for the cov. matrix but values were set by eye
         cov_mat = np.diag([.1, .05] * field)
 
     # generate sample data set
@@ -54,11 +57,12 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
         nangles = 200
         nstarts = 100
         starts = field[1]*np.random.beta(1.5, 1.5, nstarts)
+        # starts = field[1] * np.random.rand(nstarts)
 
     # draw for each start position nangles angles
     angles = max_angle * 2*(np.random.rand(nstarts, nangles) - .5)
 
-    data = np.zeros((angles.size, np.prod(grid)))
+    data = []
     impact_points = np.zeros(angles.size)
     n = 0
     print('Generating trajectories...')
@@ -74,15 +78,18 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
                 traj = Gaussian_trajectory(amplitude, mu, cov_mat,
                                            grid, h, np.array([0, s]), a, v0,
                                            kink_dict=kink_dict)
-            traj.integrate(write_pixels=fname is not None)
-            data[n] = traj.pixels.flatten()
+            traj.integrate()
+            traj_pxls = traj.to_image(linewidth)
+            img_shape = traj_pxls.shape
+            data.append(traj_pxls.flatten())
             # smooth if desired
             # tmp = gaussian_filter(traj.pixels, sigma=.7).flatten()
             # data[n] = tmp / np.max(tmp)
             impact_points[n] = traj.trace[-1, 1]
             n += 1
 
-    counts, bins, _ = plt.hist(impact_points, bins=100)
+    data = np.array(data)
+    counts, bins, _ = plt.hist(impact_points, bins='auto')
     plt.plot([field[1]/2]*2, [0, counts.max()], 'r-')
     plt.xlabel('Impact point')
     plt.ylabel('#')
@@ -96,7 +103,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
     np.random.shuffle(data)
 
     # add label layer
-    last_col = data.reshape((data.shape[0], grid[1], grid[0]))[:, :, -1]
+    last_col = data.reshape((-1, img_shape[0], img_shape[1]))[..., -1]
     reflected = np.all(last_col == 0, axis=1)
     print('{} of {} balls were reflected.'.format(reflected.sum(),
                                                   data.shape[0]))
@@ -126,14 +133,65 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
         test_set = data[-size_test:]
         test_labels = labels[-size_test:]
 
-        np.savez_compressed(os.path.join(make_data_folder('datasets', True), fname),
+        savename = os.path.join(make_data_folder('datasets', True),
+                                fname + '{}x{}'.format(*img_shape))
+        np.savez_compressed(savename,
                             ((train_set, train_labels),
                              (valid_set, valid_labels),
                              (test_set, test_labels)))
+        print('Saved data set with {} samples and image shape {}x{}'
+              ''.format(data.shape[0], *img_shape))
     return data, labels
 
 
+def test():
+    grid = np.array([48, 36])
+    h = 1./grid[0]
+    field = grid * h
+    v0 = 1.
+
+    start_pos = np.array([0, field[1]/2])
+    ang = 30.
+    amplitude = .4
+    mu = field * [.5, .5]
+    cov_mat = np.diag([.3, .2] * field)**2
+    test = Gaussian_trajectory(
+        amplitude, mu, cov_mat, grid, h, start_pos, ang, v0)
+    # test = Const_trajectory(np.array([0., 0.]), grid, h, start_pos, ang, v0)
+    test.integrate()
+    fig = plt.figure()
+    # test.draw_trajectory(fig, potential=True)
+    # imshow has the origin at the top left
+    linewidth = 5
+    pxls = test.to_image(linewidth)
+    print(pxls.shape)
+    plt.imshow(pxls, interpolation='Nearest', cmap='Blues', vmin=0, vmax=1,
+               extent=(0, field[0], 0, field[1]))
+    plt.colorbar()
+    plt.savefig('test_trajectory.png')
+
+
+def main(grid_dict, pot_dict, kink_dict):
+    raise NotImplementedError
+
+
 if __name__ == '__main__':
+    # # more flexible version
+    # if len(sys.argv) != 2:
+    #     print('Wrong number of arguments. Please provide a yaml-config file.')
+    #     sys.exit()
+    # with open(sys.argv[1]) as configfile:
+    #     config = yaml.load(configfile)
+
+    # grid_dict = config.pop('grid')
+    # pot_dict = config.pop('potential')
+    # kink_dict = config.pop('kink')
+    # main(grid_dict, pot_dict, kink_dict)
+
+    # Pong
+    generate_data([48, 36], pot_str='pong', linewidth=5., fname='thick_pong')
+
+    # # Knick
     # # first dataset had random pos between 1/3 and 2/3 and ampl=.5, sigma=.2
     # knick_ampls = np.arange(.1, .9, .1)
     # knick_pos = np.arange(.2, .9, .1)
@@ -172,28 +230,3 @@ if __name__ == '__main__':
     # plt.bar(np.arange(-initial_histo.shape[1]/2, initial_histo.shape[1]/2),
     #         np.sum(initial_histo, axis=0), width=1)
     # plt.savefig('angle_histo.png')
-
-    # testing
-    grid = np.array([48, 36])
-    h = 1./grid[0]
-    field = grid * h
-    v0 = .5
-
-    start_pos = np.array([0, field[1]/2])
-    ang = 30.
-    # coul_ampl = 1.
-    # coul_args = (coul_ampl, [field[0]/3, field[1]/2], 2*coul_ampl/v0**2)
-    # const_args = ([0., 1.],)
-    # amplitude = .4
-    # mu = field * [.5, .5]
-    # cov_mat = np.diag([.1, .05] * field)
-    # test = Gaussian_trajectory(grid, h, start_pos, ang, v0, amplitude, mu, cov_mat)
-    test = Const_trajectory(np.array([0., 0.]), grid, h, start_pos, ang, v0)
-    test.integrate(write_pixels=False)
-    fig = plt.figure()
-    # test.draw_trajectory(fig, potential=True)
-    # imshow has the origin at the top left
-    linewidth = 6
-    plt.imshow(test.to_image(linewidth), interpolation='Nearest', cmap='Blues',
-               extent=(0, field[0], 0, field[1]))
-    plt.savefig('test_trajectory.png')
