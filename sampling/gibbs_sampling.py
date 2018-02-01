@@ -34,8 +34,9 @@ between_burnin = 0
 # no burnin once actual simulation has start_idxed
 duration = (img_shape[1] + 1) * (n_samples + between_burnin)
 clamp = Clamp_window(img_shape, n_samples + between_burnin, winsize)
-clamp = Clamp_anything([0.], get_windowed_image_index(
-            img_shape, int(.2*img_shape[1])))
+# duration = n_samples
+# clamp = Clamp_anything([0.], get_windowed_image_index(
+#             img_shape, int(.2*img_shape[1])))
 
 # Load Pong data and rbm
 _, _, test_set = load_images(data_name)

@@ -160,7 +160,7 @@ def main(data, img_shape, rbm_params, hyper_params, log_params,
 
             my_rbm = RBM(n_pixels, vbias=bias_init, **rbm_params)
         else:
-            print('Training discriminative RBM on  {}'
+            print('Training discriminative RBM on {}'
                   ' instances...'.format(train_set[0].shape[0]))
 
             # transform labels into one-hot representation if necessary

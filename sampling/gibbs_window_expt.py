@@ -24,8 +24,7 @@ def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
         # special case for one image
         imgs = np.expand_dims(imgs, 0)
     vis_samples = np.zeros((n_steps, imgs.shape[0], rbm.n_visible))
-    # hid_samples = np.zeros((n_steps, imgs.shape[0], rbm.n_hidden))
-    hid_samples = 0
+    hid_samples = np.zeros((n_steps, imgs.shape[0], rbm.n_hidden))
 
     # burnin
     _, clamped_ind = clamp_fct(0)
@@ -39,7 +38,7 @@ def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
         delta_t, clamped_ind = clamp_fct(t)
         n_samples = delta_t if t + delta_t <= n_steps else n_steps - t
 
-        unclamped_vis = rbm.sample_with_clamped_units(
+        unclamped_vis, hid = rbm.sample_with_clamped_units(
             n_samples, clamped_ind, imgs[:, clamped_ind], v_init=v_init,
             binary=binary)
         if imgs.shape[0] == 1:
@@ -47,6 +46,7 @@ def run_simulation(rbm, n_steps, imgs, v_init=None, burnin=500, binary=False,
         unclamped_ind = np.setdiff1d(np.arange(rbm.n_visible), clamped_ind)
         vis_samples[t:t + n_samples, :, clamped_ind] = imgs[:, clamped_ind]
         vis_samples[t:t + n_samples, :, unclamped_ind] = unclamped_vis
+        hid_samples[t:t + n_samples] = hid
 
         # # probably slower
         # temp = rbm.draw_samples(n_samples, v_init=v_init,
@@ -144,11 +144,16 @@ def main(data_set, rbm, general_dict, analysis_dict):
                   ''.format(start, end))
             clamped_imgs = data_set[0][start:end]
             # clamped_imgs = (data_set[0][start:end] > .5)*1.
-            samples, _ = run_simulation(
+            vis_samples, hid_samples = run_simulation(
                 rbm, duration, clamped_imgs, binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp,
                 continuous=continuous, bin_imgs=bin_imgs)
 
+            # hidden samples are only saved in binary format due to file size
+            if binary:
+                samples = np.concatenate((vis_samples, hid_samples), axis=2)
+            else:
+                samples = vis_samples
             # compared to the lif-methods, the method returns an array with
             # shape [n_steps, n_imgs, n_vis]. Hence, swap axes.
             samples = np.swapaxes(samples, 0, 1)

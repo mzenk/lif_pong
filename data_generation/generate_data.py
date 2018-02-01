@@ -2,30 +2,15 @@ from __future__ import division
 from __future__ import print_function
 import numpy as np
 import os
-# import sys
+import sys
 # import yaml
 from trajectory import Gaussian_trajectory, Const_trajectory
 from scipy.ndimage import convolve1d
 from lif_pong.utils.data_mgmt import make_data_folder
+from lif_pong.utils import average_pool
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-
-
-def pool_vector(vec, width, stride, mode='default'):
-    kernel = np.ones(width)
-    # kernel = np.convolve(kernel, kernel, mode='full')
-    # sigma = .5
-    # kernel = np.exp(-(np.arange(width) - width/2)**2 / sigma**2 / 2)
-    kernel /= np.sum(kernel)
-    filtered = convolve1d(vec, kernel, mode='constant', axis=1)
-    # if no boundary effects should be visible
-    if mode == 'valid':
-        return filtered[:, width//2:-(width//2):stride]
-    # startpoint is chosen such that the remainder of the division is
-    # distributed evenly between left and right boundary
-    start = ((vec.shape[1] - 1) % stride) // 2
-    return filtered[:, start::stride]
 
 
 def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
@@ -64,7 +49,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
 
     data = []
     impact_points = np.zeros(angles.size)
-    n = 0
+    counter = 0
     print('Generating trajectories...')
     for i, s in enumerate(starts):
         for a in angles[i]:
@@ -84,9 +69,9 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
             data.append(traj_pxls.flatten())
             # smooth if desired
             # tmp = gaussian_filter(traj.pixels, sigma=.7).flatten()
-            # data[n] = tmp / np.max(tmp)
-            impact_points[n] = traj.trace[-1, 1]
-            n += 1
+            # data[counter] = tmp / np.max(tmp)
+            impact_points[counter] = traj.trace[-1, 1]
+            counter += 1
 
     data = np.array(data)
     counts, bins, _ = plt.hist(impact_points, bins='auto')
@@ -109,23 +94,22 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
                                                   data.shape[0]))
     # last_col = last_col[~reflected]
     # labels can be overlapping or not
-    labels = pool_vector(last_col, 3, 3, mode='valid')
+    labwidth = 0
+    for l in range(3, img_shape[0] + 1):
+        if img_shape[0] % l == 0:
+            labwidth = l
+            break
+    if labwidth > 5:
+        print('Label width {} is rather large.'.format(labwidth), file=sys.stderr)
+    labels = average_pool(last_col, labwidth, labwidth)
     # label prob should be normalized
     z = np.sum(labels, axis=1)
     z[z == 0] = 1
     labels /= np.expand_dims(z, 1)
-    # n_labels = labels.shape[1]
-    # binarization if desired
-    # labels = np.argmax(pooled_last_col, axis=1)
 
-    # # test ----
-    # n_col = 1
-    # data = data.reshape((nstarts * nangles, grid[1], grid[0]))
-    # data = data[:, :, -n_col:].reshape((nstarts * nangles, grid[1] * n_col))
-    # # ----
     if fname is not None:
-        size_train = data.shape[0]//4
-        size_test = data.shape[0]//2
+        size_train = data.shape[0]//2
+        size_test = data.shape[0]//4
         train_set = data[:size_train]
         train_labels = labels[:size_train]
         valid_set = data[size_train: -size_test]
@@ -139,8 +123,9 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
                             ((train_set, train_labels),
                              (valid_set, valid_labels),
                              (test_set, test_labels)))
-        print('Saved data set with {} samples and image shape {}x{}'
-              ''.format(data.shape[0], *img_shape))
+        print('Saved data set with {0} samples and image shape {2}x{3}.'
+              '(#labels = {1})'.format(
+              data.shape[0], labels.shape[1], *img_shape))
     return data, labels
 
 

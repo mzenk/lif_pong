@@ -1,6 +1,7 @@
 # script for analyzing sampled data
 from __future__ import division
 from __future__ import print_function
+import os
 import numpy as np
 import argparse
 from scipy.ndimage import convolve1d
@@ -20,24 +21,12 @@ parser.add_argument('-s', '--save_as', dest='savename', default='test',
                     help='Name of the resulting video file')
 parser.add_argument('--average', action='store_const', dest='avg', const=True,
                     default=False, help='Flag for displaying a time averaged version')
+parser.add_argument('--hidden', action='store_const', dest='show_hidden', const=True,
+                    default=False, help='Flag for displaying hidden units')
 args = parser.parse_args()
 
 show_label = False
-# # testing
-# img_shape = (2, 2)
-# n_pixels = np.prod(img_shape)
-# n_labels = 0
-# # args.sample_file = get_data_path('lif_clamp_stp') + 'test.npz'
-# args.sample_file = '/wang/users/mzenk/cluster_home/experiment/simulations/TestSweep/0.001_2000.0/samples.npz'
-# # MNIST
-# img_shape = (28, 28)
-# n_pixels = np.prod(img_shape)
-# import gzip
-# f = gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb')
-# _, _, test_set = np.load(f)
-# f.close()
-# args.sample_file = get_data_path('playground') + \
-#     'test_bias_neurons.npz'
+
 # Pong
 img_shape = (36, 48)
 n_pixels = np.prod(img_shape)
@@ -50,7 +39,8 @@ with np.load(args.sample_file) as d:
     samples = d['samples'].astype(float)[:args.n_imgs]
     if len(samples.shape) == 2:
         samples = np.expand_dims(samples, 0)
-    if 'data_idx' in d.keys():
+    if show_label:
+        # necessary for this option
         data_idx = d['data_idx']
     n_samples = samples.shape[1]
     print('Loaded sample array with shape {}'.format(samples.shape))
@@ -58,6 +48,7 @@ with np.load(args.sample_file) as d:
 
 vis_samples = samples[..., :n_pixels]
 hid_samples = samples[..., n_pixels + n_labels:]
+
 if show_label:
     test_targets = test_set[1][data_idx]
     if len(test_targets.shape) == 2:
@@ -66,6 +57,7 @@ if show_label:
     # Compute classification performance
     labels = np.argmax(lab_samples.sum(axis=1), axis=1)
     print('Correct predictions: {}'.format((labels == test_targets).mean()))
+    active_lab = np.argmax(lab_samples, axis=2).flatten()
 
 # # marginal visible probabilities can be calculated from hidden states
 # nh = hid_samples.shape[-1]
@@ -73,27 +65,42 @@ if show_label:
 
 if args.avg:
     # running average over samples
-    kwidth = 20
+    kwidth = 10
     kernel = np.ones(kwidth)/kwidth
     vis_samples = convolve1d(vis_samples, kernel, axis=1)
+    hid_samples = convolve1d(hid_samples, kernel, axis=1)
 
-frames = vis_samples.reshape(-1, *img_shape)
-if show_label:
-    active_lab = np.argmax(lab_samples, axis=2).flatten()
+if args.show_hidden:
+    n_hidden = hid_samples.shape[2]
+    img_shape = (20, int(np.ceil(n_hidden/20)))
+    frames = hid_samples.reshape(-1, *img_shape)
+    # plot mean activity for each image as a function of time
+    mean_activity = hid_samples.mean(axis=2)
+    plt.figure()
+    for i, m in enumerate(mean_activity):
+        plt.plot(np.linspace(0, 1, len(m)), m, alpha=.5,
+                 label='Image {}/{}'.format(i, args.n_imgs))
+    plt.legend()
+    plt.xlabel('Experiment time [a.u.]')
+    plt.ylabel('Mean activity of hidden units')
+    plt.savefig(os.path.join(make_figure_folder(), args.savename + '_hid_act.png'))
+else:
+    frames = vis_samples.reshape(-1, *img_shape)
+    # plot images for quick inspection
+    nrows = min(args.n_imgs, len(frames))
+    ncols = min(n_samples, 7)
+    snapshots = vis_samples[::args.n_imgs//nrows, ::n_samples//ncols].reshape(-1, *img_shape)
+    tiled_samples = tile_raster_images(snapshots,
+                                       img_shape=img_shape,
+                                       tile_shape=(nrows, ncols),
+                                       tile_spacing=(1, 1),
+                                       scale_rows_to_unit_interval=False,
+                                       output_pixel_vals=False)
 
-# # plot images for quick inspection
-# samples_per_frame = vis_samples.shape[1] / (img_shape[1] + 1)
-# tiled_samples = tile_raster_images(frames[-samples_per_frame:],
-#                                    img_shape=img_shape,
-#                                    tile_shape=(int(samples_per_frame/5), 5),
-#                                    tile_spacing=(1, 1),
-#                                    scale_rows_to_unit_interval=False,
-#                                    output_pixel_vals=False)
-
-# plt.figure()
-# plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-# plt.savefig(make_figure_folder() + 'samples.png', bbox_inches='tight')
-
+    plt.figure(figsize=(14, 7))
+    plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
+    plt.savefig(os.path.join(make_figure_folder(), args.savename + '_snapshots.png'),
+                bbox_inches='tight')
 
 # video
 def update_fig(i_frame):
@@ -119,5 +126,10 @@ time_text = ax.text(0.05, 0.01, '', va='bottom', ha='left',
 ani = animation.FuncAnimation(fig, update_fig, frames=zip(range(len(frames)), frames),
                               interval=10., blit=True, repeat=False)
 
-ani.save(make_figure_folder() + args.savename + '.mp4', writer='ffmpeg')
+if args.show_hidden:
+    ani.save(os.path.join(make_figure_folder(), args.savename + '_hid.mp4'),
+             writer='ffmpeg')
+else:
+    ani.save(os.path.join(make_figure_folder(), args.savename + '.mp4'),
+             writer='ffmpeg')
 # plt.show()

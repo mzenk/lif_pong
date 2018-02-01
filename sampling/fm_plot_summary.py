@@ -5,8 +5,10 @@ import pandas as pd
 import sys
 import os
 import yaml
-import matplotlib.pyplot as plt
 from lif_pong.utils.data_mgmt import make_figure_folder
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 
 def plot_cumerr_pcolor(df, identifier, figname='paramsweep.png'):

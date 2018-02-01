@@ -215,6 +215,8 @@ class RBM(object):
 
         samples = np.zeros((n_samples, clamped_val.shape[0],
                             unclamped_ind.size))
+        hid_samples = np.zeros((n_samples, clamped_val.shape[0],
+                               self.n_hidden))
 
         if v_init is None:
             v_init = self.np_rng.randint(2, size=(clamped_val.shape[0],
@@ -226,15 +228,17 @@ class RBM(object):
 
         # sample starting from  multiple initial values
         for t in range(n_samples):
-            _, h_samples = self.sample_h_given_v(v_curr)
+            ph, h_samples = self.sample_h_given_v(v_curr)
             unclamped_mean, unclamped_samples = \
                 unclamped_rbm.sample_v_given_h(h_samples)
             v_curr[:, unclamped_ind] = unclamped_samples
             if binary:
                 samples[t] = unclamped_samples
+                hid_samples[t] = h_samples
             else:
                 samples[t] = unclamped_mean
-        return samples.squeeze()
+                hid_samples[t] = ph
+        return samples.squeeze(), hid_samples.squeeze()
 
     def gibbs_hvh(self, h_start, beta=1.):
         pv, v = self.sample_v_given_h(h_start, beta)
