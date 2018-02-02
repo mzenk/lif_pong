@@ -22,8 +22,8 @@ class Trajectory:
                  kink_dict=None):
         # grid size: (n_pxls_x, n_pxls_y) y|_x
         # pos, angle, v0: starting position, angle, velocity
-        self.pos = pos
-        self.v0 = v0
+        self.pos = np.array(pos)
+        self.v0 = np.array(v0)
         self.angle = angle / 180. * np.pi
         self.grid_spacing = grid_spacing
         # field size (x_range, y_range) -> maybe center field later
@@ -64,9 +64,9 @@ class Trajectory:
         # program would be better/faster if dt larger, but dt needs to be
         # small enough to work with reflecting boundaries
         t1 = 10*(size[0] + size[1])/2/self.v0
-        dt = .001*(size[0] + size[1])/2/self.v0
+        dt = .001*size[1]/self.v0
+        # particle can only travel max. dt*v0 further before reflection
         pos_list = []
-        i = 0
         self.add_to_image(self.pos)
         while r.t < t1:
             r.integrate(r.t+dt)
@@ -96,29 +96,24 @@ class Trajectory:
             # reflect if particle hits top or bottom
             if r.y[1] > size[1] or r.y[1] < 0:
                 r.set_initial_value(r.y*np.array([1, 1, 1, -1]), r.t)
-            i += 1
 
         self.trace = np.array(pos_list)
         # normalize pixels
         self.pixels /= np.max(self.pixels)
 
-    def draw_trajectory(self, fig, potential=False):
+    def draw_trajectory(self, ax, potential=False, color=None):
         if self.trace.shape == (1,):
             print("integrate first!")
             return
 
-        ax = fig.add_subplot(111)
         if potential:
             # overlay potential heatmap
             gridx, gridy = np.meshgrid(np.linspace(0, self.field_size[0], 70),
                                        np.linspace(0, self.field_size[1], 70))
-            cax = ax.imshow(self.pot_fct(gridx, gridy),
-                            interpolation='Nearest',
-                            extent=(0, self.field_size[0],
-                                    0, self.field_size[1]),
-                            cmap='gray', origin='lower')
-            fig.colorbar(cax)
-        ax.plot(self.trace[:, 0], self.trace[:, 1], '.', markersize=1)
+            ax.imshow(self.pot_fct(gridx, gridy), interpolation='Nearest',
+                      extent=(0, self.field_size[0], 0, self.field_size[1]),
+                      cmap='gray', origin='lower')
+        ax.plot(self.trace[:, 0], self.trace[:, 1], '.', markersize=1, color=color)
         ax.add_patch(matplotlib.patches.Rectangle((0, 0), self.field_size[0],
                                                   self.field_size[1],
                                                   fill=False))

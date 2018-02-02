@@ -62,7 +62,12 @@ def load_images(data_name):
     else:
         path = os.path.expanduser('~/Projects/lif_pong/shared_data/datasets')
     with np.load(os.path.join(path, data_name + '.npz')) as d:
-        train_set, valid_set, test_set = d[d.keys()[0]]
+        if len(d.keys()) == 1:
+            train_set, valid_set, test_set = d[d.keys()[0]]
+        else:
+            train_set = (d['train_data'], d['train_labels'])
+            valid_set = (d['valid_data'], d['valid_labels'])
+            test_set = (d['test_data'], d['test_labels'])
     return train_set, valid_set, test_set
 
 

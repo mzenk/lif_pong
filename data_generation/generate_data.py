@@ -13,8 +13,26 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 
-def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
-                  linewidth=1., fname=None):
+def get_angle_range(pos, width, height):
+    lower = 180./np.pi * np.arctan(-(height + pos)/width)
+    upper = 180./np.pi * np.arctan((2*height - pos)/width)
+    return lower, upper
+
+# this method draws states such that only one reflection can occurr for Pong
+def draw_init_states(num, width, height, init_pos=None):
+    if init_pos is None:
+        init_pos = np.random.rand(num)*height
+    else:
+        assert num == len(init_pos)
+    init_states = []
+    lower, upper = get_angle_range(init_pos, width, height)
+    init_angle = np.random.rand(num)*(upper - lower) + lower
+    init_states = np.vstack((init_pos, init_angle)).T
+    return init_states
+
+
+def generate_data(num_train, num_valid, num_test, grid, pot_str='pong',
+                  fixed_start=False, kink_dict=None, linewidth=1., fname=None):
     # c = potential scale; h = grid spacing for pixeled image
     # actually, distinguishing grid and field may be unnecessary since we don't
     # care about physics here, i.e. realistic length scales
@@ -23,6 +41,7 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
     h = 1./grid[0]
     field = grid * h
     v0 = 1.
+    num_tot = num_train + num_valid + num_test
 
     if pot_str == 'gauss':
         # potential parameters
@@ -33,57 +52,35 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
 
     # generate sample data set
     np.random.seed(7491055)
-    max_angle = 50.
     if fixed_start:
-        nstarts = 1
-        nangles = 2*1000
-        starts = np.array([[field[1]*.5]])
+        starts = np.repeat([field[1]*.5], num_tot)
+        init_states = draw_init_states(num_tot, field[0], field[1], starts)
     else:
-        nangles = 200
-        nstarts = 100
-        starts = field[1]*np.random.beta(1.5, 1.5, nstarts)
-        # starts = field[1] * np.random.rand(nstarts)
-
-    # draw for each start position nangles angles
-    angles = max_angle * 2*(np.random.rand(nstarts, nangles) - .5)
+        init_states = draw_init_states(num_tot, field[0], field[1])
 
     data = []
-    impact_points = np.zeros(angles.size)
-    counter = 0
+    impact_points = np.zeros(num_tot)
     print('Generating trajectories...')
-    for i, s in enumerate(starts):
-        for a in angles[i]:
-            if pot_str == 'pong':
-                # No forces
-                traj = Const_trajectory(np.array([0., 0.]),
-                                        grid, h, np.array([0, s]), a, v0,
-                                        kink_dict=kink_dict)
-            if pot_str == 'gauss':
-                # Hill in the centre
-                traj = Gaussian_trajectory(amplitude, mu, cov_mat,
-                                           grid, h, np.array([0, s]), a, v0,
-                                           kink_dict=kink_dict)
-            traj.integrate()
-            traj_pxls = traj.to_image(linewidth)
-            img_shape = traj_pxls.shape
-            data.append(traj_pxls.flatten())
-            # smooth if desired
-            # tmp = gaussian_filter(traj.pixels, sigma=.7).flatten()
-            # data[counter] = tmp / np.max(tmp)
-            impact_points[counter] = traj.trace[-1, 1]
-            counter += 1
+    for i, s in enumerate(init_states):
+        init_pos = s[0]
+        init_angle =s[1]
+        if pot_str == 'pong':
+            # No forces
+            traj = Const_trajectory(np.array([0., 0.]), grid, h,
+                                    np.array([0, init_pos]), init_angle, v0,
+                                    kink_dict=kink_dict)
+        if pot_str == 'gauss':
+            # Hill in the centre
+            traj = Gaussian_trajectory(amplitude, mu, cov_mat, grid, h,
+                                       np.array([0, init_pos]), init_angle, v0,
+                                       kink_dict=kink_dict)
+        traj.integrate()
+        traj_pxls = traj.to_image(linewidth)
+        img_shape = traj_pxls.shape
+        data.append(traj_pxls.flatten())
+        impact_points[i] = traj.trace[-1, 1]
 
     data = np.array(data)
-    counts, bins, _ = plt.hist(impact_points, bins='auto')
-    plt.plot([field[1]/2]*2, [0, counts.max()], 'r-')
-    plt.xlabel('Impact point')
-    plt.ylabel('#')
-    # from scipy.stats import gaussian_kde
-    # kernel = gaussian_kde(impact_points)
-    # plt.plot(bins, kernel(bins)*impact_points.size, 'm.')
-    plt.savefig('impact_points.png')
-    # traj.draw_trajectory(potential=False)
-
     # shuffle data so that successive samples do not have same start
     np.random.shuffle(data)
 
@@ -108,24 +105,58 @@ def generate_data(grid, pot_str='pong', fixed_start=False, kink_dict=None,
     labels /= np.expand_dims(z, 1)
 
     if fname is not None:
-        size_train = data.shape[0]//2
-        size_test = data.shape[0]//4
-        train_set = data[:size_train]
-        train_labels = labels[:size_train]
-        valid_set = data[size_train: -size_test]
-        valid_labels = labels[size_train: -size_test]
-        test_set = data[-size_test:]
-        test_labels = labels[-size_test:]
+        train_data = data[:num_train]
+        train_labels = labels[:num_train]
+        valid_data = data[num_train:-num_test]
+        valid_labels = labels[num_train:-num_test]
+        test_data = data[-num_test:]
+        test_labels = labels[-num_test:]
 
         savename = os.path.join(make_data_folder('datasets', True),
                                 fname + '{}x{}'.format(*img_shape))
         np.savez_compressed(savename,
-                            ((train_set, train_labels),
-                             (valid_set, valid_labels),
-                             (test_set, test_labels)))
+                            train_data=train_data, train_labels=train_labels,
+                            valid_data=valid_data, valid_labels=valid_labels,
+                            test_data=test_data, test_labels=test_labels)
         print('Saved data set with {0} samples and image shape {2}x{3}.'
               '(#labels = {1})'.format(
               data.shape[0], labels.shape[1], *img_shape))
+
+    # some statistics
+    plt.figure()
+    counts, bins, _ = plt.hist(init_states[:, 1], bins='auto')
+    plt.xlabel('Initial angle')
+    plt.ylabel('#')
+    plt.savefig('angle_dist.png')
+
+    plt.figure()
+    counts, bins, _ = plt.hist(init_states[:, 0], bins='auto')
+    plt.plot([field[1]/2]*2, [0, counts.max()], 'r-')
+    plt.xlim([min(bins.min(), 0), max(bins.max(), field[1])])
+    plt.xlabel('Impact point')
+    plt.ylabel('#')
+    plt.savefig('start_points.png')
+
+    plt.figure()
+    counts, bins, _ = plt.hist(impact_points, bins='auto')
+    plt.plot([field[1]/2]*2, [0, counts.max()], 'r-')
+    plt.xlim([min(bins.min(), 0), max(bins.max(), field[1])])
+    plt.xlabel('Impact point')
+    plt.ylabel('#')
+    # from scipy.stats import gaussian_kde
+    # kernel = gaussian_kde(impact_points)
+    # plt.plot(bins, kernel(bins)*impact_points.size, 'm.')
+    plt.savefig('end_points.png')
+
+    # save histogram dat because it is not available afterwards
+    np.savez(os.path.join(make_data_folder(), fname + '_stats'),
+             init_pos=init_states[:, 0], init_angles=init_states[:, 1],
+             end_pos=impact_points)
+
+    plt.figure()
+    plt.imshow(data.mean(axis=0).reshape(img_shape),
+               interpolation='Nearest', cmap='gray')
+    plt.savefig('mean_image.png')
     return data, labels
 
 
@@ -135,25 +166,42 @@ def test():
     field = grid * h
     v0 = 1.
 
-    start_pos = np.array([0, field[1]/2])
-    ang = 30.
-    amplitude = .4
-    mu = field * [.5, .5]
-    cov_mat = np.diag([.3, .2] * field)**2
-    test = Gaussian_trajectory(
-        amplitude, mu, cov_mat, grid, h, start_pos, ang, v0)
+    # # general test
+    # start_pos = np.array([0, field[1]/2])
+    # ang = 30.
     # test = Const_trajectory(np.array([0., 0.]), grid, h, start_pos, ang, v0)
-    test.integrate()
-    fig = plt.figure()
-    # test.draw_trajectory(fig, potential=True)
-    # imshow has the origin at the top left
-    linewidth = 5
-    pxls = test.to_image(linewidth)
-    print(pxls.shape)
-    plt.imshow(pxls, interpolation='Nearest', cmap='Blues', vmin=0, vmax=1,
-               extent=(0, field[0], 0, field[1]))
-    plt.colorbar()
-    plt.savefig('test_trajectory.png')
+    # # amplitude = .4
+    # # mu = field * [.5, .5]
+    # # cov_mat = np.diag([.3, .2] * field)**2
+    # # test = Gaussian_trajectory(
+    # #     amplitude, mu, cov_mat, grid, h, start_pos, ang, v0)
+
+    # test.integrate()
+    # fig = plt.figure()
+    # # test.draw_trajectory(fig, potential=True)
+    # # imshow has the origin at the top left
+    # linewidth = 5
+    # pxls = test.to_image(linewidth)
+    # print(pxls.shape)
+    # plt.imshow(pxls, interpolation='Nearest', cmap='Blues', vmin=0, vmax=1,
+    #            extent=(0, field[0], 0, field[1]))
+    # plt.colorbar()
+    # plt.savefig('test_trajectory.png')
+
+    # test initialisation
+    start_pos = np.linspace(0, field[1], 5)
+    angles_lower, angles_upper = get_angle_range(start_pos, field[0], field[1])
+    fig, ax = plt.subplots()
+    for pos, al, au in zip(start_pos, angles_lower, angles_upper):
+        # draw line for lower and upper limit for angle
+        test = Const_trajectory(np.array([0., 0.]), grid, h, [0, pos], al, v0)
+        test.integrate()
+        test.draw_trajectory(ax, potential=True, color='C0')
+
+        test = Const_trajectory(np.array([0., 0.]), grid, h, [0, pos], au, v0)
+        test.integrate()
+        test.draw_trajectory(ax, potential=True, color='C1')
+    fig.savefig('test_init.png')
 
 
 def main(grid_dict, pot_dict, kink_dict):
@@ -174,7 +222,10 @@ if __name__ == '__main__':
     # main(grid_dict, pot_dict, kink_dict)
 
     # Pong
-    generate_data([48, 36], pot_str='pong', linewidth=5., fname='thick_pong')
+    generate_data(10000, 5, 5, [48, 36],
+                  pot_str='pong', linewidth=5., fname='test')
+
+    # test()
 
     # # Knick
     # # first dataset had random pos between 1/3 and 2/3 and ampl=.5, sigma=.2
