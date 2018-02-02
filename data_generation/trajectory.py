@@ -222,7 +222,7 @@ class Coulomb_trajectory(Trajectory):
 class Const_trajectory(Trajectory):
     def __init__(self, gradient, *args, **kwargs):
         super(Const_trajectory, self).__init__(*args, **kwargs)
-        self.grad = gradient
+        self.grad = np.array(gradient)
 
     def pot_fct(self, x, y):
         return self.grad[0]*x + self.grad[1]*y
@@ -238,7 +238,7 @@ class Gaussian_trajectory(Trajectory):
         self.amplitude = amplitude
         # store the inverse covariance matrix
         self.inv_covmat = np.linalg.inv(cov_mat)
-        self.mu = mu
+        self.mu = np.array(mu)
 
     def pot_fct(self, x, y):
         if type(x) is np.ndarray:
