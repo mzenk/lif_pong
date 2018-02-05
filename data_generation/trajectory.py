@@ -159,7 +159,7 @@ class Trajectory:
         # # combine them to grid
         # self.pixels += gy.T.dot(gx)
 
-    def to_image(self, linewidth=1.):
+    def to_image(self, linewidth=1., dist_exponent=2.):
         # need to add pixels on top/bottom to fit the linewidth inside
         # if linewidth/2 is not an integer, the excess pieces are cut away
         extra_y = int(.5*linewidth)
@@ -177,7 +177,7 @@ class Trajectory:
                 min_dist = np.min(np.linalg.norm(self.trace - [x, y], axis=1))
                 # print(min_dist)
                 pixelarr[i, j] = soft_assignment(
-                    min_dist, .5*linewidth*self.grid_spacing)
+                    min_dist, .5*linewidth*self.grid_spacing, dist_exponent)
 
         return pixelarr[::-1]
 
@@ -186,11 +186,11 @@ def hard_assignment(dist, threshold):
     return 1.*(dist <= threshold)
 
 
-def soft_assignment(dist, threshold, order=2.):
+def soft_assignment(dist, threshold, dist_exponent):
     if dist > threshold:
         return 0
     else:
-        return np.power((threshold - dist)/threshold, 1./order)
+        return np.power((threshold - dist)/threshold, dist_exponent)
 
 
 # class for r^-1 potential

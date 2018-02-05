@@ -6,8 +6,7 @@ import os
 import sys
 import lif_pong.training.rbm as rbm_pkg
 from lif_pong.utils.data_mgmt import make_data_folder, load_images, get_rbm_dict
-from lif_pong.utils import get_windowed_image_index
-from gibbs_window_expt import run_simulation, Clamp_window, Clamp_anything
+from gibbs_clamped_sampling import run_simulation, Clamp_window, Clamp_anything
 
 
 # pong pattern completion

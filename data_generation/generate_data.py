@@ -160,9 +160,10 @@ def generate_data_old(num_train, num_valid, num_test, grid, pot_str='pong',
     plt.savefig('mean_image.png')
     return data, labels
 
+
 def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
-                  pot_dict=None, kink_dict=None, linewidth=1., save_name=None,
-                  seed=7491055):
+                  pot_dict=None, kink_dict=None, linewidth=1., dist_exponent=2.,
+                  save_name=None, seed=7491055):
     # c = potential scale; h = grid spacing for pixeled image
     # actually, distinguishing grid and field may be unnecessary since we don't
     # care about physics here, i.e. realistic length scales
@@ -222,7 +223,7 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
                                        np.array([0, init_pos]), init_angle, v0,
                                        kink_dict=kink_dict)
         traj.integrate()
-        traj_pxls = traj.to_image(linewidth)
+        traj_pxls = traj.to_image(linewidth, dist_exponent)
         img_shape = traj_pxls.shape
         data.append(traj_pxls.flatten())
         impact_points[i] = traj.trace[-1, 1]

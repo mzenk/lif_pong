@@ -53,7 +53,17 @@ def get_data_path(source_script_name):
     return data_path
 
 
-def load_images(data_name):
+def load_images(data_name, path=False):
+    if path:
+        with np.load(data_name) as d:
+            if len(d.keys()) == 1:
+                train_set, valid_set, test_set = d[d.keys()[0]]
+            else:
+                train_set = (d['train_data'], d['train_labels'])
+                valid_set = (d['valid_data'], d['valid_labels'])
+                test_set = (d['test_data'], d['test_labels'])
+        return train_set, valid_set, test_set
+
     path = ''
     if socket.gethostname() == 'asdf':
         path = os.path.expanduser('~/mnt/hel_mnt/shared_data/datasets')

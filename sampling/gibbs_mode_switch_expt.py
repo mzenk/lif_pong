@@ -5,10 +5,11 @@ from __future__ import print_function
 import numpy as np
 import yaml
 import sys
-import expt_analysis as analysis
 import lif_pong.training.rbm as rbm_pkg
-from lif_pong.utils.data_mgmt import load_images, get_rbm_dict
-from gibbs_clamped_sampling import Clamp_window, run_simulation
+from lif_pong.utils import get_windowed_image_index
+from lif_pong.utils.data_mgmt import get_rbm_dict, load_images
+from gibbs_clamped_sampling import run_simulation, Clamp_anything
+from expt_analysis import mode_switch_analysis
 
 
 def main(data_set, rbm, general_dict, analysis_dict):
@@ -18,42 +19,54 @@ def main(data_set, rbm, general_dict, analysis_dict):
     rbm.set_seed(general_dict['seed'])
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
-    winsize = general_dict['winsize']
     gather_data = general_dict['gather_data']
+
+    if 'init_time' in general_dict.keys():
+        init_time = general_dict['init_time']
+    else:
+        init_time = 10
 
     if 'binary' in general_dict.keys():
         binary = general_dict['binary']
     else:
         binary = False
 
-    # mainly for testing
-    if 'continuous' in general_dict.keys():
-        continuous = general_dict['continuous']
-    else:
-        continuous = True
-
     if 'bin_imgs' in general_dict.keys():
         bin_imgs = general_dict['bin_imgs']
     else:
         bin_imgs = False
-
-    duration = (img_shape[1] + 1) * n_samples
-    clamp = Clamp_window(img_shape, n_samples, winsize)
 
     try:
         with np.load('samples.npz') as d:
             samples = d['samples']
     except Exception:
         if gather_data:
-            print('Running gibbs simulation for instances {} to {}'
-                  ''.format(start, end))
+            # clamp whole picture for short time
+            refresh_times = [0.]
+            clamp_idx = [np.arange(np.prod(img_shape))]
+            clamp = Clamp_anything(refresh_times, clamp_idx)
             clamped_imgs = data_set[0][start:end]
-            # clamped_imgs = (data_set[0][start:end] > .5)*1.
-            vis_samples, hid_samples = run_simulation(
-                rbm, duration, clamped_imgs, binary=binary,
+            tmp_vis, tmp_hid = run_simulation(
+                rbm, init_time, clamped_imgs, binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp,
-                continuous=continuous, bin_imgs=bin_imgs)
+                bin_imgs=bin_imgs)
 
+            # clamp part of other picture for long time
+            refresh_times = [0.]
+            clamp_idx = [get_windowed_image_index(
+                img_shape, general_dict['fraction'], fractional=True)]
+            clamp = Clamp_anything(refresh_times, clamp_idx)
+            # just take next image in the set (which is randomly shuffled)
+            clamped_imgs = data_set[0][(start + 1) % len(data_set[0]):
+                                      (end + 1) % len(data_set[0])]
+            vis_samples, hid_samples = run_simulation(
+                rbm, n_samples, clamped_imgs, binary=binary,
+                burnin=0., clamp_fct=clamp,
+                bin_imgs=bin_imgs, v_init=tmp_vis[-1])
+
+            vis_samples = np.concatenate((tmp_vis, vis_samples), axis=0)
+            hid_samples = np.concatenate((tmp_hid, hid_samples), axis=0)
+            
             # hidden samples are only saved in binary format due to file size
             if binary:
                 samples = np.concatenate((vis_samples, hid_samples), axis=2)
@@ -70,8 +83,7 @@ def main(data_set, rbm, general_dict, analysis_dict):
             print('Missing sample file', file=sys.stderr)
             samples = None
     # produce analysis file
-    return analysis.inf_speed_analysis(samples, data_set=data_set,
-                                       **analysis_dict)
+    mode_switch_analysis()
 
 
 if __name__ == '__main__':

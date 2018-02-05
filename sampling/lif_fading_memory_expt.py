@@ -5,7 +5,7 @@ import sys
 import yaml
 import numpy as np
 import lif_clamped_sampling as lifsampl
-import lif_chunk_analysis as analysis
+import expt_analysis as analysis
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict
 import lif_pong.training.rbm as rbm_pkg
 

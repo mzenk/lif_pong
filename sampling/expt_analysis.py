@@ -4,6 +4,7 @@ from __future__ import print_function
 import numpy as np
 import yaml
 import sys
+import scipy.ndimage as ndimage
 from lif_pong.utils import average_pool
 from lif_pong.utils.data_mgmt import load_images
 import pong_agent
@@ -92,6 +93,31 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2,
 
     return anadict
 
+# analysis for dreaming experiments
+def burnin_analysis(vis_samples):
+    # vis_samples.shape: (n_samples, n_visible)
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    # try getting burn-in by looking for edges in activity
+    mean_activity = vis_samples.squeeze().mean(axis=1)
+    smoothed_signal = ndimage.gaussian_filter1d(mean_activity, 5)
+    sobel_filtered = ndimage.sobel(smoothed_signal)
+    # other option: threshold crossing
+    thresh = .9
+    thresh_crossings = np.where(smoothed_signal > thresh*smoothed_signal.max())[0]
+    fig, ax = plt.subplots(1, 3, figsize=(15, 6))
+    ax[0].plot(mean_activity, '.', label='signal')
+    ax[1].plot(smoothed_signal, '.', label='smoothed')
+    ax[1].plot(ax[1].get_xlim(), 2*[thresh*smoothed_signal.max()], 'C1:')
+    ax[2].plot(sobel_filtered, '.', label='sobel')
+    fig.savefig('activity.png')
+    return {'edge_loc': int(np.argmax(sobel_filtered)),
+            'thresh_crossing': int(thresh_crossings.min())}
+
+def mode_switch_analysis():
+    pass
 
 if __name__ == '__main__':
     # if this is called as an independent analysis script load samples first

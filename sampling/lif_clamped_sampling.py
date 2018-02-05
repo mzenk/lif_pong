@@ -640,12 +640,10 @@ class Clamp_anything(object):
                         'clamp_times={}'.format(t, self.refresh_times))
             return float('inf'), [], []
 
-        # binary_val = np.round(self.clamped_val[i])
         if i < len(self.refresh_times) - 1:
             dt = self.refresh_times[i + 1] - t
         else:
             dt = float('inf')
-        # return dt, self.clamped_idx[i], binary_val.astype(float)
         return dt, self.clamped_idx[i], self.clamped_val[i]
 
 
@@ -662,7 +660,5 @@ class Clamp_window(object):
         clamped_idx = get_windowed_image_index(
             self.clamp_img.shape, end, self.win_size)
         clamped_val = self.clamp_img.flatten()[clamped_idx]
-        # # binarized version
-        # clamped_val = np.round(self.clamp_img.flatten()[clamped_idx])
 
         return self.interval, clamped_idx, clamped_val
