@@ -401,7 +401,8 @@ class RBM(object):
 
     def train(self, train_data, n_epochs=5, batch_size=10, lrate=.01,
               cd_steps=1, persistent=False, cast=False, valid_set=None,
-              momentum=0, weight_cost=1e-5, log_name=None, log_isl=False):
+              momentum=0, weight_cost=1e-5, lrate_decay_time=2000.,
+              log_name=None, log_isl=False):
         # initializations
         n_instances = train_data.shape[0]
         n_batches = int(np.ceil(n_instances/batch_size))
@@ -467,7 +468,7 @@ class RBM(object):
                 update_step = batch_index + n_batches * epoch_index
 
                 # Other lrate schedules are possible
-                lrate = initial_lrate * 2000 / (2000 + update_step)
+                lrate = initial_lrate / (1 + update_step/lrate_decay_time)
 
                 # pick mini-batch randomly; actually
                 # http://leon.bottou.org/publications/pdf/tricks-2012.pdf

@@ -1,7 +1,7 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
-import cPickle
+import os
 from lif_pong.utils import tile_raster_images, to_1_of_c
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict, make_figure_folder
 import rbm as rbm_pkg
@@ -31,7 +31,7 @@ def plot_receptive_fields(rbm, hidden_idx, img_shape, tile_shape=(4, 4),
     ax.tick_params(left='off', right='off', bottom='off',
                    labelleft='off', labelright='off', labelbottom='off')
     fig.tight_layout()
-    plt.savefig(make_figure_folder() + name + '.png')
+    plt.savefig(os.path.join(make_figure_folder(), name + '_filters.png'))
 
 
 def plot_histograms(rbm, name='histo'):
@@ -42,9 +42,10 @@ def plot_histograms(rbm, name='histo'):
     plt.title('Visible weights')
     plt.subplot(122)
     plt.hist(rbm.w[rbm.n_inputs:].flatten(), bins='auto')
+    print(len(rbm.w[rbm.n_inputs:].flatten()))
     plt.title('Label weights')
     plt.tight_layout()
-    plt.savefig(make_figure_folder() + name + '_weights.png')
+    plt.savefig(os.path.join(make_figure_folder(), name + '_weights.png'))
 
     # bias histogram
     plt.figure(figsize=(14, 7))
@@ -56,17 +57,16 @@ def plot_histograms(rbm, name='histo'):
     plt.hist(rbm.hbias, bins='auto')
     plt.title('Hidden biases')
     plt.tight_layout()
-    plt.savefig(make_figure_folder() + name + '_biases.png')
+    plt.savefig(os.path.join(make_figure_folder(), name + '_biases.png'))
 
 
 # Load data -- Pong
-img_shape = (36, 48)
-rbm_name = 'gauss_crbm_new'
+img_shape = (40, 48)
+rbm_name = 'thick_crbm'
 # data_name = 'gauss_var_start{}x{}'.format(*img_shape)
 # train_set, _, test_set = load_images(data_name)
 # assert np.prod(img_shape) == train_set[0].shape[1]
 testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
-
 # RBM-specific plots
 rand_ind = np.random.randint(testrbm.n_hidden, size=16)
 plot_receptive_fields(testrbm, rand_ind, img_shape)

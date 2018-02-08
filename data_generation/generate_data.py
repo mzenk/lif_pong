@@ -19,6 +19,7 @@ def get_angle_range(pos, width, height):
     upper = 180./np.pi * np.arctan((2*height - pos)/width)
     return lower, upper
 
+
 # this method draws states such that only one reflection can occurr for Pong
 def draw_init_states(num, width, height, init_pos=None):
     if init_pos is None:
@@ -32,137 +33,8 @@ def draw_init_states(num, width, height, init_pos=None):
     return init_states
 
 
-def generate_data_old(num_train, num_valid, num_test, grid, pot_str='pong',
-                  fixed_start=False, kink_dict=None, linewidth=1., save_name=None):
-    # c = potential scale; h = grid spacing for pixeled image
-    # actually, distinguishing grid and field may be unnecessary since we don't
-    # care about physics here, i.e. realistic length scales
-    # what does matters is the scale of the potential and the field
-    grid = np.array(grid)
-    h = 1./grid[0]
-    field = grid * h
-    v0 = 1.
-    num_tot = num_train + num_valid + num_test
-
-    if pot_str == 'gauss':
-        # potential parameters
-        amplitude = .4
-        mu = field * [.5, .5]
-        # the units are wrong for the cov. matrix but values were set by eye
-        cov_mat = np.diag([.1, .05] * field)
-
-    # generate sample data set
-    np.random.seed(7491055)
-    if fixed_start:
-        starts = np.repeat([field[1]*.5], num_tot)
-        init_states = draw_init_states(num_tot, field[0], field[1], starts)
-    else:
-        init_states = draw_init_states(num_tot, field[0], field[1])
-
-    data = []
-    impact_points = np.zeros(num_tot)
-    print('Generating trajectories...')
-    for i, s in enumerate(init_states):
-        init_pos = s[0]
-        init_angle =s[1]
-        if pot_str == 'pong':
-            # No forces
-            traj = Const_trajectory(np.array([0., 0.]), grid, h,
-                                    np.array([0, init_pos]), init_angle, v0,
-                                    kink_dict=kink_dict)
-        if pot_str == 'gauss':
-            # Hill in the centre
-            traj = Gaussian_trajectory(amplitude, mu, cov_mat, grid, h,
-                                       np.array([0, init_pos]), init_angle, v0,
-                                       kink_dict=kink_dict)
-        traj.integrate()
-        traj_pxls = traj.to_image(linewidth)
-        img_shape = traj_pxls.shape
-        data.append(traj_pxls.flatten())
-        impact_points[i] = traj.trace[-1, 1]
-
-    data = np.array(data)
-    # shuffle data so that successive samples do not have same start
-    np.random.shuffle(data)
-
-    # add label layer
-    last_col = data.reshape((-1, img_shape[0], img_shape[1]))[..., -1]
-    reflected = np.all(last_col == 0, axis=1)
-    print('{} of {} balls were reflected.'.format(reflected.sum(),
-                                                  data.shape[0]))
-    # last_col = last_col[~reflected]
-    # labels can be overlapping or not
-    labwidth = 0
-    for l in range(3, img_shape[0] + 1):
-        if img_shape[0] % l == 0:
-            labwidth = l
-            break
-    if labwidth > 5:
-        print('Label width {} is rather large.'.format(labwidth), file=sys.stderr)
-    labels = average_pool(last_col, labwidth, labwidth)
-    # label prob should be normalized
-    z = np.sum(labels, axis=1)
-    z[z == 0] = 1
-    labels /= np.expand_dims(z, 1)
-
-    if save_name is not None:
-        train_data = data[:num_train]
-        train_labels = labels[:num_train]
-        valid_data = data[num_train:-num_test]
-        valid_labels = labels[num_train:-num_test]
-        test_data = data[-num_test:]
-        test_labels = labels[-num_test:]
-
-        fname = os.path.join(make_data_folder('datasets', True),
-                             save_name + '{}x{}'.format(*img_shape))
-        np.savez_compressed(fname,
-                            train_data=train_data, train_labels=train_labels,
-                            valid_data=valid_data, valid_labels=valid_labels,
-                            test_data=test_data, test_labels=test_labels)
-        print('Saved data set with {0} samples and image shape {2}x{3}.'
-              '(#labels = {1})'.format(
-              data.shape[0], labels.shape[1], *img_shape))
-
-    # some statistics
-    plt.figure()
-    counts, bins, _ = plt.hist(init_states[:, 1], bins='auto')
-    plt.xlabel('Initial angle')
-    plt.ylabel('#')
-    plt.savefig('angle_dist.png')
-
-    plt.figure()
-    counts, bins, _ = plt.hist(init_states[:, 0], bins='auto')
-    plt.plot([field[1]/2]*2, [0, counts.max()], 'r-')
-    plt.xlim([min(bins.min(), 0), max(bins.max(), field[1])])
-    plt.xlabel('Impact point')
-    plt.ylabel('#')
-    plt.savefig('start_points.png')
-
-    plt.figure()
-    counts, bins, _ = plt.hist(impact_points, bins='auto')
-    plt.plot([field[1]/2]*2, [0, counts.max()], 'r-')
-    plt.xlim([min(bins.min(), 0), max(bins.max(), field[1])])
-    plt.xlabel('Impact point')
-    plt.ylabel('#')
-    # from scipy.stats import gaussian_kde
-    # kernel = gaussian_kde(impact_points)
-    # plt.plot(bins, kernel(bins)*impact_points.size, 'm.')
-    plt.savefig('end_points.png')
-
-    # save histogram dat because it is not available afterwards
-    np.savez(os.path.join(make_data_folder(), save_name + '_stats'),
-             init_pos=init_states[:, 0], init_angles=init_states[:, 1],
-             end_pos=impact_points)
-
-    plt.figure()
-    plt.imshow(data.mean(axis=0).reshape(img_shape),
-               interpolation='Nearest', cmap='gray')
-    plt.savefig('mean_image.png')
-    return data, labels
-
-
 def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
-                  pot_dict=None, kink_dict=None, linewidth=1., dist_exponent=2.,
+                  pot_dict=None, kink_dict=None, linewidth=1., dist_exponent=1.,
                   save_name=None, seed=7491055):
     # c = potential scale; h = grid spacing for pixeled image
     # actually, distinguishing grid and field may be unnecessary since we don't
@@ -239,13 +111,10 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
                                                   data.shape[0]))
     # last_col = last_col[~reflected]
     # labels can be overlapping or not
-    labwidth = 0
-    for l in range(3, img_shape[0] + 1):
-        if img_shape[0] % l == 0:
-            labwidth = l
-            break
-    if labwidth > 5:
-        print('Label width {} is rather large.'.format(labwidth), file=sys.stderr)
+    labwidth = 3
+    if last_col.shape[1] % labwidth != 0:
+        print('Setting label width = 3, although number of pixels is not'
+              ' a multiple of 3.', file=sys.stderr)
     labels = average_pool(last_col, labwidth, labwidth)
     # label prob should be normalized
     z = np.sum(labels, axis=1)

@@ -159,7 +159,7 @@ class Trajectory:
         # # combine them to grid
         # self.pixels += gy.T.dot(gx)
 
-    def to_image(self, linewidth=1., dist_exponent=2.):
+    def to_image(self, linewidth=1., dist_exponent=1.):
         # need to add pixels on top/bottom to fit the linewidth inside
         # if linewidth/2 is not an integer, the excess pieces are cut away
         extra_y = int(.5*linewidth)
