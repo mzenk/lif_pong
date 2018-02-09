@@ -5,6 +5,7 @@ import pyNN.nest as sim
 import numpy as np
 from scipy.optimize import curve_fit
 import cPickle
+import os
 from lif_pong.utils.data_mgmt import make_figure_folder, make_data_folder, get_data_path
 from stp_theory import compute_ru_envelope, r_theory
 from neuron_parameters import *
@@ -62,7 +63,7 @@ def get_samples(spiketrains, dt, tau_refrac, duration):
 
 def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
                   synweight=.1, tso_params=None, dt=.1, spike_interval=1.,
-                  bias=0., savename='test', store_vmem=False):
+                  bias=0., savename='test', store_vmem=False, clamp_offset=0.):
     '''
         Run a simple experiment with the following setup
         populations:
@@ -96,7 +97,7 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
         population.record(['spikes'])
 
     # setup spiking input
-    spike_times = numpy.arange(dt, duration, spike_interval)
+    spike_times = numpy.arange(clamp_offset + dt, duration, spike_interval)
     spike_source = sim.Population(
         1, sim.SpikeSourceArray(spike_times=spike_times))
     inh_spike_source = sim.Population(
@@ -147,7 +148,7 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
     samples = \
         get_samples(spiketrains, dt, neuron_params['tau_refrac'], duration)
 
-    with open(make_data_folder() + savename + '.pkl', 'w') as f:
+    with open(os.path.join(make_data_folder(), savename + '.pkl'), 'w') as f:
         if store_vmem:
             vmem = population.get_data().segments[0].filter(name='v')[0]
             if not cuba:
@@ -192,7 +193,7 @@ def get_calibration(leak_potentials, duration, neuron_params, noise_params,
     spiketrains = population.get_data().segments[0].spiketrains
     samples = \
         get_samples(spiketrains, dt, neuron_params['tau_refrac'], duration)
-    with open(make_data_folder() + 'calibration.pkl', 'w') as f:
+    with open(os.path.join(make_data_folder(), 'calibration.pkl'), 'w') as f:
         cPickle.dump({'samples': samples, 'E_l': leak_potentials,
                       'vmem': vmem.magnitude}, f)
 
@@ -212,8 +213,9 @@ def plot_w_vs_activation(filenames):
         plt.plot(weights, p_on[i], '.', label=fn)
         # fit
         fit_mask = np.logical_and(p_on[i] > .05, p_on[i] < .95)
-        assert np.any(fit_mask), \
-            'Range of data: [{}, {}]'.format(p_on.min(), p_on.max())
+        if not np.any(fit_mask):
+            print('Range of data: [{}, {}]'.format(p_on.min(), p_on.max()))
+            fit_mask = np.logical_not(fit_mask)
         x_fit = weights[fit_mask]
         y_fit = p_on[i][fit_mask]
         p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
@@ -223,7 +225,7 @@ def plot_w_vs_activation(filenames):
 
     plt.legend()
     plt.tight_layout()
-    plt.savefig(make_figure_folder() + 'w_vs_act.png')
+    plt.savefig(os.path.join(make_figure_folder(), 'w_vs_act.png'))
 
 
 def plot_activation_fct(data_file, config_file):
@@ -243,15 +245,16 @@ def plot_activation_fct(data_file, config_file):
     plt.plot(v_rests, sigma_fct(v_rests, *sbs_popt), label='sbs')
     # fit
     fit_mask = np.logical_and(p_on > .05, p_on < .95)
-    assert np.any(fit_mask), \
-        'Range of data: [{}, {}]'.format(p_on.min(), p_on.max())
+    if not np.any(fit_mask):
+        print('Range of data: [{}, {}]'.format(p_on.min(), p_on.max()))
+        fit_mask = np.logical_not(fit_mask)
     x_fit = v_rests[fit_mask]
     y_fit = p_on[fit_mask]
     p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
     popt, pcov = curve_fit(sigma_fct, x_fit, y_fit, p0=p0)
     plt.plot(x_fit, sigma_fct(x_fit, *popt), label='fit')
 
-    plt.savefig(make_figure_folder() + 'act_fct.png')
+    plt.savefig(os.path.join(make_figure_folder(), 'act_fct.png'))
 
 
 def plot_vmem_dist(data_file):
@@ -265,7 +268,7 @@ def plot_vmem_dist(data_file):
     plt.ylabel('Count')
     for i, v in enumerate(vmem):
         plt.hist(v, bins='auto', alpha=.6, label='E_l='.format(v_rests[i]))
-    plt.savefig(make_figure_folder() + 'vmem_dist.png')
+    plt.savefig(os.path.join(make_figure_folder(), 'vmem_dist.png'))
 
 
 def plot_bias_comparison(data_files, biases=None, savename=None):
@@ -289,8 +292,9 @@ def plot_bias_comparison(data_files, biases=None, savename=None):
         p_on = samples.mean(axis=0)
         # fit
         fit_mask = np.logical_and(p_on > .05, p_on < .95)
-        assert np.any(fit_mask), \
-            'Range of data: [{}, {}]'.format(p_on.min(), p_on.max())
+        if not np.any(fit_mask):
+            print('Range of data: [{}, {}]'.format(p_on.min(), p_on.max()))
+            fit_mask = np.logical_not(fit_mask)
         x_fit = weights[fit_mask]
         y_fit = p_on[fit_mask]
         p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
@@ -304,7 +308,7 @@ def plot_bias_comparison(data_files, biases=None, savename=None):
     norm = mpl.colors.Normalize(vmin=min(biases), vmax=max(biases))
     cb1 = mpl.colorbar.ColorbarBase(ax1c, cmap=cmap, norm=norm)
     cb1.set_label('Bias')
-    plt.savefig(make_figure_folder() + 'all_activations.png')
+    plt.savefig(os.path.join(make_figure_folder(), 'all_activations.png'))
 
     assert len(biases) != 0
     fit_params = np.array(fit_params)
@@ -313,11 +317,11 @@ def plot_bias_comparison(data_files, biases=None, savename=None):
     fig2, ax2 = plt.subplots()
     ax2.errorbar(biases, fit_params[:, 0], fmt='.',
                  yerr=np.sqrt(fit_covs[:, 0, 0]))
-    ax2.plot(biases, pcoeff[0]*np.array(biases)  + pcoeff[1])
+    ax2.plot(biases, pcoeff[0]*np.array(biases) + pcoeff[1])
     ax2.set_xlabel('bias')
     ax2.set_ylabel('wp05')
     plt.tight_layout()
-    plt.savefig(make_figure_folder() + 'biases_wp05.png')
+    plt.savefig(os.path.join(make_figure_folder(), 'biases_wp05.png'))
 
     fig3, ax3 = plt.subplots()
     ax3.errorbar(biases, fit_params[:, 1], fmt='.',
@@ -325,7 +329,7 @@ def plot_bias_comparison(data_files, biases=None, savename=None):
     ax3.set_xlabel('bias')
     ax3.set_ylabel('alpha')
     plt.tight_layout()
-    plt.savefig(make_figure_folder() + 'biases_alpha.png')
+    plt.savefig(os.path.join(make_figure_folder(), 'biases_alpha.png'))
 
     # save fit parameters
     if savename is not None:
@@ -368,7 +372,7 @@ def analyse_sweep(filenames, n_avg=20, filterlength=20):
     plt.errorbar(weights*clamp_tso_params['U']*.2, p_stat, yerr=p_stat_std, fmt='.')
     plt.xlabel('Weight')
     plt.ylabel('Stationary activity')
-    plt.savefig(make_figure_folder() + 'pstat.png')
+    plt.savefig(os.path.join(make_figure_folder(), 'pstat.png'))
     return (p_stat, p_stat_std)
 
 
@@ -386,7 +390,7 @@ def plot_time_evolution(data_file, tso_params=None, kwargs=None):
         # assuming file contains multiple runs of same exp't -> average
         p_on = samples.mean(axis=1)
         plt.plot(np.linspace(0, 10*len(samples), len(p_on)), p_on, '.',
-                 label='Weight {}'.format(i))
+                 label='Weight {}'.format(i), alpha=.8)
 
         if tso_params is not None and kwargs is not None:
             tau_syn = 10.
@@ -402,7 +406,7 @@ def plot_time_evolution(data_file, tso_params=None, kwargs=None):
                  sigma_fct(w_theo, kwargs['wp05'], kwargs['alpha']), 'k:',
                  linewidth=2)
 
-    plt.savefig(make_figure_folder() + 'decay.png')
+    plt.savefig(os.path.join(make_figure_folder(), 'decay.png'))
 
 
 def plot_vg_traces(data_files, duration):
@@ -443,7 +447,7 @@ def plot_vg_traces(data_files, duration):
         ax[2].set_ylabel('g_syn (inh)')
         ax[3].set_ylabel('neuron index')
         ax[3].set_xlabel('time')
-        plt.savefig(make_figure_folder() + 'traces{}.png'.format(i))
+        plt.savefig(os.path.join(make_figure_folder(), 'traces{}.png'.format(i)))
 
 
 def save_calib_fit(data_file):
@@ -454,13 +458,14 @@ def save_calib_fit(data_file):
     p_on = samples.mean(axis=0)
     # fit
     fit_mask = np.logical_and(p_on > .05, p_on < .95)
-    assert np.any(fit_mask), \
-        'Range of data: [{}, {}]'.format(p_on.min(), p_on.max())
+    if not np.any(fit_mask):
+        print('Range of data: [{}, {}]'.format(p_on.min(), p_on.max()))
+        fit_mask = np.logical_not(fit_mask)
     x_fit = weights[fit_mask]
     y_fit = p_on[fit_mask]
     p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
     popt, pcov = curve_fit(sigma_fct, x_fit, y_fit, p0=p0)
-    np.savez(make_data_folder() + data_file + '_fit', popt=popt, pcov=pcov)
+    np.savez(os.path.join(make_data_folder(), data_file + '_fit'), popt=popt, pcov=pcov)
 
 
 def sigma_fct(x, x0, alpha):
@@ -480,7 +485,7 @@ if __name__ == '__main__':
 
     clamp_tso_params = {
         "U": .002,
-        "tau_rec": 2500.,
+        "tau_rec": 8000.,
         "tau_fac": 0.,
         "weight": 0.*1000.
     }
@@ -501,41 +506,43 @@ if __name__ == '__main__':
     #               synweight=weights, tso_params=renewing_tso_params,
     #               savename='renewing', store_vmem=True)
 
-    # calibrate for zero bias:
-    duration = 1e5
-    n_neurons = 200
-    savename = 'wei_calib_data'
-    weights = np.linspace(-.008, .008, n_neurons)
-    clamping_expt(n_neurons, duration, neuron_params, noise_params, config_file,
-                  synweight=weights, tso_params=renewing_tso_params,
-                  savename=savename)
-    save_calib_fit(savename)
+    # # calibrate for zero bias:
+    # duration = 1e5
+    # n_neurons = 200
+    # savename = 'wei_calib_data'
+    # weights = np.linspace(-.008, .008, n_neurons)
+    # clamping_expt(n_neurons, duration, neuron_params, noise_params, config_file,
+    #               synweight=weights, tso_params=renewing_tso_params,
+    #               savename=savename)
+    # save_calib_fit(savename)
 
-    # duration = 5e4
+    # duration = 1e5
     # n_neurons = 200
     # biases = np.linspace(-5, 1, 20)
     # for i, b in enumerate(biases):
-    #     weights = np.linspace(-.05, .07, n_neurons)
+    #     weights = np.linspace(-.03, .03, n_neurons)
     #     clamping_expt(n_neurons, duration, neuron_params, noise_params, config_file,
     #                   synweight=weights, tso_params=renewing_tso_params,
-    #                   bias=b, spike_interval=1., savename='wei_biases{}'.format(i))
+    #                   bias=b, savename='wei_biases{}'.format(i))
 
     # duration = 1e4
     # n_neurons = 100
     # leak_potentials = np.linspace(-50.1, -49.9, n_neurons)
     # get_calibration(leak_potentials, duration, neuron_params, noise_params)
 
-    # # activity for depressing synapse
-    # n_neurons = 300
-    # duration = 2000.
-    # spike_interval = 1.
-    # wrange = np.linspace(.01, .1, 10)
-    # for i, w in enumerate(wrange):
-    #         clamping_expt(n_neurons, duration, neuron_params, noise_params,
-    #                       config_file, synweight=w,
-    #                       tso_params=clamp_tso_params,
-    #                       spike_interval=spike_interval,
-    #                       savename='wscan_depr{}'.format(i))
+    # activity for depressing synapse
+    n_neurons = 500
+    clamp_offset = 400.
+    duration = 2000. + clamp_offset
+    spike_interval = 1.
+    wrange = np.linspace(.001, .01, 10)
+    for i, w in enumerate(wrange):
+            clamping_expt(n_neurons, duration, neuron_params, noise_params,
+                          config_file, synweight=w, dt=.01,
+                          tso_params=clamp_tso_params,
+                          spike_interval=spike_interval,
+                          savename='wscan_wei{}'.format(i),
+                          clamp_offset=clamp_offset)
 
     # === Plot a figure =============================
 
@@ -545,36 +552,33 @@ if __name__ == '__main__':
     # analysis of time evolution --- under construction
     # analyse_sweep(['wscan_depr{}.pkl'.format(i) for i in range(20)], n_avg=30)
 
-    # # # t vs p_on given synaptic weight
-    # filenames = ['wscan_depr{}.pkl'.format(i) for i in range(10)]
-    # with np.load('calibrations/dt1ms_calib.npz') as d:
-    #     wp05 = d['wp05']
-    #     alpha = d['alpha']
-    # d = np.load('calibrations/nu1_calib_data_fit.npz')
-    # wp05 = d['popt'][0]
-    # alpha = d['popt'][1]
-    # d.close()
+    # # t vs p_on given synaptic weight
+    filenames = ['wscan_wei{}.pkl'.format(i) for i in range(0, 10, 2)]
+    with np.load('calibrations/wei_curr_clampcalib.npz') as d:
+        wp05 = d['wp05']
+        alpha = d['alpha']
+
     # print(4*alpha + wp05)
-    # exp_kwargs = {
-    #     'spike_times': numpy.arange(.1, 2000, 1.),
-    #     'spike_interval': 1.,
-    #     'wp05': wp05,
-    #     'alpha': alpha
-    # }
-    # plot_time_evolution(filenames, clamp_tso_params, exp_kwargs)
+    exp_kwargs = {
+        'spike_times': numpy.arange(clamp_offset + .01, duration, 1.),
+        'spike_interval': 1.,
+        'wp05': wp05,
+        'alpha': alpha
+    }
+    plot_time_evolution(filenames, clamp_tso_params, exp_kwargs)
 
     # # activation fct w/o external input
     # fn = 'calibration.pkl'
     # plot_activation_fct(fn, config_file)
     # plot_vmem_dist(fn)
 
-    # weight vs p_on
-    filenames = ['wei_calib_data.pkl']
-    plot_w_vs_activation(filenames)
+    # # weight vs p_on
+    # filenames = ['wei_calib_data.pkl']
+    # plot_w_vs_activation(filenames)
 
     # # bias expt
     # filenames = ['wei_biases{}.pkl'.format(i) for i in range(20)]
-    # b1, fp1, fc1 = plot_bias_comparison(filenames)
+    # b1, fp1, fc1 = plot_bias_comparison(filenames, savename='wei_curr_clampcalib')
     # filenames = ['bias{}.pkl'.format(i) for i in range(20)]
     # b2, fp2, fc2 = plot_bias_comparison(filenames)
 
@@ -585,7 +589,7 @@ if __name__ == '__main__':
     # ax2.set_ylabel('wp05')
     # plt.legend()
     # plt.tight_layout()
-    # plt.savefig(make_figure_folder() + 'biases_wp05.png')
+    # plt.savefig(os.path.join(make_figure_folder(), 'biases_wp05.png'))
     # fig3, ax3 = plt.subplots()
     # ax3.errorbar(b1, fp1[:, 1], fmt='.', yerr=np.sqrt(fc1[:, 1, 1]), label='1ms')
     # ax3.errorbar(b2, fp2[:, 1], fmt='.', yerr=np.sqrt(fc2[:, 1, 1]), label='10ms')
@@ -593,4 +597,4 @@ if __name__ == '__main__':
     # ax3.set_ylabel('alpha')
     # plt.legend()
     # plt.tight_layout()
-    # plt.savefig(make_figure_folder() + 'biases_alpha.png')
+    # plt.savefig(os.path.join(make_figure_folder(), 'biases_alpha.png'))

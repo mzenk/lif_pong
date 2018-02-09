@@ -61,6 +61,10 @@ def w_stat(tau_fac, U0, tau_rec=300.):
     return r_stat(us, tau_rec) * us/U0
 
 
+def decay_const(U0, tau_rec, dt_spike):
+    return 1./tau_rec - np.log(1 - U0)/dt_spike
+
+
 def param_plot(attenuation_factor, clamp_duration, spike_interval=1.):
     def lower_bound_u(tau_rec):
         return (1/attenuation_factor - 1)*(np.exp(spike_interval/tau_rec) - 1)
@@ -129,25 +133,43 @@ if __name__ == '__main__':
     # ax.set_ylim(ymin=0)
     # plt.savefig('u_comparison.pdf')
 
-    # # scan parameter region (stationary value)
-    # tf_range = np.linspace(0., 2000, 100)
-    # u0_range = np.linspace(.5e-1, 2e-1, 100)
-    # # ws = w_stat(400., u0_range)
-    # # plt.plot(u0_range, ws, '.')
-    # mtf, mu0 = np.meshgrid(tf_range, u0_range)
-    # plt.imshow(w_stat(mtf, mu0), interpolation='Nearest', cmap=plt.cm.viridis,
-    #            origin='lower', aspect='auto',
-    #            extent=(min(tf_range), max(tf_range), min(u0_range), max(u0_range)))
-    # plt.xlabel('tau_fac')
-    # plt.ylabel('U0')
-    # plt.colorbar()
-    # plt.savefig('scan.png')
+    # scan parameter region (stationary value)
+    spike_interval = 1.
+    n_points = 50
+    start_tr = 1
+    stop_tr = 4
+    start_u0 = -4
+    stop_u0 = 0
+    tr_logrange = np.logspace(start_tr, stop_tr, n_points)
+    u0_logrange = np.logspace(start_u0, stop_u0, n_points)
+    tr_grid, u0_grid = np.meshgrid(tr_logrange, u0_logrange)
+    # actually must shift in log space but i'm too stupid
+    # vecx = np.logspace(start_tr, stop_tr, n_points + 1) / \
+    #     (tr_logrange.max() - tr_logrange.min())**(.5/n_points)
+    # vecy = np.logspace(start_u0, stop_u0, n_points + 1) / \
+    #     (u0_logrange.max() - u0_logrange.min())**(.5/n_points)
+    r_stat_grid = r_stat(u0_grid, tr_grid, dt_spike=spike_interval)
+    decay_time_grid = 1/decay_const(u0_grid, tr_grid, dt_spike=spike_interval)
 
-    # parameter choice
-    attenuation_factor = np.linspace(.01, .1, 5)
-    clamp_duration = np.linspace(500., 2000., 5)
-    # clamp_duration = [2000.]
-    for cd in clamp_duration:
-        for att in attenuation_factor:
-            param_plot(att, cd, spike_interval=1.)
-    plt.savefig('params.png')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
+    im1 = ax1.pcolormesh(tr_logrange, u0_logrange, r_stat_grid, vmin=0, vmax=1)
+    im2 = ax2.pcolormesh(tr_logrange, u0_logrange, decay_time_grid)
+    ax1.set_xscale('log')
+    ax1.set_yscale('log')
+    ax2.set_xscale('log')
+    ax2.set_yscale('log')
+
+    ax1.set(xlabel='tau_rec', ylabel='U')
+    ax2.set(xlabel='tau_rec', ylabel='U')
+    plt.colorbar(im1, ax=ax1)
+    plt.colorbar(im2, ax=ax2)
+    plt.savefig('param_logscan.png')
+
+    # # parameter choice
+    # attenuation_factor = np.linspace(.01, .1, 5)
+    # clamp_duration = np.linspace(500., 2000., 5)
+    # # clamp_duration = [2000.]
+    # for cd in clamp_duration:
+    #     for att in attenuation_factor:
+    #         param_plot(att, cd, spike_interval=1.)
+    # plt.savefig('params.png')
