@@ -26,12 +26,14 @@ def mode_switch_expt(n_samples, imgs, img_shape, rbm, fraction, start, end,
     results = []
 
     for i in range(start, end):
+        # choose different seed for each simulation
+        sbs_kwargs['sim_setup_kwargs'] += i
         # clamp first whole trajectory for a short time, then parts for a while
         refresh_times = [0., n_init*sampling_interval]
         clamp_idx = [np.arange(np.prod(img_shape)), get_windowed_image_index(
             img_shape, fraction, fractional=True)]
-        clamp_val = [imgs[i, clamp_idx[0]],
-                     imgs[(i + 1) % len(imgs), clamp_idx[1]]]
+        clamp_val = [imgs[(i + 1) % len(imgs), clamp_idx[0]],
+                     imgs[i, clamp_idx[1]]]
         clamp_fct = lifsampl.Clamp_anything(refresh_times, clamp_idx, clamp_val)
         bm.spike_data = lifsampl.gather_network_spikes_clamped(
             bm, duration, clamp_fct=clamp_fct, **sbs_kwargs)
@@ -51,7 +53,8 @@ def main(data_set, rbm, general_dict, sbs_dict, analysis_dict):
     fraction = general_dict['fraction']
 
     sim_setup_kwargs = {
-        'rng_seeds_seed': sbs_dict['seed'],
+        # choose different seed for each simulation
+        'rng_seeds_seed': sbs_dict['seed'] + start,
         'threads': general_dict['threads']
     }
 

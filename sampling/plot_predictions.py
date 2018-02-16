@@ -175,7 +175,7 @@ def plot_prediction_error(ax, pred_error, label=None, x_data=None):
     # mean = np.mean(pred_error, axis=0)
     lower_quart = np.percentile(pred_error, 25, axis=0)
     upper_quart = np.percentile(pred_error, 75, axis=0)
-    print('Integral = {}'.format(
+    print('Integral = {:.1f}'.format(
           median[:48].sum()/48.))
 
     # add prediction error curve to plot

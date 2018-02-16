@@ -109,12 +109,15 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
     reflected = np.all(last_col == 0, axis=1)
     print('{} of {} balls were reflected.'.format(reflected.sum(),
                                                   data.shape[0]))
+    with open('refelcted') as f:
+        f.write(yaml.dump(np.nonzero(reflected)[0].tolist()))
     # last_col = last_col[~reflected]
     # labels can be overlapping or not
-    labwidth = 3
+    labwidth = 4
     if last_col.shape[1] % labwidth != 0:
-        print('Setting label width = 3, although number of pixels is not'
-              ' a multiple of 3.', file=sys.stderr)
+        print('Number of pixels is not a multiple of 4. Setting label width = 3',
+              file=sys.stderr)
+        labwidth = 3
     labels = average_pool(last_col, labwidth, labwidth)
     # label prob should be normalized
     z = np.sum(labels, axis=1)

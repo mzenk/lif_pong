@@ -25,7 +25,9 @@ def lif_window_expt(win_size, test_imgs, img_shape, rbm, sbs_kwargs,
         weight_scaling=sbs_kwargs.pop('weight_scaling'))
     results = []
 
-    for img in test_imgs:
+    for i, img in enumerate(test_imgs):
+        # choose different seed for each simulation
+        sbs_kwargs['sim_setup_kwargs']['rng_seeds_seed'] += i
         clamp_fct = lifsampl.Clamp_window(
             clamp_duration, img.reshape(img_shape), win_size)
         bm.spike_data = lifsampl.gather_network_spikes_clamped(
@@ -46,7 +48,8 @@ def main(data_set, rbm, general_dict, sbs_dict, analysis_dict):
     winsize = general_dict['winsize']
 
     sim_setup_kwargs = {
-        'rng_seeds_seed': sbs_dict['seed'],
+        # choose different seed for each simulation
+        'rng_seeds_seed': sbs_dict['seed'] + start,
         'threads': general_dict['threads']
     }
 
