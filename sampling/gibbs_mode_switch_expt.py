@@ -45,7 +45,10 @@ def main(data_set, rbm, general_dict, analysis_dict):
             refresh_times = [0.]
             clamp_idx = [np.arange(np.prod(img_shape))]
             clamp = Clamp_anything(refresh_times, clamp_idx)
-            clamped_imgs = data_set[0][start:end]
+            # just take neighbouring image in the set (is randomly shuffled)
+            # as initialisation
+            clamped_imgs = data_set[0][(start + 1) % len(data_set[0]):
+                                       (end + 1) % len(data_set[0])]
             tmp_vis, tmp_hid = run_simulation(
                 rbm, init_time, clamped_imgs, binary=binary,
                 burnin=general_dict['burn_in'], clamp_fct=clamp,
@@ -56,9 +59,7 @@ def main(data_set, rbm, general_dict, analysis_dict):
             clamp_idx = [get_windowed_image_index(
                 img_shape, general_dict['fraction'], fractional=True)]
             clamp = Clamp_anything(refresh_times, clamp_idx)
-            # just take next image in the set (which is randomly shuffled)
-            clamped_imgs = data_set[0][(start + 1) % len(data_set[0]):
-                                      (end + 1) % len(data_set[0])]
+            clamped_imgs = data_set[0][start:end]
             vis_samples, hid_samples = run_simulation(
                 rbm, n_samples, clamped_imgs, binary=binary,
                 burnin=0., clamp_fct=clamp,
@@ -66,7 +67,7 @@ def main(data_set, rbm, general_dict, analysis_dict):
 
             vis_samples = np.concatenate((tmp_vis, vis_samples), axis=0)
             hid_samples = np.concatenate((tmp_hid, hid_samples), axis=0)
-            
+
             # hidden samples are only saved in binary format due to file size
             if binary:
                 samples = np.concatenate((vis_samples, hid_samples), axis=2)

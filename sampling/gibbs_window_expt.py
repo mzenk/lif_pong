@@ -15,11 +15,12 @@ def main(data_set, rbm, general_dict, analysis_dict):
     # pass arguments from dictionaries to simulation
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
-    rbm.set_seed(general_dict['seed'])
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
     winsize = general_dict['winsize']
     gather_data = general_dict['gather_data']
+    # take different seed for each chunk so that they are not too similar initially
+    rbm.set_seed(general_dict['seed'] + start)
 
     if 'binary' in general_dict.keys():
         binary = general_dict['binary']

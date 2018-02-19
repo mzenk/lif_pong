@@ -99,10 +99,10 @@ def main(config_dict):
 
     frame_list = []
     n_samples = []
-    for f in sample_files:
+    for i, f in enumerate(sample_files):
         tmp, n = load_samples(
             f, n_imgs, img_shape, n_labels, average=average,
-            show_hidden=show_hidden, savename=savename)
+            show_hidden=show_hidden, savename=savename + '_{:02d}'.format(i))
         frame_list.append(tmp)
         n_samples.append(n)
     assert np.all(np.array(n_samples) == n_samples[0])
