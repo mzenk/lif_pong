@@ -63,7 +63,8 @@ def get_samples(spiketrains, dt, tau_refrac, duration):
 
 def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
                   synweight=.1, tso_params=None, dt=.1, spike_interval=1.,
-                  bias=0., savename='test', store_vmem=False, clamp_offset=0.):
+                  bias=0., savename='test', store_vmem=False, clamp_offset=0.,
+                  burn_in_time=0.):
     '''
         Run a simple experiment with the following setup
         populations:
@@ -74,6 +75,8 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
         - each LIF neuron has poisson input
         - spike sources -> LIF neurons (all2all, tso): synweight (scalar/array)
     '''
+    duration += burn_in_time
+    clamp_offset += burn_in_time
     sim.setup(timestep=dt, spike_precision="on_grid", quit_on_end=False)
     cuba = 'e_rev_E' not in neuron_params.keys()
     # setup samplers
@@ -103,7 +106,11 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
     inh_spike_source = sim.Population(
         1, sim.SpikeSourceArray(spike_times=spike_times))
 
+    accum_corr_exc = 1
+    accum_corr_inh = 1
     if tso_params is None:
+        # do not correct for accumulation with static synapses
+        # (otherwise identical to renewing after burn-in)
         bn_synapse = sim.StaticSynapse()
         weight_factor = 1.
     else:
@@ -111,15 +118,11 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
         bn_synapse = sim.native_synapse_type("avoid_pynn_trying_to_be_smart")(
             **tso_params)
         weight_factor = 1000. / tso_params['U']
-
-    if tso_params['U'] != 1 and \
-            tso_params['tau_rec'] != neuron_params['tau_syn_E']:
-        # need to correct for accumulation
-        accum_corr_exc = 1 - np.exp(-spike_interval/neuron_params['tau_syn_E'])
-        accum_corr_inh = 1 - np.exp(-spike_interval/neuron_params['tau_syn_I'])
-    else:
-        accum_corr_exc = 1
-        accum_corr_inh = 1
+        if tso_params['U'] != 1 or \
+                tso_params['tau_rec'] != neuron_params['tau_syn_E']:
+            # need to correct for accumulation
+            accum_corr_exc = 1 - np.exp(-spike_interval/neuron_params['tau_syn_E'])
+            accum_corr_inh = 1 - np.exp(-spike_interval/neuron_params['tau_syn_I'])
 
     if np.array(synweight).size == 1:
         exc_weights = (synweight > 0)*synweight
@@ -145,10 +148,13 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
 
     # === Save Data ===========================================================
     spiketrains = population.get_data().segments[0].spiketrains
-    samples = \
-        get_samples(spiketrains, dt, neuron_params['tau_refrac'], duration)
+    samples = get_samples(spiketrains, dt, neuron_params['tau_refrac'],
+                          duration)[int(burn_in_time/spike_interval):]
 
     with open(os.path.join(make_data_folder(), savename + '.pkl'), 'w') as f:
+        pynn_weights = synweight*accum_corr_exc
+        if tso_params is not None:
+            pynn_weights /= tso_params['U']
         if store_vmem:
             vmem = population.get_data().segments[0].filter(name='v')[0]
             if not cuba:
@@ -157,17 +163,17 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
 
                 cPickle.dump({'vmem': vmem, 'gsyn_exc': gexc, 'gsyn_inh': ginh,
                               'samples': samples,
-                              'weights': synweight*accum_corr_exc/tso_params['U'],
+                              'weights': pynn_weights,
                               'bias': bias},
                              f)
             else:
                 cPickle.dump({'vmem': vmem, 'samples': samples,
-                              'weights': synweight*accum_corr_exc/tso_params['U'],
+                              'weights': pynn_weights,
                               'bias': bias},
                              f)
         else:
             cPickle.dump({'samples': samples, 'bias': bias,
-                          'weights': synweight*accum_corr_exc/tso_params['U']}, f)
+                          'weights': pynn_weights}, f)
 
     # === Clean up and quit ===================================================
     sim.end()
@@ -198,7 +204,7 @@ def get_calibration(leak_potentials, duration, neuron_params, noise_params,
                       'vmem': vmem.magnitude}, f)
 
 
-def plot_w_vs_activation(filenames):
+def plot_w_vs_activation(filenames, show_fit=True):
     samples = []
     p_on = []
     plt.figure()
@@ -211,17 +217,18 @@ def plot_w_vs_activation(filenames):
             weights = d['weights']
         p_on.append(samples[i].mean(axis=0))
         plt.plot(weights, p_on[i], '.', label=fn)
-        # fit
-        fit_mask = np.logical_and(p_on[i] > .05, p_on[i] < .95)
-        if not np.any(fit_mask):
-            print('Range of data: [{}, {}]'.format(p_on.min(), p_on.max()))
-            fit_mask = np.logical_not(fit_mask)
-        x_fit = weights[fit_mask]
-        y_fit = p_on[i][fit_mask]
-        p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
-        popt, pcov = curve_fit(sigma_fct, x_fit, y_fit, p0=p0)
-        plt.plot(x_fit, sigma_fct(x_fit, *popt), 'C1-', label='fit')
-        plt.plot(weights, sigma_fct(weights, *popt), 'C1--')
+        if show_fit:
+            # fit
+            fit_mask = np.logical_and(p_on[i] > .05, p_on[i] < .95)
+            if not np.any(fit_mask):
+                print('Range of data: [{}, {}]'.format(p_on.min(), p_on.max()))
+                fit_mask = np.logical_not(fit_mask)
+            x_fit = weights[fit_mask]
+            y_fit = p_on[i][fit_mask]
+            p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
+            popt, pcov = curve_fit(sigma_fct, x_fit, y_fit, p0=p0)
+            plt.plot(x_fit, sigma_fct(x_fit, *popt), 'C1-', label='fit')
+            plt.plot(weights, sigma_fct(weights, *popt), 'C1--')
 
     plt.legend()
     plt.tight_layout()
@@ -308,7 +315,7 @@ def plot_bias_comparison(data_files, biases=None, savename=None):
     norm = mpl.colors.Normalize(vmin=min(biases), vmax=max(biases))
     cb1 = mpl.colorbar.ColorbarBase(ax1c, cmap=cmap, norm=norm)
     cb1.set_label('Bias')
-    plt.savefig(os.path.join(make_figure_folder(), 'all_activations.png'))
+    plt.savefig(os.path.join(make_figure_folder(), savename + '_actfct.png'))
 
     assert len(biases) != 0
     fit_params = np.array(fit_params)
@@ -321,7 +328,7 @@ def plot_bias_comparison(data_files, biases=None, savename=None):
     ax2.set_xlabel('bias')
     ax2.set_ylabel('wp05')
     plt.tight_layout()
-    plt.savefig(os.path.join(make_figure_folder(), 'biases_wp05.png'))
+    plt.savefig(os.path.join(make_figure_folder(), savename + '_wp05.png'))
 
     fig3, ax3 = plt.subplots()
     ax3.errorbar(biases, fit_params[:, 1], fmt='.',
@@ -329,7 +336,7 @@ def plot_bias_comparison(data_files, biases=None, savename=None):
     ax3.set_xlabel('bias')
     ax3.set_ylabel('alpha')
     plt.tight_layout()
-    plt.savefig(os.path.join(make_figure_folder(), 'biases_alpha.png'))
+    plt.savefig(os.path.join(make_figure_folder(), savename + '_alpha.png'))
 
     # save fit parameters
     if savename is not None:
@@ -506,7 +513,7 @@ if __name__ == '__main__':
     #               synweight=weights, tso_params=renewing_tso_params,
     #               savename='renewing', store_vmem=True)
 
-    # # calibrate for zero bias:
+    # # # calibrate for zero bias:
     # duration = 1e5
     # n_neurons = 200
     # savename = 'wei_calib_data'
@@ -516,56 +523,88 @@ if __name__ == '__main__':
     #               savename=savename)
     # save_calib_fit(savename)
 
+    # # sweep over biases
     # duration = 1e5
     # n_neurons = 200
     # biases = np.linspace(-5, 1, 20)
     # for i, b in enumerate(biases):
-    #     weights = np.linspace(-.03, .03, n_neurons)
+    #     weights = np.linspace(-.015, .015, n_neurons)
     #     clamping_expt(n_neurons, duration, neuron_params, noise_params, config_file,
     #                   synweight=weights, tso_params=renewing_tso_params,
-    #                   bias=b, savename='wei_biases{}'.format(i))
+    #                   bias=b, spike_interval=1.,
+    #                   savename='cuba_dt1_pretty_{:02d}'.format(i))
+
+    # # frequency sweep --- use static synapses!
+    # duration = 1e5
+    # n_neurons = 200
+    # savename = 'frequency_sweep'
+    # weights = np.linspace(-.01, .01, n_neurons)
+    # frequencies = np.linspace(0.05, 1, 8)  # in kHz
+    # for i, freq in enumerate(frequencies):
+    #     clamping_expt(n_neurons, duration, neuron_params, noise_params, config_file,
+    #                   synweight=weights, tso_params=None, spike_interval=1./freq,
+    #                   savename='freq_sweep{:02d}'.format(i), burn_in_time=100.)
 
     # duration = 1e4
     # n_neurons = 100
     # leak_potentials = np.linspace(-50.1, -49.9, n_neurons)
     # get_calibration(leak_potentials, duration, neuron_params, noise_params)
 
-    # activity for depressing synapse
-    n_neurons = 500
-    clamp_offset = 400.
-    duration = 2000. + clamp_offset
-    spike_interval = 1.
-    wrange = np.linspace(.001, .01, 10)
-    for i, w in enumerate(wrange):
-            clamping_expt(n_neurons, duration, neuron_params, noise_params,
-                          config_file, synweight=w, dt=.01,
-                          tso_params=clamp_tso_params,
-                          spike_interval=spike_interval,
-                          savename='wscan_wei{}'.format(i),
-                          clamp_offset=clamp_offset)
+    # # activity for depressing synapse
+    # n_neurons = 500
+    # clamp_offset = 400.
+    # duration = 2000. + clamp_offset
+    # spike_interval = 1.
+    # wrange = np.linspace(.001, .01, 10)
+    # for i, w in enumerate(wrange):
+    #         clamping_expt(n_neurons, duration, neuron_params, noise_params,
+    #                       config_file, synweight=w, dt=.01,
+    #                       tso_params=clamp_tso_params,
+    #                       spike_interval=spike_interval,
+    #                       savename='wscan_wei{}'.format(i),
+    #                       clamp_offset=clamp_offset)
 
     # === Plot a figure =============================
 
     # # plot voltage and conductance traces
     # plot_vg_traces(['renewing.pkl'], 2000.)
 
-    # analysis of time evolution --- under construction
-    # analyse_sweep(['wscan_depr{}.pkl'.format(i) for i in range(20)], n_avg=30)
 
-    # # t vs p_on given synaptic weight
-    filenames = ['wscan_wei{}.pkl'.format(i) for i in range(0, 10, 2)]
+    # check if act fct is equivalent to the one from sbs-calibration
+    w_fit = {}
     with np.load('calibrations/wei_curr_clampcalib.npz') as d:
-        wp05 = d['wp05']
-        alpha = d['alpha']
+        w_fit['p05'] = d['wp05']
+        w_fit['alpha'] = d['alpha']
+    sampler_config = sbs.db.SamplerConfiguration.load(config_file)
+    sampler = sbs.samplers.LIFsampler(sampler_config, sim_name='pyNN.nest')
+    sbs_fit = {}
+    sbs_fit['p05'] = sampler.calibration.fit.v_p05
+    sbs_fit['alpha'] = sampler.calibration.fit.alpha
 
-    # print(4*alpha + wp05)
-    exp_kwargs = {
-        'spike_times': numpy.arange(clamp_offset + .01, duration, 1.),
-        'spike_interval': 1.,
-        'wp05': wp05,
-        'alpha': alpha
-    }
-    plot_time_evolution(filenames, clamp_tso_params, exp_kwargs)
+    dt_spike = 1.
+    g_l = neuron_params['cm']/neuron_params['tau_m']
+    for k in w_fit.keys():
+        if k == 'alpha':
+            sbs2w = g_l/neuron_params['tau_syn_E']*dt_spike/(1 - np.exp(-dt_spike/neuron_params['tau_syn_E']))
+        else:
+            sbs2w = 0.
+        print('fit with weights: {}={}'.format(k, w_fit[k]))
+        # print('fit from calibration: {}={}'.format(k, sbs_fit[k]))
+        print('converted sbs fit: {}={}'.format(k, sbs_fit[k]*sbs2w))
+
+    # # # t vs p_on given synaptic weight
+    # filenames = ['wscan_wei{}.pkl'.format(i) for i in range(0, 10, 2)]
+    # with np.load('calibrations/wei_curr_clampcalib.npz') as d:
+    #     wp05 = d['wp05']
+    #     alpha = d['alpha']
+
+    # exp_kwargs = {
+    #     'spike_times': numpy.arange(clamp_offset + .01, duration, 1.),
+    #     'spike_interval': 1.,
+    #     'wp05': wp05,
+    #     'alpha': alpha
+    # }
+    # plot_time_evolution(filenames, clamp_tso_params, exp_kwargs)
 
     # # activation fct w/o external input
     # fn = 'calibration.pkl'
@@ -573,12 +612,12 @@ if __name__ == '__main__':
     # plot_vmem_dist(fn)
 
     # # weight vs p_on
-    # filenames = ['wei_calib_data.pkl']
-    # plot_w_vs_activation(filenames)
+    # filenames = ['freq_sweep{:02d}.pkl'.format(i) for i in range(5)]
+    # plot_w_vs_activation(filenames, show_fit=False)
 
     # # bias expt
-    # filenames = ['wei_biases{}.pkl'.format(i) for i in range(20)]
-    # b1, fp1, fc1 = plot_bias_comparison(filenames, savename='wei_curr_clampcalib')
+    # filenames = ['cuba_dt1_pretty_{:02d}.pkl'.format(i) for i in range(20)]
+    # b1, fp1, fc1 = plot_bias_comparison(filenames, savename='cuba_dt1_pretty')
     # filenames = ['bias{}.pkl'.format(i) for i in range(20)]
     # b2, fp2, fc2 = plot_bias_comparison(filenames)
 

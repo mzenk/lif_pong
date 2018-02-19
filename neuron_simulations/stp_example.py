@@ -4,6 +4,7 @@ from pyNN.utility import get_simulator, init_logging, normalized_filename
 import pyNN.nest as sim
 from neuron_parameters import dodo_params
 from lif_pong.utils.data_mgmt import make_figure_folder
+from stp_theory import compute_ru_envelope, r_theo_interpolated
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -99,30 +100,39 @@ sim.run(duration)
 # === Plot a figure ==========================================================
 figure_filename = 'stp_example.png'
 fig, axes = plt.subplots(2, 1, figsize=(10, 10))
-for i,label, alpha in zip(range(2), ['renewing', 'depressing'], [1., .5]):
+for i, label, alpha in zip(range(2), ['renewing', 'depressing'], [.7, .5]):
     data = populations[label].get_data().segments[0]
     vmem = data.filter(name='v')[0]
     gsyn = data.filter(name='gsyn_exc')[0]
     t = np.linspace(0, duration, len(vmem))
-    axes[0].plot(t, gsyn, alpha=alpha, label=label, color='C{}'.format(i))
-    axes[1].plot(t, vmem, alpha=alpha, label=label, color='C{}'.format(i))
+
     # theoretical envelope
-    from stp_theory import compute_ru_envelope
     kwargs = tso_dict[label]
-    w = kwargs['weight']*1e-3
-    del kwargs['weight']
+    w = kwargs.pop('weight')*1e-3
 
     # calculate theoretical envelope (correction factor takes account of the
     # changed stationary value due to PSC accumulation)
-    r, u = compute_ru_envelope(spike_times, **kwargs)
-    gsyn_theo = r*u*w
-    acc_correction = 1./(1 - np.exp(-spike_interval/neuron_params['tau_syn_E']))
+    # r, u = compute_ru_envelope(spike_times, **kwargs)
+    if kwargs['tau_fac'] == 0:
+        kwargs.pop('tau_fac')
+        r = r_theo_interpolated(spike_times, 0., spike_interval, **kwargs)
+        u = kwargs['U']
+    accum_corr = 1 - np.exp(-spike_interval/neuron_params['tau_syn_E'])
+    gsyn_theo = r*u*w / accum_corr
+
+    # # this is what I do in the experiments to make non-renewing comparable to renewing
+    # if label != 'renewing':
+    #     gsyn_theo *= accum_corr
+    #     gsyn *= accum_corr
     # leave out first point because the correction is only correct in the
     # stationary case anyway
-    axes[0].plot(spike_times[1:], gsyn_theo[1:]*acc_correction, '--',
+    axes[0].plot(t, gsyn, alpha=alpha, label=label, color='C{}'.format(i))
+    axes[0].plot(spike_times[1:], gsyn_theo[1:], '--',
                  label='theory ' + label, color='C{}'.format(i))
     axes[0].set_ylabel('gsyn_exc')
     axes[0].legend(loc='upper right')
+
+    axes[1].plot(t, vmem, alpha=alpha, label=label, color='C{}'.format(i))
     axes[1].set_xlabel('t [ms]')
     axes[1].set_ylabel('Membrane potential [mV]')
     axes[1].legend(loc='upper right')

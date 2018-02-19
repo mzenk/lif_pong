@@ -46,6 +46,19 @@ def r_theory(n, dt_spike, U0, tau_rec, tau_fac=0):
     return a0/(1 - q) + (1 - a0/(1 - q)) * q**(n-1)
 
 
+def r_theo_interpolated(t, offset, dt_spike, U, tau_rec):
+    # t can be an array (x)or offset
+    # in that case, R is calculated for many times or for many instances with
+    # different offsets at time t
+    n = (t - offset)/dt_spike
+    q = (1 - U) * np.exp(-dt_spike/tau_rec)
+    a0 = 1 - np.exp(-dt_spike/tau_rec)
+    result = np.zeros_like(np.array(n))
+    result[n > 0] = a0/(1 - q) + (1 - a0/(1 - q)) * q**(n-1)
+    result[n < 0] = 1.
+    return result
+
+
 def u_stat(U0, tau_fac, dt_spike=10.):
     # warning for tau_fac == 0, but function should still work in that case
     return U0/(1 - (1-U0)*np.exp(-dt_spike/tau_fac))
@@ -137,7 +150,7 @@ if __name__ == '__main__':
     spike_interval = 1.
     n_points = 50
     start_tr = 1
-    stop_tr = 4
+    stop_tr = 4.5
     start_u0 = -4
     stop_u0 = 0
     tr_logrange = np.logspace(start_tr, stop_tr, n_points)
@@ -159,8 +172,8 @@ if __name__ == '__main__':
     ax2.set_xscale('log')
     ax2.set_yscale('log')
 
-    ax1.set(xlabel='tau_rec', ylabel='U')
-    ax2.set(xlabel='tau_rec', ylabel='U')
+    ax1.set(xlabel='tau_rec', ylabel='U', title='Stationary R')
+    ax2.set(xlabel='tau_rec', ylabel='U', title='Decay time constant')
     plt.colorbar(im1, ax=ax1)
     plt.colorbar(im2, ax=ax2)
     plt.savefig('param_logscan.png')
