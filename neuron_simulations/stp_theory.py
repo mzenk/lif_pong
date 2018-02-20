@@ -50,11 +50,14 @@ def r_theo_interpolated(t, offset, dt_spike, U, tau_rec):
     # t can be an array (x)or offset
     # in that case, R is calculated for many times or for many instances with
     # different offsets at time t
+    if tau_rec == 0:
+        return np.ones_like(t - offset, dtype=float)
+
     n = (t - offset)/dt_spike
     q = (1 - U) * np.exp(-dt_spike/tau_rec)
     a0 = 1 - np.exp(-dt_spike/tau_rec)
     result = np.zeros_like(np.array(n))
-    result[n > 0] = a0/(1 - q) + (1 - a0/(1 - q)) * q**(n-1)
+    result[n > 0] = a0/(1 - q) + (1 - a0/(1 - q)) * q**(n-1)[n > 0]
     result[n < 0] = 1.
     return result
 

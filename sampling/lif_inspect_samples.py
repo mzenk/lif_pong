@@ -100,27 +100,33 @@ def main(config_dict):
     frame_list = []
     n_samples = []
     for i, f in enumerate(sample_files):
-        tmp, n = load_samples(
+        tmp, ns = load_samples(
             f, n_imgs, img_shape, n_labels, average=average,
             show_hidden=show_hidden, savename=savename + '_{:02d}'.format(i))
         frame_list.append(tmp)
-        n_samples.append(n)
+        n_samples.append(ns)
     assert np.all(np.array(n_samples) == n_samples[0])
     n_samples = n_samples[0]
 
     if len(frame_list) == 1:
         fig, single_ax = plt.subplots()
-        axarr = [single_ax]
+        axarr = np.array([single_ax])
     else:
-        fig, axarr = plt.subplots(2, len(frame_list)//2 + len(frame_list) % 2,
-                                  figsize=(10, 15))
-    im = [ax.imshow(np.zeros(img_shape), vmin=0, vmax=1.,
-                    interpolation='Nearest', cmap='gray', animated=True)
-          for ax in axarr]
-    if 'titles' in config_dict.keys():
-        assert len(config_dict['titles']) == len(im)
-        for ax, title in zip(axarr, config_dict['titles']):
-            ax.set_title(title)
+        tile_shape = (2, len(frame_list)//2 + len(frame_list) % 2)
+        fig, axarr = plt.subplots(*tile_shape, figsize=(tile_shape[1]*8, tile_shape[0]*6))
+    if len(axarr.shape) == 1:
+        axarr = np.expand_dims(axarr, 1)
+
+    im = []
+    for i, axrow in enumerate(axarr):
+        for j, ax in enumerate(axrow):
+            im.append(ax.imshow(np.zeros(img_shape), vmin=0, vmax=1.,
+                      interpolation='Nearest', cmap='gray', animated=True))
+            try:
+                title = config_dict['titles'][i*len(axrow) + j]
+                ax.set_title(title)
+            except KeyError:
+                ax.set_title('samples {}'.format(i*len(axrow) + j))
     ani = animation.FuncAnimation(
         fig, update_fig, frames=frame_list[0].shape[0],
         interval=10., blit=True, repeat=False,
