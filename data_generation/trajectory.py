@@ -3,10 +3,51 @@ from __future__ import print_function
 import numpy as np
 from scipy.integrate import ode
 from abc import ABCMeta, abstractmethod
-# from scipy.ndimage.filters import gaussian_filter
 import matplotlib
-matplotlib.use('agg')
 import matplotlib.pyplot as plt
+# from scipy.ndimage.filters import gaussian_filter
+
+#  methods that calculates the angle range for a point in the first quadrant
+def get_min_angle(x, y, width, height):
+    # x, y can be arrays of same shape
+    start_bottom_left = y > .5*height - 2*height/width*x
+    tanmin = -(.5*height + y)/(.5*width - x)  # else case
+    tanmin[start_bottom_left] = \
+        (-(1.5*height - y)/(.5*width + x))[start_bottom_left]
+    return np.arctan(tanmin)
+
+
+def get_max_angle(x, y, width, height):
+    start_bottom_left = y > height/width*x
+    end_top_right = np.logical_xor(y > 2*height/width*x - .5*height,
+                                   start_bottom_left)
+    tanmax = (1.5*height + y)/(.5*width + x)   # else case
+    tanmax[start_bottom_left] = \
+        ((.5*height + y)/(.5*width + x))[start_bottom_left]
+    tanmax[end_top_right] = ((.5*height - y)/(.5*width - x))[end_top_right]
+    return np.arctan(tanmax)
+
+
+def get_angle_range(x, y, width, height):
+    # reflect until x and y are positive
+    pos_sign = (-1)**(x < 0) * (-1)**(y < 0) == 1
+    neg_sign = np.logical_not(pos_sign)
+    abs_x = np.abs(x)
+    abs_y = np.abs(y)
+    min_angles = np.zeros_like(x, dtype=float)
+    max_angles = np.zeros_like(x, dtype=float)
+
+    # use symmetry to calculate angles
+    min_angles[pos_sign] = get_min_angle(
+        abs_x[pos_sign], abs_y[pos_sign], width, height)
+    max_angles[pos_sign] = get_max_angle(
+        abs_x[pos_sign], abs_y[pos_sign], width, height)
+
+    min_angles[neg_sign] = -get_max_angle(
+        abs_x[neg_sign], abs_y[neg_sign], width, height)
+    max_angles[neg_sign] = -get_min_angle(
+        abs_x[neg_sign], abs_y[neg_sign], width, height)
+    return min_angles, max_angles
 
 
 def gauss1d(x, mu, sigma):
@@ -258,3 +299,29 @@ class Gaussian_trajectory(Trajectory):
         centered_pos = y[:2] - self.mu
         grad = -self.pot_fct(y[0], y[1]) * self.inv_covmat.dot(centered_pos)
         return np.array([y[2], y[3], -grad[0], -grad[1]])
+
+
+if __name__ == '__main__':
+    # test
+    width = 48.
+    height = 40.
+    nx = 100
+    x = np.linspace(0, width, nx)
+    y = np.linspace(0, height, int(nx*height/width))
+    x_centered = x - x.max()/2
+    y_centered = y - y.max()/2
+    theo_max = 180/np.pi*np.arctan(2*y.max()/x.max())
+
+    xgrid, ygrid = np.meshgrid(x_centered, y_centered)
+    min_angles, max_angles = get_angle_range(xgrid, ygrid, width, height)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15,7))
+    ax1.set_title('Min. angle')
+    ax2.set_title('Max. angle')
+    im1 = ax1.imshow(min_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
+                     vmin=-theo_max, vmax=theo_max, origin='lower')
+    im2 = ax2.imshow(max_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
+                     vmin=-theo_max, vmax=theo_max, origin='lower')
+    # im2 = ax2.imshow(xgrid + ygrid, origin='lower', cmap='viridis')
+    plt.colorbar(im1, ax=ax1, orientation='horizontal')
+    plt.colorbar(im2, ax=ax2, orientation='horizontal')
+    fig.savefig('test.png')
