@@ -5,7 +5,7 @@ import numpy as np
 import os
 import sys
 import yaml
-from trajectory import Gaussian_trajectory, Const_trajectory
+from trajectory import Gaussian_trajectory, Const_trajectory, get_angle_range
 from scipy.ndimage import convolve1d
 from lif_pong.utils.data_mgmt import make_data_folder
 from lif_pong.utils import average_pool
@@ -13,23 +13,25 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
-
-def get_angle_range(pos, width, height):
-    lower = 180./np.pi * np.arctan(-(height + pos)/width)
-    upper = 180./np.pi * np.arctan((2*height - pos)/width)
-    return lower, upper
+# more general method in trajectory module
+# def get_angle_range(pos, width, height):
+#     lower = 180./np.pi * np.arctan(-(height + pos)/width)
+#     upper = 180./np.pi * np.arctan((2*height - pos)/width)
+#     return lower, upper
 
 
 # this method draws states such that only one reflection can occurr for Pong
-def draw_init_states(num, width, height, init_pos=None):
-    if init_pos is None:
-        init_pos = np.random.rand(num)*height
+def draw_init_states(num, width, height, init_posy=None):
+    if init_posy is None:
+        init_posy = np.random.rand(num)*height
     else:
-        assert num == len(init_pos)
+        assert num == len(init_posy)
+    init_posx = np.zeros_like(init_posy)
     init_states = []
-    lower, upper = get_angle_range(init_pos, width, height)
-    init_angle = np.random.rand(num)*(upper - lower) + lower
-    init_states = np.vstack((init_pos, init_angle)).T
+    lower, upper = get_angle_range(init_posx - .5*width, init_posy - .5*height,
+                                   width, height)
+    init_angle = (np.random.rand(num)*(upper - lower) + lower) * 180./np.pi
+    init_states = np.vstack((init_posy, init_angle)).T
     return init_states
 
 
@@ -41,7 +43,7 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
     # care about physics here, i.e. realistic length scales
     # what does matters is the scale of the potential and the field
     grid = np.array(grid)
-    h = 1./grid[0]
+    h = 10./grid[0]
     field = grid * h
     v0 = 1.
     num_tot = num_train + num_valid + num_test
@@ -82,10 +84,13 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
 
     data = []
     impact_points = np.zeros(num_tot)
+    if kink_dict is not None:
+        nokink_lastcols = []
+
     print('Generating trajectories...')
     for i, s in enumerate(init_states):
         init_pos = s[0]
-        init_angle =s[1]
+        init_angle = s[1]
         if pot_dict['type'] == 'pong':
             traj = Const_trajectory(pot_dict['gradient'], grid, h,
                                     np.array([0, init_pos]), init_angle, v0,
@@ -94,22 +99,37 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
             traj = Gaussian_trajectory(amplitude, mu, cov_mat, grid, h,
                                        np.array([0, init_pos]), init_angle, v0,
                                        kink_dict=kink_dict)
+
         traj.integrate()
         traj_pxls = traj.to_image(linewidth, dist_exponent)
         img_shape = traj_pxls.shape
         data.append(traj_pxls.flatten())
         impact_points[i] = traj.trace[-1, 1]
 
+        # with kink we need to run integration another time to get the target
+        # before the kink
+        if kink_dict is not None:
+            traj.reset()
+            traj.kink_dict = None
+            traj.integrate()
+            nokink_pxls = traj.to_image(linewidth, dist_exponent)
+            nokink_lastcols.append(nokink_pxls[:, -1])
+
     data = np.array(data)
     # shuffle data so that successive samples do not have same start
-    np.random.shuffle(data)
+    shuffled_idx = np.random.permutation(len(data))
+    data = data[shuffled_idx]
+    init_states = init_states[shuffled_idx]
+    impact_points = impact_points[shuffled_idx]
+    if kink_dict is not None:
+        nokink_lastcols = np.array(nokink_lastcols)[shuffled_idx]
 
     # add label layer
     last_col = data.reshape((-1, img_shape[0], img_shape[1]))[..., -1]
     reflected = np.all(last_col == 0, axis=1)
     print('{} of {} balls were reflected.'.format(reflected.sum(),
                                                   data.shape[0]))
-    with open('refelcted') as f:
+    with open('reflected', 'w') as f:
         f.write(yaml.dump(np.nonzero(reflected)[0].tolist()))
     # last_col = last_col[~reflected]
     # labels can be overlapping or not
@@ -132,13 +152,21 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
         test_data = data[-num_test:]
         test_labels = labels[-num_test:]
 
-        np.savez_compressed(save_name + '_{}x{}'.format(*img_shape),
-                            train_data=train_data, train_labels=train_labels,
-                            valid_data=valid_data, valid_labels=valid_labels,
-                            test_data=test_data, test_labels=test_labels)
+        if kink_dict is None:
+            np.savez_compressed(save_name + '_{}x{}'.format(*img_shape),
+                                train_data=train_data, train_labels=train_labels,
+                                valid_data=valid_data, valid_labels=valid_labels,
+                                test_data=test_data, test_labels=test_labels)
+        else:
+            np.savez_compressed(save_name + '_{}x{}'.format(*img_shape),
+                                train_data=train_data, train_labels=train_labels,
+                                valid_data=valid_data, valid_labels=valid_labels,
+                                test_data=test_data, test_labels=test_labels,
+                                nokink_lastcol=nokink_lastcols,
+                                kink_pos=kink_dict['pos'])
         print('Saved data set with {0} samples and image shape {2}x{3}.'
               '(#labels = {1})'.format(
-              data.shape[0], labels.shape[1], *img_shape))
+                data.shape[0], labels.shape[1], *img_shape))
 
     # some statistics
     plt.figure()
@@ -170,7 +198,8 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
     plt.imshow(data.mean(axis=0).reshape(img_shape),
                interpolation='Nearest', cmap='gray')
     plt.savefig('mean_image.png')
-    # save histogram dat because it is not available afterwards
+    # save the data used for statistics; separate statistics for train/valid/test
+    # can be obtained later by using n_train/n_valid/n_test
     np.savez(save_name + '_stats', init_pos=init_states[:, 0],
              init_angles=init_states[:, 1], end_pos=impact_points)
 
@@ -178,47 +207,68 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
 
 
 def test():
-    grid = np.array([48, 36])
-    h = 1./grid[0]
+    grid = np.array([48, 40])
+    h = 10./grid[0]
     field = grid * h
     v0 = 1.
 
     # # general test
-    # start_pos = np.array([0, field[1]/2])
-    # ang = 30.
-    # test = Const_trajectory(np.array([0., 0.]), grid, h, start_pos, ang, v0)
+    # start_pos = np.array([0, 5.08])
+    # ang = 22.6
+    # ampls = np.linspace(0.2, .8, 5)
     # # amplitude = .4
     # # mu = field * [.5, .5]
     # # cov_mat = np.diag([.3, .2] * field)**2
     # # test = Gaussian_trajectory(
     # #     amplitude, mu, cov_mat, grid, h, start_pos, ang, v0)
 
-    # test.integrate()
-    # fig = plt.figure()
-    # # test.draw_trajectory(fig, potential=True)
+    # fig, ax = plt.subplots()
+    # for ampl in ampls:
+    #     kink_dict = {'pos': ampl, 'ampl': 5., 'sigma': 0.}
+    #     test = Const_trajectory(np.array([0., 0.]), grid, h, start_pos, ang, v0,
+    #                             kink_dict=kink_dict)
+    #     test.integrate()
+    #     test.draw_trajectory(ax, potential=False)
     # # imshow has the origin at the top left
-    # linewidth = 5
-    # pxls = test.to_image(linewidth)
-    # print(pxls.shape)
-    # plt.imshow(pxls, interpolation='Nearest', cmap='Blues', vmin=0, vmax=1,
-    #            extent=(0, field[0], 0, field[1]))
-    # plt.colorbar()
+    # # linewidth = 5
+    # # pxls = test.to_image(linewidth)
+    # # print(pxls.shape)
+    # # plt.imshow(pxls, interpolation='Nearest', cmap='Blues', vmin=0, vmax=1,
+    # #            extent=(0, field[0], 0, field[1]))
+    # # plt.colorbar()
     # plt.savefig('test_trajectory.png')
 
-    # test initialisation
-    start_pos = np.linspace(0, field[1], 5)
-    angles_lower, angles_upper = get_angle_range(start_pos, field[0], field[1])
-    fig, ax = plt.subplots()
-    for pos, al, au in zip(start_pos, angles_lower, angles_upper):
-        # draw line for lower and upper limit for angle
-        test = Const_trajectory(np.array([0., 0.]), grid, h, [0, pos], al, v0)
-        test.integrate()
-        test.draw_trajectory(ax, potential=True, color='C0')
+    # # test initialisation
+    # start_posy = np.linspace(0, field[1], 5)
+    # start_posx = np.zeros_like(start_posy, dtype=float)
+    # centered_posx = start_posx - .5*field[0]
+    # centered_posy = start_posy - .5*field[1]
+    # min_angles, max_angles = get_angle_range(
+    #     centered_posx, centered_posy, field[0], field[1])
+    # min_angles *= 180./np.pi
+    # max_angles *= 180./np.pi
+    # fig, ax = plt.subplots()
+    # for posx, posy, al, au in zip(start_posx, start_posy, min_angles, max_angles):
+    #     # draw line for lower and upper angle limit
+    #     test = Const_trajectory(np.array([0., 0.]), grid, h, [posx, posy], al, v0)
+    #     test.integrate()
+    #     test.draw_trajectory(ax, potential=True, color='C0')
 
-        test = Const_trajectory(np.array([0., 0.]), grid, h, [0, pos], au, v0)
+    #     test = Const_trajectory(np.array([0., 0.]), grid, h, [posx, posy], au, v0)
+    #     test.integrate()
+    #     test.draw_trajectory(ax, potential=True, color='C1')
+    # fig.savefig('test_init.png')
+
+    # test angle restriction -> double reflections?
+    # with knick double reflections are possible
+    init_states = draw_init_states(1000, field[0], field[1])
+    for i, s in enumerate(init_states):
+        starty = s[0]
+        startangle = s[1]
+        print('{} percent done...'.format(100*i/len(init_states)))
+        test = Const_trajectory(np.array([0., 0.]), grid, h, [0, starty],
+                                startangle, v0)
         test.integrate()
-        test.draw_trajectory(ax, potential=True, color='C1')
-    fig.savefig('test_init.png')
 
 
 def main(data_dict, pot_dict, kink_dict):
@@ -231,6 +281,7 @@ def main(data_dict, pot_dict, kink_dict):
 
 
 if __name__ == '__main__':
+
     # more flexible version
     if len(sys.argv) != 2:
         print('Wrong number of arguments. Please provide a yaml-config file.')
@@ -248,9 +299,3 @@ if __name__ == '__main__':
     else:
         kink_dict = config.pop('kink')
     main(data_dict, pot_dict, kink_dict)
-
-    # # Pong
-    # generate_data_old(10, 5, 5, [48, 36],
-    #                   pot_str='pong', linewidth=5., save_name='test')
-
-    # test()

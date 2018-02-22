@@ -1,11 +1,12 @@
 from __future__ import division
 from __future__ import print_function
+import sys
 import numpy as np
 from scipy.integrate import ode
 from abc import ABCMeta, abstractmethod
 import matplotlib
-import matplotlib.pyplot as plt
 # from scipy.ndimage.filters import gaussian_filter
+
 
 #  methods that calculates the angle range for a point in the first quadrant
 def get_min_angle(x, y, width, height):
@@ -28,6 +29,7 @@ def get_max_angle(x, y, width, height):
     return np.arctan(tanmax)
 
 
+# returns angles in radiants
 def get_angle_range(x, y, width, height):
     # reflect until x and y are positive
     pos_sign = (-1)**(x < 0) * (-1)**(y < 0) == 1
@@ -72,12 +74,12 @@ class Trajectory:
         # for compatibility with plt.imshow, the pixels are saved as (ny, nx)
         self.pixels = np.zeros(grid_size[::-1])
         # list for the entire trace
-        self.trace = np.empty(1)
+        self.trace = None
+        self.kink_dict = kink_dict
         if kink_dict is not None:
             assert sorted(kink_dict.keys()) == sorted(['pos', 'ampl', 'sigma']), \
                 'Got keys {}'.format(kink_dict.keys())
-        self.kink_dict = kink_dict
-        if self.kink_dict is not None:
+            self.kink_dict = kink_dict.copy()
             # kink_pos is given relative to field-xrange
             self.kink_dict['pos'] *= self.field_size[0]
 
@@ -88,6 +90,10 @@ class Trajectory:
     @abstractmethod
     def pot_fct(self, x, y):
         pass
+
+    def reset(self):
+        self.trace = None
+        self.pixels = np.zeros_like(self.pixels)
 
     def integrate(self, write_pixels=False):
         vx = self.v0 * np.cos(self.angle)
@@ -109,35 +115,54 @@ class Trajectory:
         # particle can only travel max. dt*v0 further before reflection
         pos_list = []
         self.add_to_image(self.pos)
+        reflection_pos = []
         while r.t < t1:
             r.integrate(r.t+dt)
+            x = r.y[0]
+            y = r.y[1]
+            vx = r.y[2]
+            vy = r.y[3]
 
             # stop if particle leaves field -> maybe add epsilon term to avoid
             # overshoot
-            if r.y[0] > size[0] or r.y[0] < 0:
+            if x > size[0] or x < 0:
                 break
             pos_list.append(r.y[:2])
             if write_pixels:
                 self.add_to_image(r.y[:2])
 
-            # inject random y-momentum
-            if self.kink_dict is not None and r.y[0] > self.kink_dict['pos'] \
+            # inject random y-momentum; sigma can be zero
+            if self.kink_dict is not None and x > self.kink_dict['pos'] \
                     and not noise_injected:
-                # good values for 'amp' and 'sigma': 0.5 and 0.2
-                randmom = self.kink_dict['ampl'] * self.v0 * \
+                delta_vy = self.kink_dict['ampl'] * self.v0 * \
                     ((-1)**np.random.randint(2) + self.kink_dict['sigma'] *
                      np.random.randn())
-                v_new = r.y[2:] + np.array([0, randmom])
-                # normalize again so that pixels are still bright enough
+
+                # clip any delta_vy that exceeds the allowed angle range
+                centered_pos = r.y[:2] - .5*size
+                amin, amax = get_angle_range(centered_pos[0], centered_pos[1],
+                                             *size)
+                delta_vy = np.clip(
+                    delta_vy, np.tan(amin)*vx - vy, np.tan(amax)*vx - vy)
+
+                v_new = np.array([vx, vy + delta_vy])
+                # normalize again so that distance between trace points stays small
+                # this matters only if potential not constant
                 v_new /= np.linalg.norm(v_new) * self.v0
                 r.set_initial_value(np.hstack((r.y[:2], v_new)), r.t)
-                # shift kink_pos so that only one kink occurs
                 noise_injected = True
 
             # reflect if particle hits top or bottom
-            if r.y[1] > size[1] or r.y[1] < 0:
+            if (y > size[1] and vy > 0) or (y < 0 and vy < 0):
                 r.set_initial_value(r.y*np.array([1, 1, 1, -1]), r.t)
+                reflection_pos.append(x/size[0])
 
+        if len(reflection_pos) > 1 and self.kink_dict is None:
+            print('Warning: More than one reflection occurred! Locations: ['
+                  + '; '.join(['{:.2f}'.format(p) for p in reflection_pos])
+                  + '], parameters: start {}, angle {}, kink_dict={}'.format(
+                        pos_list[0], self.angle*180./np.pi, self.kink_dict),
+                  file=sys.stderr)
         self.trace = np.array(pos_list)
         # normalize pixels
         self.pixels /= np.max(self.pixels)
@@ -301,27 +326,29 @@ class Gaussian_trajectory(Trajectory):
         return np.array([y[2], y[3], -grad[0], -grad[1]])
 
 
-if __name__ == '__main__':
-    # test
-    width = 48.
-    height = 40.
-    nx = 100
-    x = np.linspace(0, width, nx)
-    y = np.linspace(0, height, int(nx*height/width))
-    x_centered = x - x.max()/2
-    y_centered = y - y.max()/2
-    theo_max = 180/np.pi*np.arctan(2*y.max()/x.max())
+# if __name__ == '__main__':
+#     tests
+#     # inspect angle range
+#     import matplotlib.pyplot as plt
+#     width = 48.
+#     height = 40.
+#     nx = 100
+#     x = np.linspace(0, width, nx)
+#     y = np.linspace(0, height, int(nx*height/width))
+#     x_centered = x - x.max()/2
+#     y_centered = y - y.max()/2
+#     theo_max = 180/np.pi*np.arctan(2*y.max()/x.max())
 
-    xgrid, ygrid = np.meshgrid(x_centered, y_centered)
-    min_angles, max_angles = get_angle_range(xgrid, ygrid, width, height)
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15,7))
-    ax1.set_title('Min. angle')
-    ax2.set_title('Max. angle')
-    im1 = ax1.imshow(min_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
-                     vmin=-theo_max, vmax=theo_max, origin='lower')
-    im2 = ax2.imshow(max_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
-                     vmin=-theo_max, vmax=theo_max, origin='lower')
-    # im2 = ax2.imshow(xgrid + ygrid, origin='lower', cmap='viridis')
-    plt.colorbar(im1, ax=ax1, orientation='horizontal')
-    plt.colorbar(im2, ax=ax2, orientation='horizontal')
-    fig.savefig('test.png')
+#     xgrid, ygrid = np.meshgrid(x_centered, y_centered)
+#     min_angles, max_angles = get_angle_range(xgrid, ygrid, width, height)
+#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15,7))
+#     ax1.set_title('Min. angle')
+#     ax2.set_title('Max. angle')
+#     im1 = ax1.imshow(min_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
+#                      vmin=-theo_max, vmax=theo_max, origin='lower')
+#     im2 = ax2.imshow(max_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
+#                      vmin=-theo_max, vmax=theo_max, origin='lower')
+#     # im2 = ax2.imshow(xgrid + ygrid, origin='lower', cmap='viridis')
+#     plt.colorbar(im1, ax=ax1, orientation='horizontal')
+#     plt.colorbar(im2, ax=ax2, orientation='horizontal')
+#     fig.savefig('test.png')

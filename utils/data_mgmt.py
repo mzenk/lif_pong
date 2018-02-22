@@ -55,29 +55,29 @@ def get_data_path(source_script_name):
 
 def load_images(data_name, path=False):
     if path:
-        with np.load(data_name) as d:
-            if len(d.keys()) == 1:
-                train_set, valid_set, test_set = d[d.keys()[0]]
-            else:
-                train_set = (d['train_data'], d['train_labels'])
-                valid_set = (d['valid_data'], d['valid_labels'])
-                test_set = (d['test_data'], d['test_labels'])
-        return train_set, valid_set, test_set
-
-    path = ''
-    if socket.gethostname() == 'asdf':
-        path = os.path.expanduser('~/mnt/hel_mnt/shared_data/datasets')
-    elif 'nemo' in socket.gethostname():
-        path = os.path.expanduser('~/git_repos/lif_pong/shared_data/datasets')
+        data_path = data_name
     else:
-        path = os.path.expanduser('~/Projects/lif_pong/shared_data/datasets')
-    with np.load(os.path.join(path, data_name + '.npz')) as d:
+        data_path = ''
+        if socket.gethostname() == 'asdf':
+            data_path = os.path.expanduser('~/mnt/hel_mnt/shared_data/datasets')
+        elif 'nemo' in socket.gethostname():
+            data_path = os.path.expanduser('~/git_repos/lif_pong/shared_data/datasets')
+        else:
+            data_path = os.path.expanduser('~/Projects/lif_pong/shared_data/datasets')
+        data_path = os.path.join(data_path, data_name + '.npz')
+    with np.load(data_path) as d:
         if len(d.keys()) == 1:
             train_set, valid_set, test_set = d[d.keys()[0]]
         else:
             train_set = (d['train_data'], d['train_labels'])
             valid_set = (d['valid_data'], d['valid_labels'])
             test_set = (d['test_data'], d['test_labels'])
+            if 'kink_pos' in d.keys():
+                kink_dict = {}
+                kink_dict['pos'] = d['kink_pos']
+                kink_dict['nokink_lastcol'] = d['nokink_lastcol']
+                return train_set, valid_set, test_set, kink_dict
+
     return train_set, valid_set, test_set
 
 
