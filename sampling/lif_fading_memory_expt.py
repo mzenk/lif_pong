@@ -11,7 +11,7 @@ import lif_pong.training.rbm as rbm_pkg
 
 
 def lif_tso_clamping_expt(test_imgs, img_shape, rbm, sbs_kwargs,
-                          clamp_kwargs, n_samples=20):
+                          clamp_dict, n_samples=20, winsize=None):
     # Bring weights and biases into right form
     w, b = rbm.bm_params()
     sampling_interval = sbs_kwargs.pop('sampling_interval')
@@ -25,13 +25,7 @@ def lif_tso_clamping_expt(test_imgs, img_shape, rbm, sbs_kwargs,
 
     # add all necessary kwargs to one dictionary
     kwargs = {k: sbs_kwargs[k] for k in sbs_kwargs.keys()}
-    try:
-        winsize = clamp_kwargs.pop('winsize')
-    except KeyError:
-        winsize = None
 
-    for k in clamp_kwargs.keys():
-        kwargs[k] = clamp_kwargs[k]
     results = []
     for i, img in enumerate(test_imgs):
         # choose different seed for each simulation
@@ -40,40 +34,7 @@ def lif_tso_clamping_expt(test_imgs, img_shape, rbm, sbs_kwargs,
             lifsampl.Clamp_window(clamp_duration, img.reshape(img_shape),
                                   win_size=winsize)
         bm.spike_data = lifsampl.gather_network_spikes_clamped_sf(
-            bm, duration, rbm.n_inputs, **kwargs)
-        results.append(bm.get_sample_states(sampling_interval))
-    return np.array(results)
-
-
-def test(test_imgs, img_shape, rbm, sbs_kwargs,
-         clamp_kwargs, n_samples=20):
-    # Bring weights and biases into right form
-    w, b = rbm.bm_params()
-    sampling_interval = sbs_kwargs['sampling_interval']
-    # clamp using TSO
-    duration = n_samples * sampling_interval
-    # clamp all but labels
-    clamped_mask = np.ones(img_shape)
-    clamped_mask = clamped_mask.flatten()
-    clamped_idx = np.nonzero(clamped_mask == 1)[0]
-    refresh_times = [0.]
-
-    bm = lifsampl.initialise_network(
-        sbs_kwargs['calib_file'], w, b, tso_params=sbs_kwargs['tso_params'])
-
-    # add all necessary kwargs to one dictionary
-    kwargs = {k: sbs_kwargs[k] for k in
-              ('dt', 'sim_setup_kwargs', 'burn_in_time')}
-    for k in clamp_kwargs.keys():
-        kwargs[k] = clamp_kwargs[k]
-    results = []
-    for img in test_imgs:
-        kwargs['clamp_fct'] = \
-            lifsampl.Clamp_anything(refresh_times, clamped_idx, img)
-        # bm.spike_data = lifsampl.gather_network_spikes_clamped_bn(
-        #     bm, duration, rbm.n_inputs, **kwargs)
-        bm.spike_data = lifsampl.gather_network_spikes_clamped_sf(
-            bm, duration, rbm.n_inputs, **kwargs)
+            bm, duration, rbm.n_inputs, clamp_dict=clamp_dict, **kwargs)
         results.append(bm.get_sample_states(sampling_interval))
     return np.array(results)
 
@@ -86,22 +47,10 @@ def main(data_set, rbm, general_dict, sbs_dict, clamp_dict, analysis_dict):
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
 
-    # It is possible to set the weights of the bias synapses using a
-    # calibration file or all equal to the value in tso_params
-    if 'calib_file' in clamp_dict.keys():
-        wp_fit_params = {}
-        with np.load(clamp_dict['calib_file']) as d:
-            for k in d.keys():
-                wp_fit_params[k] = d[k]
-    else:
-        wp_fit_params = None
-
-    clamp_kwargs = {
-        'clamp_tso_params': clamp_dict['tso_params'],
-        'wp_fit_params': wp_fit_params
-    }
     if 'winsize' in clamp_dict.keys():
-        clamp_kwargs['winsize'] = clamp_dict['winsize']
+        winsize = clamp_dict.pop('winsize')
+    else:
+        winsize = None
 
     sim_setup_kwargs = {
         # choose different seed for each simulation
@@ -121,7 +70,7 @@ def main(data_set, rbm, general_dict, sbs_dict, clamp_dict, analysis_dict):
         if gather_data:
             samples = lif_tso_clamping_expt(
                 data_set[0][start:end], img_shape, rbm, sbs_kwargs,
-                clamp_kwargs, n_samples=n_samples)
+                clamp_dict, n_samples=n_samples, winsize=winsize)
             if samples is not None:
                 np.savez_compressed('samples', samples=samples.astype(bool))
         else:

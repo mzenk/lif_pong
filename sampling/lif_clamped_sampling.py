@@ -295,8 +295,7 @@ def gather_network_spikes_clamped_bn(
 def gather_network_spikes_clamped_sf(
         network, duration, nv, dt=0.1, burn_in_time=500., create_kwargs=None,
         sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None,
-        clamp_tso_params=None, wp_fit_params=None, on_thresh=.5,
-        off_thresh=None):
+        clamp_dict=None, on_thresh=.5, off_thresh=None):
     """
         create_kwargs: Extra parameters for the networks creation routine.
 
@@ -322,7 +321,8 @@ def gather_network_spikes_clamped_sf(
 
     start = time.time()
     # Create spike sources for whole simulation
-    spike_interval = 1.   # ms
+    spike_interval = clamp_dict['spike_interval']
+    clamp_tso_params = clamp_dict['tso_params']
     exc_spiketrains, inh_spiketrains = clampfct_to_spiketrain(
         clamp_fct, nv, duration + burn_in_time, dt, spike_interval,
         offset=burn_in_time, on_thresh=on_thresh)
@@ -332,35 +332,29 @@ def gather_network_spikes_clamped_sf(
     inh_bias_neurons = sim.Population(
         nv, sim.SpikeSourceArray, cellparams={'spike_times': inh_spiketrains})
 
-    # calculate weights according to the calibration from wp_fit_params
-    if wp_fit_params is not None:
-        w_on = wp_fit_params['wp05'] + 2*4*wp_fit_params['alpha']
-        w_off = wp_fit_params['wp05'] - 2*4*wp_fit_params['alpha']
-        bias_factor = wp_fit_params['bias_factor']
-        exc_weights = w_on + bias_factor * network.biases_theo[:nv]
-        inh_weights = w_off + bias_factor * network.biases_theo[:nv]
-        # choose symmetric weights so that decay takes equally long. Necessary?
-        weights = np.maximum(np.abs(exc_weights), np.abs(inh_weights))
-    elif clamp_tso_params is not None and 'weight' in clamp_tso_params.keys():
-        weights = clamp_tso_params['weight'] * np.ones(nv)
-    else:
-        weights = np.zeros(nv)
-        log.warning('No weights provided for bias neuron synapses.')
-
-    # apply corrections (nest units, compensate U, compensate accumulation)
     tau_syn = population.get('tau_syn_E')
-    if clamp_tso_params is not None and clamp_tso_params['U'] != 0:
-        weights *= 1000. / clamp_tso_params['U']
-        if clamp_tso_params['U'] != 1 \
-                and clamp_tso_params['tau_rec'] != tau_syn:
-            weights *= 1 - np.exp(-spike_interval/tau_syn)
+    # assume all neurons have same calibration
+    alpha = network.samplers[0].calibration.fit.alpha
+    gl = population.get('cm')/population.get('tau_m')
+    # alpha_w is 1/4 of the width of p_on(w_syn) for static synapses
+    alpha_w = alpha*gl * spike_interval/tau_syn
+    exc_weights, inh_weights = get_clamp_weights(
+        clamp_dict, network.biases_theo[:nv], alpha_w, tau_syn)
+
+    # # could choose symmetric weights so that final w value is same for exc/inh
+    # weights = np.maximum(np.abs(exc_weights), np.abs(inh_weights))
+
+    # apply corrections (nest units)
+    if clamp_tso_params is not None:
+        exc_weights *= 1000.
+        inh_weights *= 1000.
 
     # Create connections
     exc_connections = []
     inh_connections = []
     for i in range(nv):
-        exc_connections.append((i, i, weights[i]))
-        inh_connections.append((i, i, -np.abs(weights[i])))
+        exc_connections.append((i, i, exc_weights[i]))
+        inh_connections.append((i, i, -np.abs(inh_weights[i])))
 
     bn_connector_exc = sim.FromListConnector(
         exc_connections, column_names=['weight'])
@@ -472,6 +466,37 @@ def clampfct_to_spiketrain(clamp_fct, n_neurons, duration, dt, spike_interval,
                 inh_spiketimes_array[i] += st_firing.tolist()
         t = t_next
     return exc_spiketimes_array, inh_spiketimes_array
+
+
+# calculate weights according to calibration function
+# different rest potentials are taken into account by shift
+# assumes small spike interval so that I_syn is roughly constant
+# returns the weight a static synapse should have if the clamped neuron gets
+# no other input than the clamping spike train
+def get_clamp_weights(clamp_dict, vis_bias, alpha_w, tau_syn):
+    U = clamp_dict['tso_params']['U']
+    tau_rec = clamp_dict['tso_params']['tau_rec']
+    dt_spike = clamp_dict['spike_interval']
+
+    # apply corrections to weight as in lif_clamped_sampling
+    if 'weight' in clamp_dict.keys():
+        weight = clamp_dict['weight']/U
+        exc_weights = weight*np.ones_like(vis_bias)
+        inh_weights = -weight*np.ones_like(vis_bias)
+    else:
+        # width of sigma function is roughly 4
+        if 'bias_shift' in clamp_dict.keys():
+            bshift = clamp_dict['bias_shift']
+        else:
+            bshift = 4
+        exc_weights = alpha_w*(bshift - vis_bias)/U
+        inh_weights = alpha_w*(-bshift - vis_bias)/U
+        if U == 1 and tau_rec == tau_syn:
+            # for renewing synapses we usually want to clamp such that the
+            # stationary weights yield the desired clamping. correction:
+            exc_weights /= (1 - np.exp(-dt_spike/tau_syn))
+            inh_weights /= (1 - np.exp(-dt_spike/tau_syn))
+    return exc_weights, inh_weights
 
 
 def inv_sigma(p):

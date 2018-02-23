@@ -7,7 +7,8 @@ import yaml
 import numpy as np
 from scipy.ndimage import convolve1d
 from lif_pong.utils import tile_raster_images
-from lif_pong.utils.data_mgmt import make_figure_folder, load_images, get_rbm_dict, get_data_path
+from lif_pong.utils.data_mgmt import make_figure_folder, get_rbm_dict
+import lif_pong.training.rbm as rbm_pkg
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -28,7 +29,7 @@ def update_fig(i, frames, fig, img_artists, n_samples, n_imgs):
 
 
 def load_samples(sample_file, n_imgs, img_shape, n_labels, average=False,
-                 show_hidden=False, savename='test'):
+                 show_probs=False, rbm=None, show_hidden=False, savename='test'):
     n_pixels = np.prod(img_shape)
     with np.load(os.path.expanduser(sample_file)) as d:
         # samples.shape: ([n_instances], n_samples, n_units)
@@ -41,9 +42,15 @@ def load_samples(sample_file, n_imgs, img_shape, n_labels, average=False,
     vis_samples = samples[..., :n_pixels]
     hid_samples = samples[..., n_pixels + n_labels:]
 
-    # # marginal visible probabilities can be calculated from hidden states
-    # nh = hid_samples.shape[-1]
-    # vis_samples = rbm.sample_v_given_h(hid_samples.reshape(-1, nh))[0][:, :n_pixels]
+    if show_probs and hid_samples.size > 0:
+        if rbm is None:
+            print('No RBM supplied for calculating probabilities.', file=sys.stderr)
+        else:
+            # marginal visible probabilities can be calculated from hidden states
+            nh = hid_samples.shape[-1]
+            vis_samples = rbm.sample_v_given_h(
+                hid_samples.reshape(-1, nh))[0][:, :n_pixels]
+            vis_samples = vis_samples.reshape(-1, n_samples, n_pixels)
 
     if average:
         # running average over samples
@@ -94,14 +101,20 @@ def main(config_dict):
     img_shape = tuple(config_dict['img_shape'])
     n_labels = config_dict['n_labels']
     average = config_dict['average']
+    show_probs = config_dict['show_probs']
     show_hidden = config_dict['show_hidden']
     savename = config_dict['savename']
+    if 'rbm_name' in config_dict.keys():
+        rbm = rbm_pkg.load(get_rbm_dict(config['rbm_name']))
+    else:
+        rbm = None
 
     frame_list = []
     n_samples = []
     for i, f in enumerate(sample_files):
         tmp, ns = load_samples(
-            f, n_imgs, img_shape, n_labels, average=average,
+            f, n_imgs, img_shape, n_labels, average=average, 
+            show_probs=show_probs, rbm=rbm,
             show_hidden=show_hidden, savename=savename + '_{:02d}'.format(i))
         frame_list.append(tmp)
         n_samples.append(ns)

@@ -6,7 +6,7 @@ import os
 import numpy as np
 import yaml
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict, make_data_folder
-from lif_pong.sampling.lif_clamped_sampling import Clamp_window
+from lif_pong.sampling.lif_clamped_sampling import Clamp_window, get_clamp_weights
 from lif_pong.neuron_simulations.stp_theory import r_theo_interpolated
 import lif_pong.training.rbm as rbm_pkg
 import sbs
@@ -58,7 +58,7 @@ def get_frames_for_img(img, vis_bias, n_samples, sbs_dict, clamp_dict):
     assert len(img.shape) == 2
     n_pixels = img.size
     sampling_interval = sbs_dict['sampling_interval']
-    clamp_dt_spike = clamp_dict['dt_spike']
+    clamp_dt_spike = clamp_dict['spike_interval']
 
     # get activation function and neuron parameters from calibration
     neuron_calib = sbs_dict['calib_file']
@@ -79,27 +79,15 @@ def get_frames_for_img(img, vis_bias, n_samples, sbs_dict, clamp_dict):
     else:
         winsize = img.shape[1]
     clamp_tso_params = clamp_dict['tso_params']
+    U = clamp_tso_params['U']
+    tau_rec = clamp_tso_params['tau_rec']
     try:
         clamp_tso_params.pop('tau_fac')
     except KeyError:
         pass
 
-    # apply corrections to weight as in lif_clamped_sampling
-    if 'weight' in clamp_tso_params.keys():
-        weight = clamp_tso_params.pop('weight')/clamp_tso_params['U']
-        exc_weights = weight
-        inh_weights = -weight
-    else:
-        # width of sigma function is roughly 4
-        bshift = 4
-        exc_weights = alpha_w*(bshift - vis_bias)/clamp_tso_params['U']
-        inh_weights = alpha_w*(-bshift - vis_bias)/clamp_tso_params['U']    
-        if clamp_tso_params['U'] == 1 and clamp_tso_params['tau_rec'] == tau_syn:
-            # for renewing synapses we usually want to clamp such that the
-            # stationary weights yield the desired clamping. correction:
-            exc_weights /= (1 - np.exp(-clamp_dt_spike/tau_syn))
-            inh_weights /= (1 - np.exp(-clamp_dt_spike/tau_syn))
-        print(exc_weights.max(), exc_weights.min())
+    exc_weights, inh_weights = \
+        get_clamp_weights(clamp_dict, vis_bias, alpha_w, tau_syn)
 
     clamp_interval = sampling_interval*n_samples
     clamp_fct = Clamp_window(clamp_interval, img, win_size=winsize)
@@ -116,13 +104,13 @@ def get_frames_for_img(img, vis_bias, n_samples, sbs_dict, clamp_dict):
         inh_mask = np.in1d(np.arange(n_pixels), clamp_idx[clamp_val < thresh])
 
         rarr_exc = r_theo_interpolated(t, exc_offsets, clamp_dt_spike,
-                                       **clamp_tso_params)
+                                       U, tau_rec)
         rarr_inh = r_theo_interpolated(t, inh_offsets, clamp_dt_spike,
-                                       **clamp_tso_params)
+                                       U, tau_rec)
 
         # improve if necessary to support weight matrix
-        eff_weights = exc_weights*exc_mask*rarr_exc*clamp_tso_params['U'] + \
-            inh_weights*inh_mask*rarr_inh*clamp_tso_params['U']
+        eff_weights = exc_weights*exc_mask*rarr_exc*U + \
+            inh_weights*inh_mask*rarr_inh*U
         p_on[i] = sigma(vis_bias + eff_weights/alpha_w)
 
     print(p_on.max())
@@ -130,7 +118,6 @@ def get_frames_for_img(img, vis_bias, n_samples, sbs_dict, clamp_dict):
 
 
 def main(data_set, rbm, general_dict, sbs_dict, clamp_dict):
-    clamp_dict['dt_spike'] = 1.
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
     n_pixels = np.prod(img_shape)
