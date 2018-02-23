@@ -53,7 +53,7 @@ def get_data_path(source_script_name):
     return data_path
 
 
-def load_images(data_name, path=False):
+def load_images(data_name, path=False, for_analysis=False):
     if path:
         data_path = data_name
     else:
@@ -72,7 +72,7 @@ def load_images(data_name, path=False):
             train_set = (d['train_data'], d['train_labels'])
             valid_set = (d['valid_data'], d['valid_labels'])
             test_set = (d['test_data'], d['test_labels'])
-            if 'kink_pos' in d.keys():
+            if for_analysis and 'kink_pos' in d.keys():
                 kink_dict = {}
                 kink_dict['pos'] = d['kink_pos']
                 kink_dict['nokink_lastcol'] = d['nokink_lastcol']

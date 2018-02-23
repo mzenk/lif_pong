@@ -21,10 +21,6 @@ class Pong_agent(object):
         self.pos = .5*max_pos
 
     def update_pos(self, prediction):
-        # buggy?
-        # step = prediction - pos
-        # pos += np.clip(step, -self.max_step, self.max_step)
-        # alternatively
         step = np.minimum(self.max_step, np.abs(prediction - self.pos))
         self.pos += np.sign(prediction - self.pos) * step
 
@@ -74,32 +70,28 @@ def test():
     plt.savefig('figures/test.png')
 
 
-def compute_performance(img_shape, test_set, data_idx, prediction, max_speedup=2.,
+def compute_performance(predictions, targets, data_idx, max_speedup=2.,
                         use_labels=False, paddle_width=3, leave_uncovered=1):
-    if use_labels:
-        n_pos = img_shape[0] // 3
+    # predictions must have shape (n_instances, n_steps, n_pos)
+    # targets must either have same shape as predictions or (n_instances, n_pos)
+    n_instances, n_frames, n_pos = predictions.shape
+    if targets.size != predictions.size:
+        target_pos = average_helper(n_pos, targets)
     else:
-        n_pos = img_shape[0]
-
-    n_instances = prediction.shape[0]
-    n_frames = prediction.shape[1]
-
-    # compare vis_prediction dataset pixels
-    if use_labels:
-        groundtruth = test_set[1]
-    else:
-        groundtruth = test_set[0].reshape((-1,) + img_shape)[..., -1]
-    targets = average_helper(n_pos, groundtruth[data_idx])
-
+        target_pos = np.zeros((n_instances, n_frames))
     predicted_pos = np.zeros((n_instances, n_frames))
     for i in range(n_instances):
-        predicted_pos[i] = average_helper(n_pos, prediction[i])
+        predicted_pos[i] = average_helper(n_pos, predictions[i])
+        if targets.size == predictions.size:
+            target_pos[i] = average_helper(n_pos, targets[i])
 
     # for knowing how the agent performs at infinite speed just return the
     # number of cases where the prediction error is smaller than the
     # paddle width. successes has n_frames entries (basically time)
     if max_speedup == np.inf:
-        pred_error = np.abs(predicted_pos - targets.reshape((len(targets), 1)))
+        if len(target_pos.shape) == 1:
+            target_pos = target_pos.reshape((-1, 1))
+        pred_error = np.abs(predicted_pos - target_pos)
         successes = np.sum(pred_error < .5*paddle_width, axis=0)
         # for inspecting failed cases
         wrong_idx = data_idx[np.where(
@@ -108,12 +100,14 @@ def compute_performance(img_shape, test_set, data_idx, prediction, max_speedup=2
             'successes': successes,
             'distances': pred_error,  # for infinite speed equivalent
             'speeds': np.inf,
-            'n_instances': len(data_idx),
+            'n_instances': n_instances,
             'wrong_idx': wrong_idx
         }
         return result
 
     predicted_pos = predicted_pos.T
+    if target_pos.size == predicted_pos.size:
+        target_pos = target_pos.T
     # exclude fully clamped prediction because it is always correct
     if leave_uncovered > 0:
         predicted_pos = predicted_pos[:-leave_uncovered]
@@ -123,15 +117,14 @@ def compute_performance(img_shape, test_set, data_idx, prediction, max_speedup=2
     speed_range = np.linspace(0, max_speedup * v_ball, 100)
     successes = np.zeros_like(speed_range)
     successes_std = np.zeros_like(speed_range)
-    distances = np.zeros((len(speed_range), len(targets)))
-    n_recorded = len(targets)//100
+    distances = np.zeros((len(speed_range), n_instances))
+    n_recorded = n_instances//100
     traces = np.zeros((speed_range.shape[0], predicted_pos.shape[0], n_recorded))
     print('sweep agent speed ({} to {})...'.format(speed_range[0], speed_range[-1]))
     for i, speed in enumerate(speed_range):
-        my_agent = Pong_agent(img_shape[0], paddle_len=paddle_width,
-                              max_step=speed)
+        my_agent = Pong_agent(n_pos, paddle_len=paddle_width, max_step=speed)
         successes[i], successes_std[i], distances[i], tmp = \
-            my_agent.simulate_games(predicted_pos, targets)
+            my_agent.simulate_games(predicted_pos, target_pos)
         traces[i] = tmp[:, :n_recorded]
 
     # save data - speed normalized to ball speed
@@ -142,7 +135,7 @@ def compute_performance(img_shape, test_set, data_idx, prediction, max_speedup=2
         'distances': distances,
         'traces': traces,
         'speeds': speed_range/v_ball,
-        'n_instances': len(data_idx)
+        'n_instances': n_instances
     }
     return result
 
