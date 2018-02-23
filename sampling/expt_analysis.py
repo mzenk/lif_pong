@@ -20,11 +20,18 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2,
     n_samples = general_dict['n_samples']
     start = general_dict['start_idx']
     img_shape = tuple(general_dict['img_shape'])
+    kink_dict = None
+    data_tuple = load_images(general_dict['data_name'], for_analysis=True)
+    if len(data_tuple) == 4:
+            kink_dict = data_tuple[3]
     if data_set is None:
         # take test set as default
-        _, _, data_set = load_images(general_dict['data_name'])
-    n_labels = img_shape[0]//3
+        data_set = data_tuple[2]
+    data_tuple = None
+    data = data_set[0]
+    n_labels = data_set[1].shape[1]
     n_pxls = np.prod(img_shape)
+
     if identifier_params is None:
         identifier_params = simdict.pop('identifier')
 
@@ -39,18 +46,28 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2,
             chunk_pred = average_pool(chunk_vis, n_samples, n_samples)
             chunk_idxs = np.arange(start, start + len(chunk_pred))
 
-            last_col = chunk_pred[..., :-n_labels].reshape(
+            last_col = chunk_pred[..., :n_pxls].reshape(
                 chunk_pred.shape[:-1] + img_shape)[..., -1]
-            lab = chunk_pred[..., -n_labels:]
+            lab = chunk_pred[..., n_pxls:]
 
             print('Saving prediction data of {} instances'.format(len(last_col)))
             # save data (averaged samples for label units and last column)
             np.savez_compressed('prediction', label=lab, last_col=last_col,
                                 data_idx=chunk_idxs)
 
+            # make groundtruth array
+            targets = data[chunk_idxs].reshape((-1,) + img_shape)[..., -1]
+            if kink_dict is not None:
+                prekink_test_targets = kink_dict['nokink_lastcol'][-len(data):]
+                nsteps_pre = int(kink_dict['pos']*img_shape[1])
+                targets = np.concatenate(
+                    (np.tile(np.expand_dims(prekink_test_targets[chunk_idxs], 1), (1, nsteps_pre, 1)),
+                    np.tile(np.expand_dims(targets, 1), (1, last_col.shape[1] - nsteps_pre, 1))),
+                    axis=1)
+
             # compute agent performance
             result_dict = pong_agent.compute_performance(
-                img_shape, data_set, chunk_idxs, last_col, max_speedup=np.inf)
+                last_col, targets, chunk_idxs, max_speedup=np.inf)
             print('Saving agent performance data...')
             np.savez_compressed('agent_performance', **result_dict)
 
@@ -77,7 +94,7 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2,
             if 'wrong_idx' in result_dict.keys():
                 with open('wrong_cases', 'w') as f:
                     f.write(yaml.dump(result_dict['wrong_idx'].tolist()))
-    except Exception as e:
+    except KeyError as e:
         anadict = {'n_instances': float('nan'),
                    'inf_success': float('nan'),
                    'cum_prederr_sum': float('nan'),
@@ -93,6 +110,7 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2,
 
     return anadict
 
+
 # analysis for dreaming experiments
 def burnin_analysis(vis_samples):
     # vis_samples.shape: (n_samples, n_visible)
@@ -106,7 +124,7 @@ def burnin_analysis(vis_samples):
     sobel_filtered = ndimage.sobel(smoothed_signal)
     # other option: threshold crossing
     thresh = .9
-    thresh_crossings = np.where(smoothed_signal > thresh*smoothed_signal.max())[0]
+    above_thresh = np.where(smoothed_signal > thresh*smoothed_signal.max())[0]
     fig, ax = plt.subplots(1, 3, figsize=(15, 6))
     ax[0].plot(mean_activity, '.', label='signal')
     ax[1].plot(smoothed_signal, '.', label='smoothed')
@@ -114,10 +132,26 @@ def burnin_analysis(vis_samples):
     ax[2].plot(sobel_filtered, '.', label='sobel')
     fig.savefig('activity.png')
     return {'edge_loc': int(np.argmax(sobel_filtered)),
-            'thresh_crossing': int(thresh_crossings.min())}
+            'thresh_crossing': int(above_thresh.min())}
 
-def mode_switch_analysis():
-    pass
+
+def mode_switch_analysis(vis_samples, target_data, n_init):
+    # vis_samples.shape: (n_instances, n_samples, n_visible)
+    l2_diff = np.sqrt(np.sum(
+        (vis_samples - np.expand_dims(target_data, 1))**2, axis=2))
+
+    smoothed_signal = ndimage.gaussian_filter1d(l2_diff, 5, axis=1)
+    sobel_filtered = ndimage.sobel1d(smoothed_signal, axis=1)
+    edge_loc = np.argmin(sobel_filtered, axis=1)
+    # other option: threshold crossing
+    min_diff = l2_diff.min(axis=1)
+    thresh = 1.1
+    below_thresh = np.where(smoothed_signal < thresh*min_diff)
+    # threshold_crossing = np.hmmmm
+    return {'n_instances': len(vis_samples),
+            'edge_loc': int(),
+            'thresh_crossing': int()}
+
 
 if __name__ == '__main__':
     # if this is called as an independent analysis script load samples first

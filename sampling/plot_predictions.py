@@ -52,34 +52,6 @@ def merge_chunks(basefolder, identifier_dict, savename):
             # findDiff(identifier_dict, sim_identifiers)
             continue
 
-        # # first version: compute predictions from samples. since the analysis
-        # # should have done this already it is better to just load the prediction
-        # # file (see below)
-        # general_dict = simdict.pop('general')
-        # n_samples = general_dict['n_samples']
-        # img_shape = tuple(general_dict['img_shape'])
-        # n_labels = img_shape[0]//3
-        # n_pxls = np.prod(img_shape)
-        # try:
-        #     with np.load(os.path.join(simpath, 'samples.npz')) as d:
-        #         chunk_samples = d['samples'].astype(float)
-        #         if 'data_idx' in d.keys():
-        #             chunk_idx = d['data_idx']
-        #         else:
-        #             chunk_idx = np.arange(
-        #                 chunk_start, chunk_start + len(chunk_samples))
-        # except IOError:
-        #     print('File not found: ' + folder + '/samples.npz',
-        #           file=sys.stderr)
-        #     continue
-
-        # chunk_vis = chunk_samples[..., :n_pxls + n_labels]
-        # # average pool on each chunk, then compute prediction
-        # chunk_vis = average_pool(chunk_vis, n_samples, n_samples)
-
-        # tmp = chunk_vis[..., :-n_labels].reshape(
-        #     chunk_vis.shape[:-1] + img_shape)[..., -1]
-
         try:
             with np.load(os.path.join(simpath, 'prediction.npz')) as d:
                 tmp = d['last_col'].astype(float)
@@ -114,7 +86,7 @@ def merge_chunks(basefolder, identifier_dict, savename):
     return prediction, data_idx
 
 
-def get_performance_data(basefolder, identifier_dict, test_set):
+def get_performance_data(basefolder, identifier_dict, test_data):
     id_string = '_'.join(
         ['{}'.format(identifier_dict[k]) for k in sorted(identifier_dict.keys())])
     savename = os.path.join(make_data_folder(),
@@ -129,41 +101,40 @@ def get_performance_data(basefolder, identifier_dict, test_set):
         prediction, data_idx = merge_chunks(basefolder, identifier_dict,
                                             savename)
 
-    # load stuff for pong agent from an arbitrary sim folder
-    # (params should be the same for all)
-    simpath = os.path.join(basefolder, os.listdir(basefolder)[0])
-    with open(os.path.join(simpath, 'sim.yaml')) as config:
-        general_dict = yaml.load(config)['general']
-
     if prediction is not None:
+        targets = test_data[data_idx].reshape(
+            (len(data_idx), prediction.shape[2], -1))[..., -1]
         # compute agent performance
         agent_result = pong_agent.compute_performance(
-            tuple(general_dict['img_shape']), test_set, data_idx, prediction)
+            prediction, targets, data_idx)
 
     return data_idx, prediction, agent_result
 
 
-def compute_prediction_error(prediction, targets, n_pos, use_labels=False,
+def compute_prediction_error(predictions, targets, n_pos, use_labels=False,
                              lab2pxl=3):
     if use_labels:
         raise NotImplementedError
 
-    n_instances = prediction.shape[0]
-    n_frames = prediction.shape[1]
+    n_instances = predictions.shape[0]
+    n_frames = predictions.shape[1]
 
     # transform one-hot-encoded prediction and targets to position in pxls
-    target_pos = average_helper(n_pos, targets)
+    if targets.size != predictions.size:
+        target_pos = average_helper(n_pos, targets).reshape((n_instances, 1))
+    else:
+        target_pos = np.zeros((n_instances, n_frames))
     predicted_pos = np.zeros((n_instances, n_frames))
     for i in range(n_instances):
-        predicted_pos[i] = average_helper(n_pos, prediction[i])
+        predicted_pos[i] = average_helper(n_pos, predictions[i])
+        if targets.size == predictions.size:
+            target_pos[i] = average_helper(n_pos, targets[i])
 
     if use_labels:
         predicted_pos *= lab2pxl
         target_pos *= lab2pxl
 
-    # compute percentiles of prediction error
-    dist = np.abs(predicted_pos - target_pos.reshape((len(target_pos), 1)))
-    return dist
+    return np.abs(predicted_pos - target_pos)
 
 # copied and adapted from prediction_quality.py; ugly but no time for more
 def plot_prediction_error(ax, pred_error, label=None, x_data=None):
@@ -225,24 +196,39 @@ def main(identifier_list):
         with open(config_file) as config:
             experiment_dict = yaml.load(config)
         # load data
+        stub_dict = experiment_dict.pop('stub')
         if 'data_name' in identifier_dict.keys():
             data_name = identifier_dict['data_name']
         else:
-            stub_dict = experiment_dict.pop('stub')
             data_name = stub_dict['general']['data_name']
-        _, _, test_set = load_images(data_name)
+        img_shape = tuple(stub_dict['general']['img_shape'])
+        data_tuple = load_images(data_name, for_analysis=True)
+        test_set = data_tuple[2]
+        kink_dict = None
+        if len(data_tuple) == 4:
+            kink_dict = data_tuple[3]
+
         try:
             label = identifier_dict.pop('label')
         except KeyError:
             label = 'parameters {}'.format(i)
-        data_idx, prediction, agent_result = get_performance_data(
-            os.path.join(simfolder, expt_name), identifier_dict, test_set)
 
         # load data and compute prediction errors
-        n_pxlrows = prediction.shape[2]
-        test_data = test_set[0][data_idx]
-        targets = test_data.reshape((len(test_data), n_pxlrows, -1))[..., -1]
-        pred_error = compute_prediction_error(prediction, targets, n_pxlrows)
+        test_data = test_set[0]
+        data_idx, prediction, agent_result = get_performance_data(
+            os.path.join(simfolder, expt_name), identifier_dict, test_data)
+        targets = test_data[data_idx].reshape((-1,)  + img_shape)[..., -1]
+
+        if kink_dict is not None:
+            prekink_test_targets = kink_dict['nokink_lastcol'][-len(test_data):]
+            nsteps_pre = int(kink_dict['pos']*img_shape[1])
+            targets = np.concatenate(
+                (np.tile(np.expand_dims(prekink_test_targets[data_idx], 1), (1, nsteps_pre, 1)),
+                np.tile(np.expand_dims(targets, 1), (1, prediction.shape[1] - nsteps_pre, 1))),
+                axis=1)
+
+        n_pos = prediction.shape[2]
+        pred_error = compute_prediction_error(prediction, targets, n_pos)
 
         plot_prediction_error(ax_pe, pred_error, label)
         for i, dist_pos in enumerate(np.arange(.2, 1., .2)*pred_error.shape[1]):
