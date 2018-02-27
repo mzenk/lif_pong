@@ -118,39 +118,58 @@ def burnin_analysis(vis_samples):
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    # try getting burn-in by looking for edges in activity
+    # assumption: network reaches stationary activity level state after 3/4 of
+    # simulation
     mean_activity = vis_samples.squeeze().mean(axis=1)
     smoothed_signal = ndimage.gaussian_filter1d(mean_activity, 5)
-    sobel_filtered = ndimage.sobel(smoothed_signal)
-    # other option: threshold crossing
-    thresh = .9
-    above_thresh = np.where(smoothed_signal > thresh*smoothed_signal.max())[0]
-    fig, ax = plt.subplots(1, 3, figsize=(15, 6))
+    stat_activity = mean_activity[-int(.75*len(mean_activity)):].mean()
+
+    # good estimator of burnin: #samples after which activity level is at
+    # X % (90, 95?) of final level
+    thresh = .95*stat_activity
+    above_thresh = np.argmax(smoothed_signal > thresh)
+
+    # # use of sobel is discouraged because not always just one rising flank
+    # sobel_filtered = ndimage.sobel(smoothed_signal)
+    # edge_loc = int(np.argmax(sobel_filtered))
+
+    fig, ax = plt.subplots(1, 2, figsize=(15, 6))
+
+    ax[0].hlines(stat_activity, 0, len(mean_activity), label='stationary')
+    ax[1].hlines(thresh, 0, len(smoothed_signal), colors='C1', label='threshold')
+    ax[1].hlines(stat_activity, 0, len(smoothed_signal), label='stationary')
+
     ax[0].plot(mean_activity, '.', label='signal')
     ax[1].plot(smoothed_signal, '.', label='smoothed')
-    ax[1].plot(ax[1].get_xlim(), 2*[thresh*smoothed_signal.max()], 'C1:')
-    ax[2].plot(sobel_filtered, '.', label='sobel')
+
+    ax[0].set_ylim(bottom=0.)
+    ax[1].set_ylim(bottom=0.)
+    ax[0].legend()
+    ax[1].legend()
     fig.savefig('activity.png')
-    return {'edge_loc': int(np.argmax(sobel_filtered)),
-            'thresh_crossing': int(above_thresh.min())}
+    return {'stat_activity': float(stat_activity),
+            'thresh_crossing': int(above_thresh)}
 
 
+# under construction
 def mode_switch_analysis(vis_samples, target_data, n_init):
     # vis_samples.shape: (n_instances, n_samples, n_visible)
+    # target_data.shape: (n_instances, n_visible)
     l2_diff = np.sqrt(np.sum(
         (vis_samples - np.expand_dims(target_data, 1))**2, axis=2))
 
     smoothed_signal = ndimage.gaussian_filter1d(l2_diff, 5, axis=1)
     sobel_filtered = ndimage.sobel1d(smoothed_signal, axis=1)
     edge_loc = np.argmin(sobel_filtered, axis=1)
-    # other option: threshold crossing
-    min_diff = l2_diff.min(axis=1)
-    thresh = 1.1
-    below_thresh = np.where(smoothed_signal < thresh*min_diff)
-    # threshold_crossing = np.hmmmm
+    # for threshold assume that after 3/4 of expt, difference is stationary
+    stat_diff = l2_diff[-int(.75*l2_diff.shape[1]):].mean(axis=1)
+    thresh = 1.1*stat_diff
+    thresh_crossing = np.argmax(smoothed_signal < np.expand_dims(thresh, 1), axis=1)
+
     return {'n_instances': len(vis_samples),
-            'edge_loc': int(),
-            'thresh_crossing': int()}
+            'edge_loc': edge_loc.tolist(),
+            'stat_diff': stat_diff.tolist(),
+            'thresh_crossing': thresh_crossing.tolist()}
 
 
 if __name__ == '__main__':

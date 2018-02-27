@@ -140,6 +140,8 @@ def main(config_dict):
                 ax.set_title(title)
             except KeyError:
                 ax.set_title('samples {}'.format(i*len(axrow) + j))
+            except IndexError:
+                im.pop()
     ani = animation.FuncAnimation(
         fig, update_fig, frames=frame_list[0].shape[0],
         interval=10., blit=True, repeat=False,

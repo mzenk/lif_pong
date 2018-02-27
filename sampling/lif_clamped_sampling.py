@@ -31,8 +31,7 @@ def sample_network(config_file, weights, biases, duration, dt=.1,
         sim_setup_kwargs['spike_precision'] = 'on_grid'
 
     v_reset =  network.samplers[0].neuron_parameters.v_reset
-    v_init = np.random.randint(2, size=len(biases))*(-v_reset) + v_reset
-
+    v_init = np.random.binomial(1, sigma(biases))*(-v_reset) + v_reset
 
     network.gather_spikes(duration=duration, dt=dt, burn_in_time=burn_in_time,
                           sim_setup_kwargs=sim_setup_kwargs, initial_vmem=v_init)
@@ -136,7 +135,7 @@ def gather_network_spikes_clamped(
     population.record("spikes")
     if initial_vmem is None:
         v_reset =  network.samplers[0].neuron_parameters.v_reset
-        v_init = np.random.randint(2, size=len(network.samplers))*(-v_reset) + v_reset
+        v_init = np.random.binomial(1, sigma(network.biases_theo))*(-v_reset) + v_reset
     population.initialize(v=v_init)
 
     callbacks = get_callbacks(sim, {
@@ -244,7 +243,7 @@ def gather_network_spikes_clamped_bn(
     population.record("spikes")
     if initial_vmem is None:
         v_reset =  network.samplers[0].neuron_parameters.v_reset
-        v_init = np.random.randint(2, size=len(network.samplers))*(-v_reset) + v_reset
+        v_init = np.random.binomial(1, sigma(network.biases_theo))*(-v_reset) + v_reset
     population.initialize(v=v_init)
 
     callbacks = get_callbacks(sim, {
@@ -402,7 +401,7 @@ def gather_network_spikes_clamped_sf(
     population.record("spikes")
     if initial_vmem is None:
         v_reset =  network.samplers[0].neuron_parameters.v_reset
-        v_init = np.random.randint(2, size=len(network.samplers))*(-v_reset) + v_reset
+        v_init = np.random.binomial(1, sigma(network.biases_theo))*(-v_reset) + v_reset
     population.initialize(v=v_init)
 
     callbacks = get_callbacks(sim, {
@@ -497,6 +496,10 @@ def get_clamp_weights(clamp_dict, vis_bias, alpha_w, tau_syn):
             exc_weights /= (1 - np.exp(-dt_spike/tau_syn))
             inh_weights /= (1 - np.exp(-dt_spike/tau_syn))
     return exc_weights, inh_weights
+
+
+def sigma(x):
+    return 1./(1 + np.exp(-x))
 
 
 def inv_sigma(p):

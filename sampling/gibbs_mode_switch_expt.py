@@ -16,10 +16,10 @@ def main(data_set, rbm, general_dict, analysis_dict):
     # pass arguments from dictionaries to simulation
     n_samples = general_dict['n_samples']
     img_shape = tuple(general_dict['img_shape'])
-    rbm.set_seed(general_dict['seed'])
     start = general_dict['start_idx']
     end = start + general_dict['chunksize']
     gather_data = general_dict['gather_data']
+    rbm.set_seed(general_dict['seed'] + start)
 
     if 'init_time' in general_dict.keys():
         init_time = general_dict['init_time']

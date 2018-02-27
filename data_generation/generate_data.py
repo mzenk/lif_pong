@@ -129,6 +129,15 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
     reflected = np.all(last_col == 0, axis=1)
     print('{} of {} balls were reflected.'.format(reflected.sum(),
                                                   data.shape[0]))
+    # remove reflected samples
+    if reflected.sum() > 0:
+        last_col = last_col[np.logical_not(reflected)]
+        data = data[np.logical_not(reflected)]
+        init_states = init_states[np.logical_not(reflected)]
+        impact_points = impact_points[np.logical_not(reflected)]
+        if kink_dict is not None:
+            nokink_lastcols = nokink_lastcols[np.logical_not(reflected)]
+
     with open('reflected', 'w') as f:
         f.write(yaml.dump(np.nonzero(reflected)[0].tolist()))
     # last_col = last_col[~reflected]
