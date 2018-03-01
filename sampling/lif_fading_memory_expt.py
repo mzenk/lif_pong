@@ -25,16 +25,17 @@ def lif_tso_clamping_expt(test_imgs, img_shape, rbm, sbs_kwargs,
 
     # add all necessary kwargs to one dictionary
     kwargs = {k: sbs_kwargs[k] for k in sbs_kwargs.keys()}
+    clamp_dict['n_pixels'] = rbm.n_inputs
 
     results = []
     for i, img in enumerate(test_imgs):
         # choose different seed for each simulation
-        sbs_kwargs['sim_setup_kwargs']['rng_seeds_seed'] += i
+        sbs_kwargs['sim_setup_kwargs']['rng_seeds_seed'] += 100
         kwargs['clamp_fct'] = \
             lifsampl.Clamp_window(clamp_duration, img.reshape(img_shape),
                                   win_size=winsize)
         bm.spike_data = lifsampl.gather_network_spikes_clamped_sf(
-            bm, duration, rbm.n_inputs, clamp_dict=clamp_dict, **kwargs)
+            bm, duration, clamp_dict=clamp_dict, **kwargs)
         results.append(bm.get_sample_states(sampling_interval))
     return np.array(results)
 

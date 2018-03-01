@@ -5,12 +5,21 @@ from sbs.logcfg import log
 from lif_pong.utils import get_windowed_image_index
 import time
 import sys
+import copy
 import numpy as np
 import pyNN.nest as sim
 
 # from sbs.logcfg import set_loglevel
 # set_loglevel(log, 3)
 sbs.gather_data.set_subprocess_silent(True)
+
+
+def init_vmem(network):
+    v_reset =  network.samplers[0].neuron_parameters.v_reset
+    v_thresh =  network.samplers[0].neuron_parameters.v_thresh
+    v_init = np.random.binomial(1, sigma(network.biases_theo))* \
+        (v_thresh + .01*np.abs(v_thresh) - v_reset) + v_reset
+    return v_init
 
 
 def sample_network(config_file, weights, biases, duration, dt=.1,
@@ -30,8 +39,7 @@ def sample_network(config_file, weights, biases, duration, dt=.1,
     if 'spike_precision' not in sim_setup_kwargs.keys():
         sim_setup_kwargs['spike_precision'] = 'on_grid'
 
-    v_reset =  network.samplers[0].neuron_parameters.v_reset
-    v_init = np.random.binomial(1, sigma(biases))*(-v_reset) + v_reset
+    v_init = init_vmem(network)
 
     network.gather_spikes(duration=duration, dt=dt, burn_in_time=burn_in_time,
                           sim_setup_kwargs=sim_setup_kwargs, initial_vmem=v_init)
@@ -134,8 +142,7 @@ def gather_network_spikes_clamped(
 
     population.record("spikes")
     if initial_vmem is None:
-        v_reset =  network.samplers[0].neuron_parameters.v_reset
-        v_init = np.random.binomial(1, sigma(network.biases_theo))*(-v_reset) + v_reset
+        v_init = init_vmem(network)
     population.initialize(v=v_init)
 
     callbacks = get_callbacks(sim, {
@@ -242,8 +249,7 @@ def gather_network_spikes_clamped_bn(
 
     population.record("spikes")
     if initial_vmem is None:
-        v_reset =  network.samplers[0].neuron_parameters.v_reset
-        v_init = np.random.binomial(1, sigma(network.biases_theo))*(-v_reset) + v_reset
+        v_init = init_vmem(network)
     population.initialize(v=v_init)
 
     callbacks = get_callbacks(sim, {
@@ -292,7 +298,7 @@ def gather_network_spikes_clamped_bn(
 
 # Clamping implemented with bias neurons that fire at 1kHz whenever unit "on"
 def gather_network_spikes_clamped_sf(
-        network, duration, nv, dt=0.1, burn_in_time=500., create_kwargs=None,
+        network, duration, dt=0.1, burn_in_time=500., create_kwargs=None,
         sim_setup_kwargs=None, initial_vmem=None, clamp_fct=None,
         clamp_dict=None, on_thresh=.5, off_thresh=None):
     """
@@ -305,6 +311,12 @@ def gather_network_spikes_clamped_sf(
         is called by the ClampCallback object, which then adjusts the biases
         accordingly
     """
+    if clamp_fct is None or clamp_dict is None:
+        return network.gather_spikes(
+            duration=duration, dt=dt, burn_in_time=burn_in_time,
+            sim_setup_kwargs=sim_setup_kwargs, initial_vmem=initial_vmem)
+
+    nv = clamp_dict['n_pixels']
     log.info("Gathering spike data...")
     if sim_setup_kwargs is None:
         sim_setup_kwargs = {}
@@ -400,8 +412,7 @@ def gather_network_spikes_clamped_sf(
 
     population.record("spikes")
     if initial_vmem is None:
-        v_reset =  network.samplers[0].neuron_parameters.v_reset
-        v_init = np.random.binomial(1, sigma(network.biases_theo))*(-v_reset) + v_reset
+        v_init = init_vmem(network)
     population.initialize(v=v_init)
 
     callbacks = get_callbacks(sim, {
@@ -638,15 +649,15 @@ class Clamp_anything(object):
             self.clamped_val = [clamped_val]
         else:
             assert len(refresh_times) == len(clamped_idx) == len(clamped_val)
-            self.clamped_idx = clamped_idx
-            self.clamped_val = clamped_val
+            self.clamped_idx = copy.deepcopy(clamped_idx)
+            self.clamped_val = copy.deepcopy(clamped_val)
 
         # method is always called with t==0, so we need to add this if necess.
-        if refresh_times[0] != 0:
-            refresh_times.insert(0, 0.)
+        self.refresh_times = copy.deepcopy(refresh_times)
+        if self.refresh_times[0] != 0:
+            self.refresh_times.insert(0, 0.)
             self.clamped_idx.insert(0, [])
             self.clamped_val.insert(0, [])
-        self.refresh_times = refresh_times
 
     def set_clamped_val(self, clamped_val):
         if type(clamped_val) is not list and \
@@ -676,15 +687,19 @@ class Clamp_anything(object):
 
 
 class Clamp_window(object):
-    def __init__(self, interval, clamp_img, win_size=None):
+    def __init__(self, interval, clamp_img, win_size=None, offset=0.):
+        # clamp_img must have two dimensions
         self.interval = interval
         self.clamp_img = clamp_img
         if win_size is None:
             win_size = clamp_img.shape[1]
         self.win_size = win_size
+        self.offset = offset
 
     def __call__(self, t):
-        end = min(int(t / self.interval), self.clamp_img.shape[1])
+        if t < self.offset:
+            return self.offset - t, [], []
+        end = min(int((t - self.offset) / self.interval), self.clamp_img.shape[1])
         clamped_idx = get_windowed_image_index(
             self.clamp_img.shape, end, self.win_size)
         clamped_val = self.clamp_img.flatten()[clamped_idx]

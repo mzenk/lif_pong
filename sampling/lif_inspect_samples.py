@@ -126,7 +126,8 @@ def main(config_dict):
         axarr = np.array([single_ax])
     else:
         tile_shape = (2, len(frame_list)//2 + len(frame_list) % 2)
-        fig, axarr = plt.subplots(*tile_shape, figsize=(tile_shape[1]*8, tile_shape[0]*6))
+        fig, axarr = plt.subplots(*tile_shape, figsize=(tile_shape[1]*6, tile_shape[0]*4.5))
+        fig.subplots_adjust(wspace=0.1, hspace=0.3)
     if len(axarr.shape) == 1:
         axarr = np.expand_dims(axarr, 1)
 

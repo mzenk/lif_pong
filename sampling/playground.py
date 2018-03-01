@@ -11,24 +11,84 @@ import matplotlib.pyplot as plt
 
 
 def lif_clamp_pattern(n_samples, test_imgs, img_shape, rbm, calib_file,
-                      sampling_interval=10., burn_in_time=100.):
+                      sampling_interval=10., burn_in_time=100., synclamp=False):
     # Bring weights and biases into right form
     w, b = rbm.bm_params()
     duration = n_samples * sampling_interval
-    refresh_times = [0]
+    refresh_times = [.75*duration, .85*duration]
     clamp_mask = np.ones(img_shape).reshape(img_shape)
-    clamp_mask[:, int(.2*img_shape[1]):] = 0
+    clamp_mask[:, int(.5*img_shape[1]):] = 0
     clamp_idx = np.where(clamp_mask.flatten() == 1)[0]
-    refresh_times = [0.]
+    clamp_dict = {
+      'n_pixels': np.prod(img_shape),
+      'spike_interval': 1.,
+      'bias_shift': 8,
+      'tso_params': {'U': 1., 'tau_rec': 10., 'tau_fac': 0.}
+    }
 
-    bm = lifsampl.initialise_network(calib_file, w, b)
+    renewing_params = {'U': 1., 'tau_rec': 10., 'tau_fac': 0}
+    bm = lifsampl.initialise_network(calib_file, w, b, tso_params=renewing_params)
     results = []
 
+    sim_setup_kwargs = {
+        # choose different seed for each simulation
+        'rng_seeds_seed': 479233,
+    }
+
     for img in test_imgs:
-        clamp_fct = lifsampl.Clamp_anything(refresh_times, [clamp_idx],
-                                            [img[clamp_idx]])
-        bm.spike_data = lifsampl.gather_network_spikes_clamped(
-            bm, duration, clamp_fct=clamp_fct, burn_in_time=burn_in_time)
+        sim_setup_kwargs['rng_seeds_seed'] += 1
+        clamp_fct = lifsampl.Clamp_anything(refresh_times, [[], clamp_idx],
+                                            [[], img[clamp_idx]])
+        if not synclamp:
+            bm.spike_data = lifsampl.gather_network_spikes_clamped(
+                bm, duration, clamp_fct=clamp_fct, burn_in_time=burn_in_time,
+                sim_setup_kwargs=sim_setup_kwargs)
+        else:
+            bm.spike_data = lifsampl.gather_network_spikes_clamped_sf(
+                bm, duration, clamp_fct=clamp_fct, burn_in_time=burn_in_time,
+                clamp_dict=clamp_dict, sim_setup_kwargs=sim_setup_kwargs)
+        if bm.spike_data is None:
+            return None
+        results.append(bm.get_sample_states(sampling_interval))
+    return np.array(results)
+
+
+def lif_clamp_window(n_samples, test_imgs, img_shape, rbm, calib_file,
+                     sampling_interval=10., burn_in_time=100., offset=0.,
+                     synclamp=False):
+    # Bring weights and biases into right form
+    w, b = rbm.bm_params()
+    duration = n_samples * sampling_interval
+    offset_time = offset * sampling_interval
+    clamp_interval = 10 * sampling_interval
+    clamp_dict = {
+      'n_pixels': np.prod(img_shape),
+      'spike_interval': 1.,
+      'bias_shift': 8,
+      'tso_params': {'U': 1., 'tau_rec': 10., 'tau_fac': 0.}
+    }
+
+    renewing_params = {'U': 1., 'tau_rec': 10., 'tau_fac': 0}
+    bm = lifsampl.initialise_network(calib_file, w, b, tso_params=renewing_params)
+    results = []
+
+    sim_setup_kwargs = {
+        # choose different seed for each simulation
+        'rng_seeds_seed': 479233,
+    }
+
+    for img in test_imgs:
+        sim_setup_kwargs['rng_seeds_seed'] += 1
+        clamp_fct = lifsampl.Clamp_window(
+            clamp_interval, img.reshape(img_shape), offset=offset_time)
+        if not synclamp:
+            bm.spike_data = lifsampl.gather_network_spikes_clamped(
+                bm, duration, clamp_fct=clamp_fct, burn_in_time=burn_in_time,
+                sim_setup_kwargs=sim_setup_kwargs)
+        else:
+            bm.spike_data = lifsampl.gather_network_spikes_clamped_sf(
+                bm, duration, clamp_fct=clamp_fct, burn_in_time=burn_in_time,
+                clamp_dict=clamp_dict, sim_setup_kwargs=sim_setup_kwargs)
         if bm.spike_data is None:
             return None
         results.append(bm.get_sample_states(sampling_interval))
@@ -73,20 +133,34 @@ def gibbs_classification_check(rbm, data_set, img_shape):
     plt.savefig('label_histo')
 
 
-
-
 if __name__ == '__main__':
-    # load data
-    data_name = 'gauss_lw5_40x48'
-    rbm_name = 'gauss_lw5_40x48_crbm'
-    img_shape = (40, 48)
-    # data_name = 'pong_var_start36x48'
-    # rbm_name = 'pong_var_start36x48_crbm'
-    # img_shape = (36, 48)
     calib_file = 'calibrations/wei_curr_calib.json'
-    save_name = 'test'
-    
+    # load data
+    data_name = 'pong_lw5_40x48'
+    rbm_name = 'pong_lw5_40x48_crbm'
+    img_shape = (40, 48)
     _, _, test_set = load_images(data_name)
     rbm = rbm_pkg.load(get_rbm_dict(rbm_name))
+    save_name = 'test'
 
-    gibbs_classification_check(rbm, test_set, img_shape)
+    # # gibbs_classification_check(rbm, test_set, img_shape)
+    # samples = lif_clamp_pattern(500, test_set[0][:2], img_shape, rbm, calib_file,
+    #                             burn_in_time=0.)
+    samples = lif_clamp_window(750, test_set[0][:2], img_shape, rbm, calib_file,
+                               burn_in_time=0., offset=500, synclamp=True)
+    np.savez_compressed(os.path.join(make_data_folder(), 'window_sf'), samples=samples)
+    samples = lif_clamp_window(750, test_set[0][:2], img_shape, rbm, calib_file,
+                               burn_in_time=0., offset=500, synclamp=False)
+    np.savez_compressed(os.path.join(make_data_folder(), 'window'), samples=samples)
+
+    # # toy rbm
+    # nv = 7
+    # rbm = rbm_pkg.RBM(nv, 5)
+    # w, b = rbm.bm_params()
+    # duration = 1000.
+    # test_set = np.random.randint(2, size=(2, nv))
+    # save_name = 'toytest'
+
+    # renewing_params = {'U': 1., 'tau_rec': 10., 'tau_fac': 0}
+    # samples = lifsampl.sample_network(calib_file, w, b, duration,
+    #  tso_params=renewing_params, burn_in_time=0.)

@@ -27,7 +27,7 @@ def lif_window_expt(win_size, test_imgs, img_shape, rbm, sbs_kwargs,
 
     for i, img in enumerate(test_imgs):
         # choose different seed for each simulation
-        sbs_kwargs['sim_setup_kwargs']['rng_seeds_seed'] += i
+        sbs_kwargs['sim_setup_kwargs']['rng_seeds_seed'] += 100
         clamp_fct = lifsampl.Clamp_window(
             clamp_duration, img.reshape(img_shape), win_size)
         bm.spike_data = lifsampl.gather_network_spikes_clamped(
