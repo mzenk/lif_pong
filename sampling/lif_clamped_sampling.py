@@ -17,8 +17,10 @@ sbs.gather_data.set_subprocess_silent(True)
 def init_vmem(network):
     v_reset =  network.samplers[0].neuron_parameters.v_reset
     v_thresh =  network.samplers[0].neuron_parameters.v_thresh
-    v_init = np.random.binomial(1, sigma(network.biases_theo))* \
-        (v_thresh + .01*np.abs(v_thresh) - v_reset) + v_reset
+    # np.random.seed(123456)
+    # v_init = np.random.binomial(1, sigma(network.biases_theo))* \
+    #     (v_thresh + .01*np.abs(v_thresh) - v_reset) + v_reset
+    v_init = (v_thresh + .01*np.abs(v_thresh))*np.ones_like(network.biases_theo)
     return v_init
 
 
@@ -40,7 +42,6 @@ def sample_network(config_file, weights, biases, duration, dt=.1,
         sim_setup_kwargs['spike_precision'] = 'on_grid'
 
     v_init = init_vmem(network)
-
     network.gather_spikes(duration=duration, dt=dt, burn_in_time=burn_in_time,
                           sim_setup_kwargs=sim_setup_kwargs, initial_vmem=v_init)
 
@@ -94,6 +95,7 @@ def initialise_network(config_file, weights, biases, tso_params=None,
         bm.saturating_synapses_enabled = False
     else:
         bm.saturating_synapses_enabled = True
+        bm.use_proper_tso = True
         # only adjust if not renewing
         log.warning('Check for renewing synapses assumes tau_syn == 10.')
         if not (tso_params['U'] == 1. and 
@@ -102,7 +104,6 @@ def initialise_network(config_file, weights, biases, tso_params=None,
             # weight scaling could be swept over
             if tso_params['U'] != 0:
                 bm.weights_bio *= weight_scaling / tso_params['U']
-        bm.use_proper_tso = True
     return bm
 
 

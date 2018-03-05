@@ -68,7 +68,7 @@ def lif_clamp_window(n_samples, test_imgs, img_shape, rbm, calib_file,
       'tso_params': {'U': 1., 'tau_rec': 10., 'tau_fac': 0.}
     }
 
-    renewing_params = {'U': 1., 'tau_rec': 10., 'tau_fac': 0}
+    renewing_params = {'U': 1., 'tau_rec': 100., 'tau_fac': 0}
     bm = lifsampl.initialise_network(calib_file, w, b, tso_params=renewing_params)
     results = []
 
@@ -146,21 +146,21 @@ if __name__ == '__main__':
     # # gibbs_classification_check(rbm, test_set, img_shape)
     # samples = lif_clamp_pattern(500, test_set[0][:2], img_shape, rbm, calib_file,
     #                             burn_in_time=0.)
-    samples = lif_clamp_window(750, test_set[0][:2], img_shape, rbm, calib_file,
-                               burn_in_time=0., offset=500, synclamp=True)
-    np.savez_compressed(os.path.join(make_data_folder(), 'window_sf'), samples=samples)
-    samples = lif_clamp_window(750, test_set[0][:2], img_shape, rbm, calib_file,
-                               burn_in_time=0., offset=500, synclamp=False)
-    np.savez_compressed(os.path.join(make_data_folder(), 'window'), samples=samples)
+    # samples = lif_clamp_window(750, test_set[0][:2], img_shape, rbm, calib_file,
+    #                            burn_in_time=0., offset=500, synclamp=True)
+    # np.savez_compressed(os.path.join(make_data_folder(), 'window_sf'), samples=samples)
+    # samples = lif_clamp_window(750, test_set[0][:2], img_shape, rbm, calib_file,
+    #                            burn_in_time=0., offset=500, synclamp=False)
+    # np.savez_compressed(os.path.join(make_data_folder(), 'window'), samples=samples)
 
-    # # toy rbm
-    # nv = 7
-    # rbm = rbm_pkg.RBM(nv, 5)
-    # w, b = rbm.bm_params()
-    # duration = 1000.
-    # test_set = np.random.randint(2, size=(2, nv))
-    # save_name = 'toytest'
+    # toy rbm
+    nv = 7
+    rbm = rbm_pkg.RBM(nv, 5)
+    w, b = rbm.bm_params()
+    duration = 1000.
+    test_set = np.random.randint(2, size=(2, nv))
+    save_name = 'toytest'
 
-    # renewing_params = {'U': 1., 'tau_rec': 10., 'tau_fac': 0}
-    # samples = lifsampl.sample_network(calib_file, w, b, duration,
-    #  tso_params=renewing_params, burn_in_time=0.)
+    renewing_params = {'U': 1., 'tau_rec': 10., 'tau_fac': 0}
+    samples = lifsampl.sample_network(calib_file, w, b, duration,
+     tso_params=renewing_params, burn_in_time=0.)
