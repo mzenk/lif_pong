@@ -118,15 +118,19 @@ def burnin_analysis(vis_samples):
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
+    # the first sample is always zero and the second one the initialised state;
+    # both shall be neglected for analysis
+    vis_samples[:2] = 0
+
     # assumption: network reaches stationary activity level state after 3/4 of
     # simulation
-    mean_activity = vis_samples.squeeze().mean(axis=1)
+    mean_activity = vis_samples.mean(axis=1)
     smoothed_signal = ndimage.gaussian_filter1d(mean_activity, 5)
     stat_activity = mean_activity[-int(.75*len(mean_activity)):].mean()
 
     # good estimator of burnin: #samples after which activity level is at
     # X % (90, 95?) of final level
-    thresh = .95*stat_activity
+    thresh = .9*stat_activity
     above_thresh = np.argmax(smoothed_signal > thresh)
 
     # # use of sobel is discouraged because not always just one rising flank

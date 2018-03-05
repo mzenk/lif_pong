@@ -51,7 +51,7 @@ def main(rbm, general_dict, sbs_dict, analysis_dict):
     nv = rbm.n_visible
     if 'n_labels' in rbm.__dict__.keys():
         nv -= rbm.n_labels
-    result_dict = burnin_analysis(samples[:, :nv])
+    result_dict = burnin_analysis(samples[..., :nv].squeeze())
     result_dict['seed'] = sim_setup_kwargs['rng_seeds_seed']
     with open('analysis', 'w') as f:
             f.write(yaml.dump(result_dict))

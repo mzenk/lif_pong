@@ -138,7 +138,7 @@ def scale_to_unit_interval(ndar, eps=1e-8):
 
 def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0),
                        scale_rows_to_unit_interval=True,
-                       output_pixel_vals=True):
+                       output_pixel_vals=True, spacing_val=.5):
     """
     Transform an array with one flattened image per row, into an array in
     which images are reshaped and layed out like tiles on a floor.
@@ -231,7 +231,7 @@ def tile_raster_images(X, img_shape, tile_shape, tile_spacing=(0, 0),
         dt = X.dtype
         if output_pixel_vals:
             dt = 'uint8'
-        out_array = np.zeros(out_shape, dtype=dt)
+        out_array = spacing_val*np.ones(out_shape, dtype=dt)
 
         for tile_row in range(tile_shape[0]):
             for tile_col in range(tile_shape[1]):

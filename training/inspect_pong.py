@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 mpl.rcParams['font.size'] = 12
 
 
-def plot_data(data_set, show_idx, img_shape, tile_shape=(5, 5), binary=False):
+def plot_data(data_set, show_idx, img_shape, tile_shape=(4, 4), binary=False):
     if binary:
         data = (data_set[0][idx] > .4)*1.
         name_mod = '_bin'
@@ -20,13 +20,13 @@ def plot_data(data_set, show_idx, img_shape, tile_shape=(5, 5), binary=False):
         name_mod = ''
     samples = tile_raster_images(data,
                                  img_shape=img_shape,
-                                 tile_shape=(4, 4),
+                                 tile_shape=tile_shape,
                                  tile_spacing=(1, 1),
                                  scale_rows_to_unit_interval=True,
                                  output_pixel_vals=False)
 
     plt.figure()
-    plt.imshow(samples, interpolation='Nearest', cmap='gray', origin='lower')
+    plt.imshow(samples, interpolation='Nearest', cmap='gray_r', origin='lower')
     plt.gca().get_xaxis().set_visible(False)
     plt.gca().get_yaxis().set_visible(False)
     plt.tight_layout()
@@ -36,7 +36,7 @@ def plot_data(data_set, show_idx, img_shape, tile_shape=(5, 5), binary=False):
 
 # Load data -- Pong
 img_shape = (40, 48)
-data_name = 'knick_lw5_pos0.5_ampl0.7_40x48'
+data_name = 'gauss_lw5_40x48'
 train_set, valid_set, test_set = load_images(data_name)
 # # Load data -- MNIST
 # import gzip
@@ -50,11 +50,11 @@ print('Number of samples in train/valid/test set: {}, {}, {}'.format(
     len(train_set[0]), len(valid_set[0]), len(test_set[0])))
 print('labels: {}'.format(train_set[1].shape[1]))
 # inspect data
-data_set = train_set
+data_set = test_set
 np.random.seed(42)
 idx = np.random.choice(np.arange(len(data_set[0])),
-                       size=min(25, len(data_set[0])), replace=False)
-plot_data(data_set, idx, img_shape, binary=False)
+                       size=min(16, len(data_set[0])), replace=False)
+plot_data(data_set, idx, img_shape, binary=False, tile_shape=(3, 3))
 
 # # inspect label placement
 # imgs = train_set[0].reshape((train_set[0].shape[0], img_shape[0], img_shape[1]))

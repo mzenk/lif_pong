@@ -29,7 +29,7 @@ with open(os.path.join(collectfolder, expt_name)) as f:
 # make histogram of threshold crossings and stationary values
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 df.hist(column='stat_activity', ax=ax1, bins='auto', grid=False)
-df.hist(column='thresh_crossing', ax=ax2, bins='auto', grid=False)
+df.hist(column='thresh_crossing', ax=ax2, bins=100, grid=False)
 fig.savefig(os.path.join(make_figure_folder(), expt_name + '_histo.png'))
 
 quantiles = df.quantile([.25, .5, .75])
