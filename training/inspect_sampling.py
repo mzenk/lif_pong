@@ -17,6 +17,7 @@ def plot_samples(rbm, tile_shape, img_shape, samples_per_tile=1000, data=None,
     if data is None:
         v_init = None
     else:
+        np.random.seed(4200)
         rand_idx = np.random.choice(range(len(data)), size=n_chains,
                                     replace=False)
         v_init = np.hstack((data[rand_idx], np.zeros((len(rand_idx), rbm.n_labels))))
@@ -43,7 +44,7 @@ def plot_samples(rbm, tile_shape, img_shape, samples_per_tile=1000, data=None,
     # needs (n_imgs, n_pxls); samples is (n_steps, n_chains, n_pixels)
     # desired order: (chain[0], step[0]) -> (chain[1], step[0]) -> ...
     #                ... -> (chain[nc], step[0]) -> (chain[0], step[1]) -> ...
-    snapshots = samples[:, ::samples_per_tile, :n_pixels].reshape(-1, n_pixels)
+    snapshots = samples[::samples_per_tile, :, :n_pixels].reshape(-1, n_pixels)
 
     tiled_samples = tile_raster_images(snapshots,
                                        img_shape=img_shape,
@@ -59,8 +60,11 @@ def plot_samples(rbm, tile_shape, img_shape, samples_per_tile=1000, data=None,
     fig.savefig(os.path.join(make_figure_folder(), name + '_samples.png'))
 
 
-# Load rbm and data
-# testrbm = load_rbm('mnist_disc_rbm')
+# # Load rbm and data
+# import gzip, cPickle
+# with open('../shared_data/saved_rbms/mnist_crbm.pkl', 'rb') as f:
+#     rbm_dict = cPickle.load(f)
+# testrbm = rbm_pkg.load(rbm_dict)
 # with gzip.open('../shared_data/datasets/mnist.pkl.gz', 'rb') as f:
 #     _, _, test_set = np.load(f)
 # img_shape = (28, 28)
@@ -70,8 +74,10 @@ rbm_name = 'pong_lw5_40x48_crbm'
 data_name = 'pong_lw5_40x48'
 _, _, test_set = load_images(data_name)
 testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
+testrbm = rbm_pkg.load(rbm_dict)
 n_pixels = np.prod(img_shape)
 
+testrbm.set_seed(1234)
 plot_samples(testrbm, (10, 3), img_shape, samples_per_tile=100,
              data=test_set[0], ast=False)
 

@@ -792,13 +792,13 @@ class CRBM(RBM):
     def monitor_progress(self, train_set, valid_set, logger, isl=False):
         train_vis = train_set[:, :self.n_inputs]
         train_lab = train_set[:, self.n_inputs:]
-        valid_vis = valid_set[:, :self.n_inputs]
-        valid_lab = valid_set[:, self.n_inputs:]
         prediction = self.classify(train_vis)
         labels = np.argmax(train_lab, axis=1)
         logger.info('Correct classifications on training set: '
                     '{:.3f}'.format(np.average(prediction == labels)))
         if valid_set is not None:
+            valid_vis = valid_set[:, :self.n_inputs]
+            valid_lab = valid_set[:, self.n_inputs:]
             prediction = self.classify(valid_vis)
             labels = np.argmax(valid_lab, axis=1)
             logger.info('Correct classifications on validation set: '
