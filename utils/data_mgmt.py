@@ -59,7 +59,7 @@ def load_images(data_name, path=False, for_analysis=False):
     else:
         data_path = ''
         if socket.gethostname() == 'asdf':
-            data_path = os.path.expanduser('~/mnt/hel_mnt/shared_data/datasets')
+            data_path = os.path.expanduser('~/Repos/lif_pong/shared_data/datasets')
         elif 'nemo' in socket.gethostname():
             data_path = os.path.expanduser('~/git_repos/lif_pong/shared_data/datasets')
         else:
@@ -88,7 +88,7 @@ def load_images(data_name, path=False, for_analysis=False):
 def get_rbm_dict(rbm_name):
     path = ''
     if socket.gethostname() == 'asdf':
-        path = os.path.expanduser('~/mnt/hel_mnt/shared_data/saved_rbms')
+        path = os.path.expanduser('~/Repos/lif_pong/shared_data/saved_rbms')
     elif 'nemo' in socket.gethostname():
         path = os.path.expanduser('~/git_repos/lif_pong/shared_data/saved_rbms')
     else:

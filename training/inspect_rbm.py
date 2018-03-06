@@ -8,32 +8,39 @@ import rbm as rbm_pkg
 import matplotlib as mpl
 mpl.use('agg')
 import matplotlib.pyplot as plt
-# from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 mpl.rcParams['font.size'] = 12
 
 
-def plot_labvis_filters(rbm, label_idxs, img_shape, tile_shape=(3, 4),
-                        name='lab_filters', title='Label filters'):
+def plot_labvis_filters(rbm, label_idxs, img_shape, name='lab_filters',
+                        title='Label filters', ax=None):
     hidden_act = 1./(1 + np.exp(-rbm.wv - rbm.hbias))
     filters = np.dot(rbm.wl, hidden_act.T) + rbm.lbias.reshape((-1, 1))
     tiled_filters = tile_raster_images(X=filters[label_idxs],
                                        img_shape=img_shape,
-                                       tile_shape=tile_shape,
+                                       tile_shape=(1, len(label_idxs)),
                                        tile_spacing=(1, 1),
+                                       spacing_val=filters[label_idxs].min(),
                                        scale_rows_to_unit_interval=False,
                                        output_pixel_vals=False)
-    fig, ax = plt.subplots()
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        fig = None
     im = ax.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
-    # divider = make_axes_locatable(ax)
-    # cax = divider.append_axes("right", size="5%", pad=0.1)
-    # plt.colorbar(im, cax=cax)
-    plt.colorbar(im)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+    fmin = np.ceil(tiled_filters.min())
+    fmax = np.floor(tiled_filters.max())
+    plt.colorbar(im, cax=cax, ticks=[fmin, .5*(fmin + fmax), fmax])
+    # plt.colorbar(im, orientation='horizontal')
     ax.set_title(title)
     ax.tick_params(left='off', right='off', bottom='off',
                    labelleft='off', labelright='off', labelbottom='off')
-    fig.tight_layout()
-    plt.savefig(os.path.join(make_figure_folder(), name + '_filters.png'))
+    if fig is not None:
+        fig.tight_layout()
+        plt.savefig(os.path.join(make_figure_folder(), name + '_filters.png'))
 
 
 def plot_filters(rbm, hidden_idxs, img_shape, tile_shape=(4, 4),
@@ -46,10 +53,10 @@ def plot_filters(rbm, hidden_idxs, img_shape, tile_shape=(4, 4),
                                        output_pixel_vals=False)
     fig, ax = plt.subplots()
     im = ax.imshow(tiled_filters, interpolation='Nearest', cmap='gray')
-    # divider = make_axes_locatable(ax)
-    # cax = divider.append_axes("right", size="5%", pad=0.1)
-    # plt.colorbar(im, cax=cax)
-    plt.colorbar(im)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+    plt.colorbar(im, cax=cax)
+    # plt.colorbar(im)
     ax.set_title(title)
     ax.tick_params(left='off', right='off', bottom='off',
                    labelleft='off', labelright='off', labelbottom='off')
@@ -90,10 +97,20 @@ rbm_name = 'pong_lw5_40x48_crbm'
 # assert np.prod(img_shape) == train_set[0].shape[1]
 testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
 # RBM-specific plots
-rand_ind = np.random.randint(testrbm.n_hidden, size=16)
-plot_filters(testrbm, rand_ind, img_shape)
-plot_labvis_filters(testrbm, np.arange(10), img_shape)
-plot_histograms(testrbm)
+rand_ind = np.random.choice(np.arange(testrbm.n_hidden), size=12, replace=False)
+# plot_filters(testrbm, rand_ind, img_shape, tile_shape=(3, 4), name='gauss',
+#              title='Gau\ss')
+fig, ax = plt.subplots(2, 1, figsize=(14, 7))
+plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Pong',
+                    ax=ax[0])
+
+rbm_name = 'gauss_lw5_40x48_crbm'
+testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
+plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Gau\ss',
+                    ax=ax[1])
+fig.tight_layout()
+fig.savefig(os.path.join(make_figure_folder(), 'lab_filters.png'))
+# plot_histograms(testrbm)
 
 # # testing of L2
 # fname = 'gauss_uncover{}w{}s'.format(100, 100)

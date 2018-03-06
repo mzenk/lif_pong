@@ -1,25 +1,62 @@
 from __future__ import division
 import numpy as np
-import cPickle, gzip
-import matplotlib
-matplotlib.use('agg')
-import matplotlib.pyplot as plt
+import os
 from lif_pong.utils import tile_raster_images
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict, make_figure_folder
 import rbm as rbm_pkg
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
 
 
-def plot_samples(rbm, n_tiles, img_shape):
-    samples = testrbm.draw_samples(n_tiles*100)
-    tiled_samples = tile_raster_images(samples[::100, :np.prod(img_shape)],
+def plot_samples(rbm, tile_shape, img_shape, samples_per_tile=1000, data=None,
+                 title='', name='test', ast=False):
+    n_pixels = np.prod(img_shape)
+    n_samples = tile_shape[0]*samples_per_tile
+    n_chains = tile_shape[1]
+    if data is None:
+        v_init = None
+    else:
+        rand_idx = np.random.choice(range(len(data)), size=n_chains,
+                                    replace=False)
+        v_init = np.hstack((data[rand_idx], np.zeros((len(rand_idx), rbm.n_labels))))
+
+    # for i in range(len(v_init)):
+    #     plt.figure()
+    #     plt.imshow(v_init[i, :n_pixels].reshape(img_shape))
+    #     plt.savefig('test{}.png'.format(i))
+    if ast:
+        samples = np.zeros((n_samples, n_chains, n_pixels))
+        for i in range(n_chains):
+            tmp = testrbm.draw_samples_ast(
+                n_samples, v_init=v_init[i])[:, :n_pixels]
+            samples[:, i] = tmp
+    else:
+        # # for testing
+        # samples = np.zeros((n_samples, n_chains, n_pixels))
+        # for i in range(n_chains):
+        #     tmp = testrbm.draw_samples(
+        #         n_samples, v_init=v_init[i])[:, :n_pixels]
+        #     samples[:, i] = tmp
+        samples = testrbm.draw_samples(n_samples,
+                                       n_chains=n_chains, v_init=v_init)
+    # needs (n_imgs, n_pxls); samples is (n_steps, n_chains, n_pixels)
+    # desired order: (chain[0], step[0]) -> (chain[1], step[0]) -> ...
+    #                ... -> (chain[nc], step[0]) -> (chain[0], step[1]) -> ...
+    snapshots = samples[:, ::samples_per_tile, :n_pixels].reshape(-1, n_pixels)
+
+    tiled_samples = tile_raster_images(snapshots,
                                        img_shape=img_shape,
-                                       tile_shape=(10, 10),
+                                       tile_shape=tile_shape,
                                        scale_rows_to_unit_interval=False,
                                        output_pixel_vals=False)
 
-    plt.figure()
-    plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-    plt.savefig(make_figure_folder() + 'samples.png')
+    fig, ax = plt.subplots()
+    ax.imshow(tiled_samples, interpolation='Nearest', cmap='gray_r')
+    ax.tick_params(left='off', right='off', bottom='off',
+                   labelleft='off', labelright='off', labelbottom='off')
+    fig.tight_layout()
+    fig.savefig(os.path.join(make_figure_folder(), name + '_samples.png'))
 
 
 # Load rbm and data
@@ -28,14 +65,15 @@ def plot_samples(rbm, n_tiles, img_shape):
 #     _, _, test_set = np.load(f)
 # img_shape = (28, 28)
 
-img_shape = (36, 48)
-rbm_name = 'gauss_crbm_new'
-# data_name = 'pong_var_start{}x{}'.format(*img_shape)
-# _, _, test_set = load_images(data_name)
+img_shape = (40, 48)
+rbm_name = 'pong_lw5_40x48_crbm'
+data_name = 'pong_lw5_40x48'
+_, _, test_set = load_images(data_name)
 testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
 n_pixels = np.prod(img_shape)
 
-plot_samples(testrbm, 100, img_shape)
+plot_samples(testrbm, (10, 3), img_shape, samples_per_tile=100,
+             data=test_set[0], ast=False)
 
 
 # # samples with partially clamped inputs
