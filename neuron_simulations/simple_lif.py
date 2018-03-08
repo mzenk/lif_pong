@@ -69,20 +69,24 @@ def lif_iext_expt():
     # === Plotting ===========================================================
 
     figure_filename = 'test.png'
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
+    fig, ax1 = plt.subplots(figsize=(10, 7))
 
     vmem = lif_pop.get_data().segments[0].filter(name='v')[0]
     spiketrain = lif_pop.get_data().segments[0].spiketrains[0]
     t = np.linspace(0, duration, len(vmem))
-    ax1.plot(t, vmem, '-')
-    ax1.set(ylabel='u [mV]')
+    ax1.plot(t, vmem, 'C0-')
+    ax1.set_ylabel('u [mV]', color='C0')
+    ax1.tick_params('y', colors='C0')
 
     i_data = np.repeat(i_ext.reshape(-1, 1), 2, axis=1).flatten()
     t_i = np.zeros_like(i_data)
     t_i[1:-1] = np.repeat(switch_times[1:].reshape(-1, 1), 2, axis=1).flatten()
     t_i[-1] = duration
-    ax2.plot(t_i, i_data, '-')
-    ax2.set(xlabel='t [ms]', ylabel='I_ext [uA]')
+    ax2 = ax1.twinx()
+    ax2.plot(t_i, i_data, 'C1-')
+    ax2.set(xlabel='t [ms]')
+    ax2.set_ylabel('I_\mathrm{ext} [\mu A]', color='C1')
+    ax2.tick_params('y', colors='C1')
     # plt.tight_layout()
     plt.savefig(os.path.join(make_figure_folder(), figure_filename))
 
@@ -227,5 +231,5 @@ def exp_kernel(t, t0, tau):
 
 if __name__ == '__main__':
     # lif_isyn_expt()
-    # lif_iext_expt()
-    lif_tso_expt()
+    lif_iext_expt()
+    # lif_tso_expt()
