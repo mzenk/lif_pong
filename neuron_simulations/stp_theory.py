@@ -153,23 +153,26 @@ if __name__ == '__main__':
     spike_interval = 1.
     n_points = 50
     start_tr = 1
-    stop_tr = 4.5
-    start_u0 = -4
+    stop_tr = 5.
+    start_u0 = -4.
     stop_u0 = 0
     tr_logrange = np.logspace(start_tr, stop_tr, n_points)
     u0_logrange = np.logspace(start_u0, stop_u0, n_points)
     tr_grid, u0_grid = np.meshgrid(tr_logrange, u0_logrange)
-    # actually must shift in log space but i'm too stupid
-    # vecx = np.logspace(start_tr, stop_tr, n_points + 1) / \
-    #     (tr_logrange.max() - tr_logrange.min())**(.5/n_points)
-    # vecy = np.logspace(start_u0, stop_u0, n_points + 1) / \
-    #     (u0_logrange.max() - u0_logrange.min())**(.5/n_points)
+    # pcolormesh takes grid edges
+    tmp_list = []
+    for vec in [tr_logrange, u0_logrange]:
+        tmp = np.hstack((vec, vec[-1]*np.power(vec[-1]/vec[0], 1/len(vec))))
+        shift_factor = np.power(tmp.max() / tmp.min(), -1./(2*len(tmp)))
+        tmp_list.append(shift_factor*tmp)
+    xedges, yedges = tmp_list
+
     r_stat_grid = r_stat(u0_grid, tr_grid, dt_spike=spike_interval)
     decay_time_grid = 1/decay_const(u0_grid, tr_grid, dt_spike=spike_interval)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
-    im1 = ax1.pcolormesh(tr_logrange, u0_logrange, r_stat_grid, vmin=0, vmax=1)
-    im2 = ax2.pcolormesh(tr_logrange, u0_logrange, decay_time_grid)
+    im1 = ax1.pcolormesh(xedges, yedges, r_stat_grid, vmin=0, vmax=1)
+    im2 = ax2.pcolormesh(xedges, yedges, decay_time_grid)
     ax1.set_xscale('log')
     ax1.set_yscale('log')
     ax2.set_xscale('log')
