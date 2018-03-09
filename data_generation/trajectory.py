@@ -167,7 +167,7 @@ class Trajectory:
         # normalize pixels
         self.pixels /= np.max(self.pixels)
 
-    def draw_trajectory(self, ax, potential=False, color=None):
+    def draw_trajectory(self, ax, potential=False, color=None, framecolor=None):
         if self.trace.shape == (1,):
             print("integrate first!")
             return
@@ -179,10 +179,12 @@ class Trajectory:
             ax.imshow(self.pot_fct(gridx, gridy), interpolation='Nearest',
                       extent=(0, self.field_size[0], 0, self.field_size[1]),
                       cmap='gray', origin='lower')
-        ax.plot(self.trace[:, 0], self.trace[:, 1], '.', markersize=1, color=color)
-        ax.add_patch(matplotlib.patches.Rectangle((0, 0), self.field_size[0],
-                                                  self.field_size[1],
-                                                  fill=False))
+        ax.plot(self.trace[:, 0], self.trace[:, 1],
+                # '.', markersize=.5,
+                '-', color=color)
+        ax.add_patch(matplotlib.patches.Rectangle(
+            (0, 0), self.field_size[0], self.field_size[1], fill=False,
+            edgecolor=framecolor, linestyle='--', lw=1.5))
         ax.set_xlim(0 - self.field_size[0]*.1, self.field_size[0]*1.1)
         ax.set_ylim(0 - self.field_size[1]*.1, self.field_size[1]*1.1)
 

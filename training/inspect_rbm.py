@@ -10,8 +10,6 @@ mpl.use('agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-mpl.rcParams['font.size'] = 12
-
 
 def plot_labvis_filters(rbm, label_idxs, img_shape, name='lab_filters',
                         title='Label filters', ax=None):
@@ -98,18 +96,18 @@ rbm_name = 'pong_lw5_40x48_crbm'
 testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
 # RBM-specific plots
 rand_ind = np.random.choice(np.arange(testrbm.n_hidden), size=12, replace=False)
-# plot_filters(testrbm, rand_ind, img_shape, tile_shape=(3, 4), name='gauss',
-#              title='Gau\ss')
-fig, ax = plt.subplots(2, 1, figsize=(14, 7))
-plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Pong',
-                    ax=ax[0])
+plot_filters(testrbm, rand_ind, img_shape, tile_shape=(3, 4), name='pong',
+             title='Pong')
+# fig, ax = plt.subplots(1, 2, figsize=(18, 5))
+# plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Pong',
+#                     ax=ax[0])
 
-rbm_name = 'gauss_lw5_40x48_crbm'
-testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
-plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Gau\ss',
-                    ax=ax[1])
-fig.tight_layout()
-fig.savefig(os.path.join(make_figure_folder(), 'lab_filters.png'))
+# rbm_name = 'gauss_lw5_40x48_crbm'
+# testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
+# plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Gauss',
+#                     ax=ax[1])
+# fig.tight_layout()
+# fig.savefig(os.path.join(make_figure_folder(), 'lab_filters.png'))
 # plot_histograms(testrbm)
 
 # # testing of L2

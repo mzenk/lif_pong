@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 def plot_samples(rbm, tile_shape, img_shape, samples_per_tile=1000, data=None,
                  title='', name='test', ast=False):
     n_pixels = np.prod(img_shape)
-    n_samples = tile_shape[0]*samples_per_tile
-    n_chains = tile_shape[1]
+    n_samples = tile_shape[1]*samples_per_tile
+    n_chains = tile_shape[0]
     if data is None:
         v_init = None
     else:
@@ -44,7 +44,8 @@ def plot_samples(rbm, tile_shape, img_shape, samples_per_tile=1000, data=None,
     # needs (n_imgs, n_pxls); samples is (n_steps, n_chains, n_pixels)
     # desired order: (chain[0], step[0]) -> (chain[1], step[0]) -> ...
     #                ... -> (chain[nc], step[0]) -> (chain[0], step[1]) -> ...
-    snapshots = samples[::samples_per_tile, :, :n_pixels].reshape(-1, n_pixels)
+    vis_samples = samples[..., :n_pixels]
+    snapshots = np.swapaxes(vis_samples[::samples_per_tile], 0, 1).reshape(-1, n_pixels)
 
     tiled_samples = tile_raster_images(snapshots,
                                        img_shape=img_shape,
@@ -52,7 +53,7 @@ def plot_samples(rbm, tile_shape, img_shape, samples_per_tile=1000, data=None,
                                        scale_rows_to_unit_interval=False,
                                        output_pixel_vals=False)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(tile_shape[1]*1, tile_shape[0]*.75))
     ax.imshow(tiled_samples, interpolation='Nearest', cmap='gray_r')
     ax.tick_params(left='off', right='off', bottom='off',
                    labelleft='off', labelright='off', labelbottom='off')
@@ -74,12 +75,11 @@ rbm_name = 'pong_lw5_40x48_crbm'
 data_name = 'pong_lw5_40x48'
 _, _, test_set = load_images(data_name)
 testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
-testrbm = rbm_pkg.load(rbm_dict)
 n_pixels = np.prod(img_shape)
 
 testrbm.set_seed(1234)
-plot_samples(testrbm, (10, 3), img_shape, samples_per_tile=100,
-             data=test_set[0], ast=False)
+plot_samples(testrbm, (5, 10), img_shape, samples_per_tile=100,
+             data=test_set[0], ast=True)
 
 
 # # samples with partially clamped inputs
