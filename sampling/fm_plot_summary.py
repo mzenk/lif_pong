@@ -35,7 +35,6 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.png', logscale=False,
         tmp_mesh = np.meshgrid(xcenters, ycenters)
         X_params_flat = tmp_mesh[0].flatten()
         Y_params_flat = tmp_mesh[1].flatten()
-        print(xcenters, ycenters)
     else:
         # create axis vectors for meshgrid. This code assumes that the differences
         # between x/y-values are all a multiple of some smallest delta
@@ -44,8 +43,8 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.png', logscale=False,
             [np.arange(mins[i], maxs[i] + 1.1*mindiffs[i],
                        mindiffs[i]) - .5*mindiffs[i] for i in range(2)]
         X, Y = np.meshgrid(xedges, yedges)
-        X_params_flat = (X + .5*mindiffs[0]).flatten()
-        Y_params_flat = (Y + .5*mindiffs[1]).flatten()
+        X_params_flat = (X[:-1, :-1] + .5*mindiffs[0]).flatten()
+        Y_params_flat = (Y[:-1, :-1] + .5*mindiffs[1]).flatten()
 
     # create value array with nans for non-existing data
     # # doesn't work with numpy 1.11. Also, fails if a combination is missing
@@ -85,8 +84,8 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.png', logscale=False,
     plt.ylabel(identifier[1])
     cbar_m = plt.colorbar(im, ax=ax_mean)
     cbar_m.ax.set_ylabel('Mean cum. prediction error')
-    fig_mean.suptitle(title)
-    fig_mean.savefig(os.path.join(make_figure_folder(), figname) + '.png')
+    ax_mean.set_title(title)
+    fig_mean.savefig(os.path.join(make_figure_folder(), figname) + '.pdf')
 
     # save std
     fig_std, ax_std = plt.subplots()
@@ -100,8 +99,8 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.png', logscale=False,
     plt.ylabel(identifier[1])
     cbar_s = plt.colorbar(im, ax=ax_std)
     cbar_s.ax.set_ylabel('Std. of cum. prediction error')
-    fig_std.suptitle(title)
-    fig_std.savefig(os.path.join(make_figure_folder(), figname + '_std.png'))
+    ax_std.set_title('{} (std)'.format(title))
+    fig_std.savefig(os.path.join(make_figure_folder(), figname + '_std.pdf'))
 
 
 def plot_inferror_pcolor(df, identifier, figname='paramsweep.png', logscale=False,
@@ -136,8 +135,8 @@ def plot_inferror_pcolor(df, identifier, figname='paramsweep.png', logscale=Fals
             [np.arange(mins[i], maxs[i] + 1.1*mindiffs[i],
                        mindiffs[i]) - .5*mindiffs[i] for i in range(2)]
         X, Y = np.meshgrid(xvec, yvec)
-        X_params_flat = (X + .5*mindiffs[0]).flatten()
-        Y_params_flat = (Y + .5*mindiffs[1]).flatten()
+        X_params_flat = (X[:-1, :-1] + .5*mindiffs[0]).flatten()
+        Y_params_flat = (Y[:-1, :-1] + .5*mindiffs[1]).flatten()
 
     # C = np.ones((len(yvec), len(xvec))) * np.nan
     # mask = np.logical_and(np.isin(X + .5*mindiffs[0], sorted_df[identifier[0]]),
@@ -169,7 +168,7 @@ def plot_inferror_pcolor(df, identifier, figname='paramsweep.png', logscale=Fals
     plt.ylabel(identifier[1])
     cbar = plt.colorbar(im, ax=ax)
     cbar.ax.set_ylabel('Error rate')
-    fig.suptitle(title)
+    ax.set_title(title)
     plt.savefig(os.path.join(make_figure_folder(), figname))
 
 
@@ -195,16 +194,18 @@ def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
         savefig = True
     else:
         savefig = False
-    ax.errorbar(xdata, ydata, yerr=yerr, fmt='.:', alpha=.6, label=label)
+    ax.errorbar(xdata, ydata, yerr=yerr, fmt='.:', label=label)
     # ax.plot(xdata, ydata, '.:', label=label)
     # ax.fill_between(xdata, ydata-ystd, ydata+ystd, alpha=.3)
+    ax.axhline(4.68, label='500 samples', color='C1')
     if logscale:
         ax.set_xscale('log')
     ax.set_xlabel(identifier[0])
-    ax.set_ylabel('Mean cum. prediction error')
+    ax.set_ylabel('$<\mathrm{Err}>_\mathrm{data}$')
 
     if savefig:
-        fig.savefig(os.path.join(make_figure_folder(), figname + '.png'))
+        ax.legend()
+        fig.savefig(os.path.join(make_figure_folder(), figname + '.pdf'))
 
 
 def plot_inferror_1d(df, identifier, fig=None, ax=None, label=None,
@@ -381,7 +382,6 @@ else:
             for i, v in enumerate(slice_vals):
                     slicedf = subdf.loc[subdf[slice_param] == v, :].copy()
                     slicedf.pop(slice_param)
-                    print(slicedf.columns)
                     label = slice_labels[i]
                     plot_cumerr_pcolor(slicedf, plot_params,
                                        figname=expt_name + '_slice_{}{:02d}_cumerr'.format(slice_param, i),

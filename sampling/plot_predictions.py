@@ -164,17 +164,19 @@ def plot_agent_performance(ax, agent_dict, label=None):
     ax.plot(speeds, succrate, label=label)
 
 def plot_prediction_error_dist(ax, pred_error, dist_pos=-1, label=None):
+    if label is not None:
+        label += '@col={}'.format(dist_pos%pred_error.shape[1])
     pe_hist, bin_edges = np.histogram(pred_error[:, dist_pos], bins='auto')
     ax.bar(bin_edges[:-1], pe_hist, width=bin_edges[1] - bin_edges[0],
-           alpha=.4, label=label + '@col={}'.format(dist_pos%pred_error.shape[1]))
+           alpha=.4, label=label)
     ax.set(xlabel='Prediction error')
 
 
 def main(identifier_list):
     # set up figures
-    fig_pe, ax_pe = plt.subplots()
-    ax_pe.set_ylabel('Prediction error')
-    ax_pe.set_ylim([-.5, 16])
+    fig_pe, (ax_pe, ax_ap) = plt.subplots(1, 2, figsize=(16, 6))
+    ax_pe.set_ylabel('Prediction error [pxls]')
+    ax_pe.set_ylim([-.5, 17])
     ax_pe.set_xlabel('Ball position / field length')
     # color_cycle = [plt.cm.rainbow(i)
     #                for i in np.linspace(0, 1, len(identifier_list))]
@@ -185,8 +187,8 @@ def main(identifier_list):
     axarr_pd[0].set(ylabel='Abundance')
     fig_pd.subplots_adjust(wspace=0)
 
-    fig_ap, ax_ap = plt.subplots()
-    ax_ap.set_xlabel('Agent speed / ball speed')
+    # fig_ap, ax_ap = plt.subplots()
+    ax_ap.set_xlabel('Agent speed / ball speed ($r$)')
     ax_ap.set_ylabel('Success rate')
     ax_ap.set_ylim([0., 1.1])
     for i, identifier_dict in enumerate(identifier_list):
@@ -236,15 +238,14 @@ def main(identifier_list):
                                        label)
         plot_agent_performance(ax_ap, agent_result, label)
 
-    ax_pe.legend()
-    fig_pe.savefig(make_figure_folder() + 'pred_error.png')  #, transparent=True)
-
-    [axarr_pd[i].legend() for i in range(len(axarr_pd))]
-    fig_pd.savefig(make_figure_folder() + 'pred_error_dist.png')  #, transparent=True)
-
     ax_ap.plot(ax_ap.get_xlim(), [1, 1], 'k:')
     ax_ap.legend()
-    fig_ap.savefig(make_figure_folder() + 'agent_perf.png')  #, transparent=True)
+    ax_pe.legend()
+    [axarr_pd[i].legend() for i in range(len(axarr_pd))]
+
+    fig_pe.savefig(make_figure_folder() + 'pred_error.pdf')  #, transparent=True)
+    fig_pd.savefig(make_figure_folder() + 'pred_error_dist.pdf')  #, transparent=True)
+    # fig_ap.savefig(make_figure_folder() + 'agent_perf.pdf')  #, transparent=True)
 
 
 if __name__ == '__main__':

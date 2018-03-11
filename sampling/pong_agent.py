@@ -71,7 +71,7 @@ def test():
 
 
 def compute_performance(predictions, targets, data_idx, max_speedup=2.,
-                        use_labels=False, paddle_width=3, leave_uncovered=1):
+                        use_labels=False, paddle_width=4, leave_uncovered=1):
     # predictions must have shape (n_instances, n_steps, n_pos)
     # targets must either have same shape as predictions or (n_instances, n_pos)
     n_instances, n_frames, n_pos = predictions.shape
@@ -151,9 +151,12 @@ def compute_baseline_performance(img_shape, test_set, data_idx, max_speedup=2.,
     bl_preds[:, 0] = np.ones((bl_preds.shape[0], bl_preds.shape[2]))/n_pos
     bl_preds[:, 1:] = np.swapaxes(imgs, 1, 2)
 
+    # has no knick adaption
+    targets = imgs[..., -1]
+
     # quick and dirty save
     np.savez('prediction', last_col=bl_preds, data_idx=data_idx)
-    return compute_performance(img_shape, test_set, data_idx, bl_preds,
+    return compute_performance(bl_preds, targets, data_idx,
                                max_speedup=max_speedup, 
                                paddle_width=paddle_width,
                                leave_uncovered=leave_uncovered)

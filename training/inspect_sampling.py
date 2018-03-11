@@ -1,19 +1,16 @@
 from __future__ import division
 import numpy as np
 import os
+import sys
 from lif_pong.utils import tile_raster_images
 from lif_pong.utils.data_mgmt import load_images, get_rbm_dict, make_figure_folder
+from lif_pong.sampling.lif_inspect_samples import plot_samples
 import rbm as rbm_pkg
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
-
-def plot_samples(rbm, tile_shape, img_shape, samples_per_tile=1000, data=None,
-                 title='', name='test', ast=False):
-    n_pixels = np.prod(img_shape)
-    n_samples = tile_shape[1]*samples_per_tile
-    n_chains = tile_shape[0]
+def draw_samples(rbm, data, n_pixels, n_chains, n_samples, ast=False):
     if data is None:
         v_init = None
     else:
@@ -41,24 +38,7 @@ def plot_samples(rbm, tile_shape, img_shape, samples_per_tile=1000, data=None,
         #     samples[:, i] = tmp
         samples = testrbm.draw_samples(n_samples,
                                        n_chains=n_chains, v_init=v_init)
-    # needs (n_imgs, n_pxls); samples is (n_steps, n_chains, n_pixels)
-    # desired order: (chain[0], step[0]) -> (chain[1], step[0]) -> ...
-    #                ... -> (chain[nc], step[0]) -> (chain[0], step[1]) -> ...
-    vis_samples = samples[..., :n_pixels]
-    snapshots = np.swapaxes(vis_samples[::samples_per_tile], 0, 1).reshape(-1, n_pixels)
-
-    tiled_samples = tile_raster_images(snapshots,
-                                       img_shape=img_shape,
-                                       tile_shape=tile_shape,
-                                       scale_rows_to_unit_interval=False,
-                                       output_pixel_vals=False)
-
-    fig, ax = plt.subplots(figsize=(tile_shape[1]*1, tile_shape[0]*.75))
-    ax.imshow(tiled_samples, interpolation='Nearest', cmap='gray_r')
-    ax.tick_params(left='off', right='off', bottom='off',
-                   labelleft='off', labelright='off', labelbottom='off')
-    fig.tight_layout()
-    fig.savefig(os.path.join(make_figure_folder(), name + '_samples.png'))
+    return samples
 
 
 # # Load rbm and data
@@ -78,8 +58,17 @@ testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
 n_pixels = np.prod(img_shape)
 
 testrbm.set_seed(1234)
-plot_samples(testrbm, (5, 10), img_shape, samples_per_tile=100,
-             data=test_set[0], ast=True)
+n_chains = 5
+n_cols = 10
+samples_per_tile = 1000
+tile_shape = (n_chains, n_cols)
+
+# dreaming
+n_samples = samples_per_tile*n_cols
+samples = draw_samples(testrbm, test_set[0], n_pixels, n_chains, n_samples, ast=False)
+
+# or load other sample file
+plot_samples(samples, tile_shape, img_shape, samples_per_tile=100)
 
 
 # # samples with partially clamped inputs

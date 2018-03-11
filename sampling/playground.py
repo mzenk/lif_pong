@@ -113,7 +113,7 @@ def gibbs_classification_check(rbm, data_set, img_shape):
     # # grid orientation of pcolor, meshgrid
     H = H.T
     # X, Y = np.meshgrid(xedges, yedges)
-    # plt.pcolor(X, Y, H, cmap='gray')
+    # plt.pcolormesh(X, Y, H, cmap='gray')
     wrong_cases = 0
     labwidth = int(img_shape[0]/n_labels)
     for i, row in enumerate(H):
