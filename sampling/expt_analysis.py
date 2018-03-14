@@ -94,7 +94,7 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2,
             if 'wrong_idx' in result_dict.keys():
                 with open('wrong_cases', 'w') as f:
                     f.write(yaml.dump(result_dict['wrong_idx'].tolist()))
-    except KeyError as e:
+    except Exception as e:
         anadict = {'n_instances': float('nan'),
                    'inf_success': float('nan'),
                    'cum_prederr_sum': float('nan'),

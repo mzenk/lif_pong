@@ -100,8 +100,8 @@ def load_samples(sample_file, data_idx, img_shape, n_labels, average=False,
     return frames, n_samples
 
 
-def make_video(frame_list, img_shape, n_samples, titles=[], show_hidden=False,
-               savename='test'):
+def plot_animation(frame_list, img_shape, n_samples, titles=[], show_hidden=False,
+                   savename='test'):
     if len(frame_list) == 1:
         fig, single_ax = plt.subplots()
         axarr = np.array([single_ax])
@@ -167,8 +167,8 @@ def plot_samples(samples, tile_shape, img_shape, samples_per_tile=1000,
 
     fig, ax = plt.subplots(figsize=(tile_shape[1]*2, tile_shape[0]*1.5))
     ax.imshow(tiled_samples, interpolation='Nearest', cmap='gray_r')
-    ax.tick_params(left='off', right='off', bottom='off',
-                   labelleft='off', labelright='off', labelbottom='off')
+    ax.tick_params(left='off', right='off', bottom='off', top='off',
+                   labelleft='off', labelbottom='off')
     fig.tight_layout()
     fig.savefig(os.path.join(make_figure_folder(), savename + '.png'))
 
@@ -205,8 +205,8 @@ def main(config_dict):
     n_samples = n_samples[0]
 
     if make_video:
-        make_video(frame_list, img_shape, n_samples, titles=titles,
-                   show_hidden=show_hidden, savename=savename)
+        plot_animation(frame_list, img_shape, n_samples, titles=titles,
+                       show_hidden=show_hidden, savename=savename)
     else:
         tile_shape = config_dict['tile_shape']
         samples_per_tile = config_dict['samples_per_tile']
