@@ -11,7 +11,7 @@ import matplotlib
 #  methods that calculates the angle range for a point in the first quadrant
 def get_min_angle(x, y, width, height):
     # x, y can be arrays of same shape
-    start_bottom_left = y > .5*height - 2*height/width*x
+    start_bottom_left = y > .5*height - 2.*height/width*x
     tanmin = -(.5*height + y)/(.5*width - x)  # else case
     tanmin[start_bottom_left] = \
         (-(1.5*height - y)/(.5*width + x))[start_bottom_left]
@@ -19,13 +19,12 @@ def get_min_angle(x, y, width, height):
 
 
 def get_max_angle(x, y, width, height):
+    start_top_left = y <= -.5*height + 2.*height/width*x
     start_bottom_left = y > height/width*x
-    end_top_right = np.logical_xor(y > 2*height/width*x - .5*height,
-                                   start_bottom_left)
-    tanmax = (1.5*height + y)/(.5*width + x)   # else case
+    tanmax = (.5*height - y)/(.5*width - x)   # else case
     tanmax[start_bottom_left] = \
         ((.5*height + y)/(.5*width + x))[start_bottom_left]
-    tanmax[end_top_right] = ((.5*height - y)/(.5*width - x))[end_top_right]
+    tanmax[start_top_left] = ((1.5*height + y)/(.5*width + x))[start_top_left]
     return np.arctan(tanmax)
 
 
@@ -134,13 +133,12 @@ class Trajectory:
             # inject random y-momentum; sigma can be zero
             if self.kink_dict is not None and x > self.kink_dict['pos'] \
                     and not noise_injected:
-                delta_vy = self.kink_dict['ampl'] * self.v0 * \
-                    ((-1)**np.random.randint(2) + self.kink_dict['sigma'] *
-                     np.random.randn())
+                delta_vy = self.v0 * np.random.normal(
+                    (-1)**np.random.randint(2) * self.kink_dict['ampl'],
+                    self.kink_dict['sigma'])
 
                 # clip any delta_vy that exceeds the allowed angle range
-                centered_pos = r.y[:2] - .5*size
-                amin, amax = get_angle_range(centered_pos[0], centered_pos[1],
+                amin, amax = get_angle_range(x - .5*size[0], y - .5*size[1],
                                              *size)
                 delta_vy = np.clip(
                     delta_vy, np.tan(amin)*vx - vy, np.tan(amax)*vx - vy)
@@ -160,8 +158,8 @@ class Trajectory:
         if len(reflection_pos) > 1 and self.kink_dict is None:
             print('Warning: More than one reflection occurred! Locations: ['
                   + '; '.join(['{:.2f}'.format(p) for p in reflection_pos])
-                  + '], parameters: start {}, angle {}, kink_dict={}'.format(
-                        pos_list[0], self.angle*180./np.pi, self.kink_dict),
+                  + '], parameters: start {}, angle {}'.format(
+                        pos_list[0], self.angle*180./np.pi),
                   file=sys.stderr)
         self.trace = np.array(pos_list)
         # normalize pixels
@@ -328,29 +326,61 @@ class Gaussian_trajectory(Trajectory):
         return np.array([y[2], y[3], -grad[0], -grad[1]])
 
 
-# if __name__ == '__main__':
-#     tests
-#     # inspect angle range
-#     import matplotlib.pyplot as plt
-#     width = 48.
-#     height = 40.
-#     nx = 100
-#     x = np.linspace(0, width, nx)
-#     y = np.linspace(0, height, int(nx*height/width))
-#     x_centered = x - x.max()/2
-#     y_centered = y - y.max()/2
-#     theo_max = 180/np.pi*np.arctan(2*y.max()/x.max())
+if __name__ == '__main__':
+    # tests
+    # inspect angle range
+    import matplotlib.pyplot as plt
+    # width = 48.
+    # height = 40.
+    # nx = 100
+    # x = np.linspace(0, width, nx)
+    # y = np.linspace(0, height, int(nx*height/width))
+    # x_centered = x - x.max()/2
+    # y_centered = y - y.max()/2
+    # theo_max = 180/np.pi*np.arctan(2*y.max()/x.max())
 
-#     xgrid, ygrid = np.meshgrid(x_centered, y_centered)
-#     min_angles, max_angles = get_angle_range(xgrid, ygrid, width, height)
-#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15,7))
-#     ax1.set_title('Min. angle')
-#     ax2.set_title('Max. angle')
-#     im1 = ax1.imshow(min_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
-#                      vmin=-theo_max, vmax=theo_max, origin='lower')
-#     im2 = ax2.imshow(max_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
-#                      vmin=-theo_max, vmax=theo_max, origin='lower')
-#     # im2 = ax2.imshow(xgrid + ygrid, origin='lower', cmap='viridis')
-#     plt.colorbar(im1, ax=ax1, orientation='horizontal')
-#     plt.colorbar(im2, ax=ax2, orientation='horizontal')
-#     fig.savefig('test.png')
+    # xgrid, ygrid = np.meshgrid(x_centered, y_centered)
+    # min_angles, max_angles = get_angle_range(xgrid, ygrid, width, height)
+    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
+    # ax1.set_title('Min. angle')
+    # ax2.set_title('Max. angle')
+    # im1 = ax1.imshow(min_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
+    #                  vmin=-theo_max, vmax=theo_max, origin='lower')
+    # im2 = ax2.imshow(max_angles*180/np.pi, interpolation='Nearest', cmap='viridis',
+    #                  vmin=-theo_max, vmax=theo_max, origin='lower')
+    # # im2 = ax2.imshow(xgrid + ygrid, origin='lower', cmap='viridis')
+    # plt.colorbar(im1, ax=ax1, orientation='horizontal')
+    # plt.colorbar(im2, ax=ax2, orientation='horizontal')
+    # fig.savefig('test.png')
+
+    width = 48.
+    height = 40.
+    nx = 5
+    x = np.linspace(.5*width, width, nx)
+    y = np.linspace(.5*height, height, int(nx*height/width))
+    x_centered = x - x.max()/2
+    y_centered = y - y.max()/2
+    theo_max = 180/np.pi*np.arctan(2*y.max()/x.max())
+
+    xgrid, ygrid = np.meshgrid(x_centered, y_centered)
+    min_angles, max_angles = get_angle_range(xgrid, ygrid, width, height)
+    print(xgrid.shape)
+    for i in range(xgrid.shape[0]):
+        for j in range(xgrid.shape[1]):
+            # plot
+            amin = min_angles[i, j]
+            amax = max_angles[i, j]
+            x = xgrid[i, j]
+            y = ygrid[i, j]
+
+            rangex = np.linspace(-.5*width, .5*width, 10)
+            plt.figure()
+            plt.xlim([rangex[0], rangex[-1]])
+            plt.ylim([-1.5*height, 1.5*height])
+            plt.plot(rangex, np.tan(amax)*(rangex - x) + y)
+            plt.plot(rangex, np.tan(amin)*(rangex - x) + y)
+            plt.axhline(-.5*height, color='k')
+            plt.axhline(.5*height, color='k')
+            plt.axvline(-.5*width, color='k')
+            plt.axvline(.5*width, color='k')
+            plt.savefig('test{}{}.png'.format(i, j))

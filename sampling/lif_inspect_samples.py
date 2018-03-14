@@ -28,12 +28,17 @@ def update_fig(i, frames, fig, img_artists, n_samples):
     return img_artists
 
 
-def load_samples(sample_file, n_imgs, img_shape, n_labels, average=False,
+def load_samples(sample_file, data_idx, img_shape, n_labels, average=False,
                  show_probs=False, rbm=None, show_hidden=False, savename='test'):
     n_pixels = np.prod(img_shape)
+    try:
+        n_imgs = len(data_idx)
+    except TypeError:
+        n_imgs = data_idx
+
     with np.load(os.path.expanduser(sample_file)) as d:
         # samples.shape: ([n_instances], n_samples, n_units)
-        samples = d['samples'].astype(float)[:n_imgs]
+        samples = d['samples'].astype(float)[data_idx]
         if len(samples.shape) == 2:
             samples = np.expand_dims(samples, 0)
         n_samples = samples.shape[1]
@@ -96,7 +101,7 @@ def load_samples(sample_file, n_imgs, img_shape, n_labels, average=False,
 
 
 def make_video(frame_list, img_shape, n_samples, titles=[], show_hidden=False,
-                savename='test'):
+               savename='test'):
     if len(frame_list) == 1:
         fig, single_ax = plt.subplots()
         axarr = np.array([single_ax])
@@ -170,7 +175,7 @@ def plot_samples(samples, tile_shape, img_shape, samples_per_tile=1000,
 
 def main(config_dict):
     sample_files = config_dict['sample_files']
-    n_imgs = config_dict['n_imgs']
+    data_idx = config_dict['data_idx']
     img_shape = tuple(config_dict['img_shape'])
     n_labels = config_dict['n_labels']
     average = config_dict['average']
@@ -191,7 +196,7 @@ def main(config_dict):
     n_samples = []
     for i, f in enumerate(sample_files):
         tmp, ns = load_samples(
-            f, n_imgs, img_shape, n_labels, average=average, 
+            f, data_idx, img_shape, n_labels, average=average,
             show_probs=show_probs, rbm=rbm,
             show_hidden=show_hidden, savename=savename + '_{:02d}'.format(i))
         frame_list.append(tmp)
@@ -208,10 +213,9 @@ def main(config_dict):
 
         samples = np.array(frame_list, dtype=float).reshape(-1, n_samples, np.prod(img_shape))
         assert tile_shape[0] == len(samples)
-        plot_samples(samples, tile_shape, img_shape, 
+        plot_samples(samples, tile_shape, img_shape,
                      samples_per_tile=samples_per_tile, title='',
                      savename=savename)
-
 
 
 if __name__ == '__main__':

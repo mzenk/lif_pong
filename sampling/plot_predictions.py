@@ -136,6 +136,7 @@ def compute_prediction_error(predictions, targets, n_pos, use_labels=False,
 
     return np.abs(predicted_pos - target_pos)
 
+
 # copied and adapted from prediction_quality.py; ugly but no time for more
 def plot_prediction_error(ax, pred_error, label=None, x_data=None):
     n_frames = pred_error.shape[1]
@@ -163,16 +164,45 @@ def plot_agent_performance(ax, agent_dict, label=None):
     print('Maximum success rate: {:.3f}'.format(np.max(succrate)))
     ax.plot(speeds, succrate, label=label)
 
+
 def plot_prediction_error_dist(ax, pred_error, dist_pos=-1, label=None):
     if label is not None:
-        label += '@col={}'.format(dist_pos%pred_error.shape[1])
+        label += '@col={}'.format(dist_pos % pred_error.shape[1])
     pe_hist, bin_edges = np.histogram(pred_error[:, dist_pos], bins='auto')
     ax.bar(bin_edges[:-1], pe_hist, width=bin_edges[1] - bin_edges[0],
            alpha=.4, label=label)
     ax.set(xlabel='Prediction error')
 
 
-def main(identifier_list):
+def list_bad_examples(pred_errors, img_shape):
+    median = np.percentile(pred_errors, 50, axis=0)
+    # mean = np.mean(pred_error, axis=0)
+    lower_quart = np.percentile(pred_errors, 25, axis=0)
+    upper_quart = np.percentile(pred_errors, 75, axis=0)
+
+    bad_examples = []
+    worse_examples = []
+    good_examples = []
+    fine_examples = []
+    for i in range(pred_errors.shape[1]):
+        err = pred_errors[:, i]
+        above_med = err > median[i]
+        above_upquart = err > upper_quart[i]
+        below_loquart = err < lower_quart[i]
+
+        bad_examples.append(np.where(np.logical_and(above_med, 1 - above_upquart))[0].tolist())
+        worse_examples.append(np.where(above_upquart)[0].tolist())
+        good_examples.append(np.where(np.logical_and(1 - above_med, 1 - below_loquart))[0].tolist())
+        fine_examples.append(np.where(below_loquart)[0].tolist())
+
+    # save dictionary in yaml format
+    d = {'fine': fine_examples, 'good': good_examples,
+         'bad': bad_examples, 'worse': worse_examples}
+    with open('mylist.yaml', 'w') as f:
+        f.write(yaml.dump(d))
+
+
+def main(identifier_list, list_bad=False):
     # set up figures
     fig_pe, (ax_pe, ax_ap) = plt.subplots(1, 2, figsize=(16, 6))
     ax_pe.set_ylabel('Prediction error [pxls]')
@@ -226,7 +256,7 @@ def main(identifier_list):
             nsteps_pre = int(kink_dict['pos']*img_shape[1])
             targets = np.concatenate(
                 (np.tile(np.expand_dims(prekink_test_targets[data_idx], 1), (1, nsteps_pre, 1)),
-                np.tile(np.expand_dims(targets, 1), (1, prediction.shape[1] - nsteps_pre, 1))),
+                 np.tile(np.expand_dims(targets, 1), (1, prediction.shape[1] - nsteps_pre, 1))),
                 axis=1)
 
         n_pos = prediction.shape[2]
@@ -237,6 +267,9 @@ def main(identifier_list):
             plot_prediction_error_dist(axarr_pd[i], pred_error, int(dist_pos),
                                        label)
         plot_agent_performance(ax_ap, agent_result, label)
+
+        if list_bad:
+            list_bad_examples(pred_error, img_shape)
 
     ax_ap.plot(ax_ap.get_xlim(), [1, 1], 'k:')
     ax_ap.legend()
@@ -249,7 +282,7 @@ def main(identifier_list):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
+    if len(sys.argv) > 3:
         print('Wrong number of arguments. Please provide a yaml that specifies'
               ' which simulations to compare.')
         sys.exit()
@@ -258,4 +291,9 @@ if __name__ == '__main__':
     with open(sys.argv[1]) as f:
         identifier_list = yaml.load(f)
 
-    main(identifier_list)
+    if len(sys.argv) == 3 and sys.argv[2] == 'bad':
+        list_bad = True
+    else:
+        list_bad = False
+
+    main(identifier_list, list_bad)

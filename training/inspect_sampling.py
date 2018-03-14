@@ -10,11 +10,12 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
+
 def draw_samples(rbm, data, n_pixels, n_chains, n_samples, ast=False):
     if data is None:
         v_init = None
     else:
-        np.random.seed(4200)
+        np.random.seed(420)
         rand_idx = np.random.choice(range(len(data)), size=n_chains,
                                     replace=False)
         v_init = np.hstack((data[rand_idx], np.zeros((len(rand_idx), rbm.n_labels))))
@@ -51,8 +52,8 @@ def draw_samples(rbm, data, n_pixels, n_chains, n_samples, ast=False):
 # img_shape = (28, 28)
 
 img_shape = (40, 48)
-rbm_name = 'pong_lw5_40x48_crbm'
-data_name = 'pong_lw5_40x48'
+rbm_name = 'gauss_lw5_40x48_crbm'
+data_name = 'gauss_lw5_40x48'
 _, _, test_set = load_images(data_name)
 testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
 n_pixels = np.prod(img_shape)
@@ -68,7 +69,7 @@ n_samples = samples_per_tile*n_cols
 samples = draw_samples(testrbm, test_set[0], n_pixels, n_chains, n_samples, ast=False)
 
 # or load other sample file
-plot_samples(samples, tile_shape, img_shape, samples_per_tile=100)
+plot_samples(samples, tile_shape, img_shape, samples_per_tile=samples_per_tile)
 
 
 # # samples with partially clamped inputs
