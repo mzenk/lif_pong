@@ -62,8 +62,10 @@ def load_images(data_name, path=False, for_analysis=False):
             data_path = os.path.expanduser('~/Repos/lif_pong/shared_data/datasets')
         elif 'nemo' in socket.gethostname():
             data_path = os.path.expanduser('~/git_repos/lif_pong/shared_data/datasets')
-        else:
+        elif 'hel' in socket.gethostname():
             data_path = os.path.expanduser('~/Projects/lif_pong/shared_data/datasets')
+        else:
+            data_path = '../shared_data/datasets'
         data_path = os.path.join(data_path, data_name + '.npz')
     with np.load(data_path) as d:
         if len(d.keys()) == 1:
@@ -91,8 +93,10 @@ def get_rbm_dict(rbm_name):
         path = os.path.expanduser('~/Repos/lif_pong/shared_data/saved_rbms')
     elif 'nemo' in socket.gethostname():
         path = os.path.expanduser('~/git_repos/lif_pong/shared_data/saved_rbms')
-    else:
+    elif 'hel' in socket.gethostname():
         path = os.path.expanduser('~/Projects/lif_pong/shared_data/saved_rbms')
+    else:
+        path = '../shared_data/saved_rbms'
     with open(os.path.join(path, rbm_name + '.pkl'), 'rb') as f:
         try:
             rbm_dict = cPickle.load(f)
