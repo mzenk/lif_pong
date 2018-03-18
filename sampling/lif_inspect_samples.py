@@ -35,6 +35,7 @@ def load_samples(sample_file, data_idx, img_shape, n_labels, average=False,
         n_imgs = len(data_idx)
     except TypeError:
         n_imgs = data_idx
+        data_idx = np.arange(data_idx)
 
     with np.load(os.path.expanduser(sample_file)) as d:
         # samples.shape: ([n_instances], n_samples, n_units)
@@ -141,9 +142,9 @@ def plot_animation(frame_list, img_shape, n_samples, titles=[], show_hidden=Fals
 
 
 def plot_samples(samples, tile_shape, img_shape, samples_per_tile=1000,
-                 title='', savename='test'):
+                 offset=0, titles=[], savename='test'):
     n_pixels = np.prod(img_shape)
-    n_samples = samples_per_tile*tile_shape[1]
+    n_samples = samples_per_tile*tile_shape[1] + offset
     # needs (n_imgs, n_pxls); samples is (n_instances, n_samples, n_pixels)
     vis_samples = samples[..., :n_pixels]
 
@@ -155,12 +156,12 @@ def plot_samples(samples, tile_shape, img_shape, samples_per_tile=1000,
             vis_samples = np.swapaxes(vis_samples, 0, 1)
     if vis_samples.shape[1] > n_samples:
         print('Cropped some images (array too large)', file=sys.stderr)
-    snapshots = vis_samples[:, :n_samples:samples_per_tile].reshape(-1, n_pixels)
+    snapshots = vis_samples[:, offset:n_samples:samples_per_tile].reshape(-1, n_pixels)
 
     tiled_samples = tile_raster_images(snapshots,
                                        img_shape=img_shape,
                                        tile_shape=tile_shape,
-                                       tile_spacing=(1, 0),
+                                       tile_spacing=(1, 1),
                                        # spacing_val=1.,
                                        scale_rows_to_unit_interval=False,
                                        output_pixel_vals=False)
@@ -169,6 +170,12 @@ def plot_samples(samples, tile_shape, img_shape, samples_per_tile=1000,
     ax.imshow(tiled_samples, interpolation='Nearest', cmap='gray_r')
     ax.tick_params(left='off', right='off', bottom='off', top='off',
                    labelleft='off', labelbottom='off')
+    if len(titles) > 0:
+        ax.tick_params(labelleft='on')
+        imgheight = (tiled_samples.shape[0] + 1)/tile_shape[0]
+        tick_locs = .5*imgheight + np.arange(tile_shape[0])*imgheight
+        plt.yticks(tick_locs, titles, rotation='horizontal')
+
     fig.tight_layout()
     fig.savefig(os.path.join(make_figure_folder(), savename + '.png'))
 
@@ -209,12 +216,16 @@ def main(config_dict):
                        show_hidden=show_hidden, savename=savename)
     else:
         tile_shape = config_dict['tile_shape']
+        try:
+            offset = config_dict['offset']
+        except KeyError:
+            offset = 0
         samples_per_tile = config_dict['samples_per_tile']
 
         samples = np.array(frame_list, dtype=float).reshape(-1, n_samples, np.prod(img_shape))
         assert tile_shape[0] == len(samples)
         plot_samples(samples, tile_shape, img_shape,
-                     samples_per_tile=samples_per_tile, title='',
+                     samples_per_tile=samples_per_tile, offset=offset,
                      savename=savename)
 
 
