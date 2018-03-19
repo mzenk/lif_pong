@@ -59,7 +59,7 @@ def inf_speed_analysis(samples=None, identifier_params=None, clamp_pos=-2,
             targets = data[chunk_idxs].reshape((-1,) + img_shape)[..., -1]
             if kink_dict is not None:
                 prekink_test_targets = kink_dict['nokink_lastcol'][-len(data):]
-                nsteps_pre = int(kink_dict['pos']*img_shape[1])
+                nsteps_pre = int(np.round(kink_dict['pos']*img_shape[1]))
                 targets = np.concatenate(
                     (np.tile(np.expand_dims(prekink_test_targets[chunk_idxs], 1), (1, nsteps_pre, 1)),
                     np.tile(np.expand_dims(targets, 1), (1, last_col.shape[1] - nsteps_pre, 1))),

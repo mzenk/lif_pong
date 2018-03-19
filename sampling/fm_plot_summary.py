@@ -11,8 +11,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
-def plot_cumerr_pcolor(df, identifier, figname='paramsweep.png', logscale=False,
-                       title=''):
+def plot_cumerr_pcolor(df, identifier, figname='paramsweep.pdf', logscale=False,
+                       title='', axlabels=None):
     assert len(identifier) == 2
     df['mean_cum_prederr'] = df['cum_prederr_sum'] / df['n_instances']
     df['std_cum_prederr'] = (df['cum_prederr_sqsum'] / df['n_instances'] -
@@ -80,8 +80,16 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.png', logscale=False,
     if logscale:
         ax_mean.set_xscale('log')
         ax_mean.set_yscale('log')
-    plt.xlabel(identifier[0])
-    plt.ylabel(identifier[1])
+    try:
+        if len(axlabels) == 2:
+            plt.xlabel(axlabels[0])
+            plt.ylabel(axlabels[1])
+        else:
+            raise TypeError
+    except TypeError:
+        plt.xlabel(identifier[0])
+        plt.ylabel(identifier[1])
+
     cbar_m = plt.colorbar(im, ax=ax_mean)
     cbar_m.ax.set_ylabel('Mean cum. prediction error')
     ax_mean.set_title(title)
@@ -103,8 +111,8 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.png', logscale=False,
     fig_std.savefig(os.path.join(make_figure_folder(), figname + '_std.pdf'))
 
 
-def plot_inferror_pcolor(df, identifier, figname='paramsweep.png', logscale=False,
-                         title=''):
+def plot_inferror_pcolor(df, identifier, figname='paramsweep.pdf', logscale=False,
+                         title='', axlabels=None):
     assert len(identifier) == 2
     df['error_rate'] = 1 - df['inf_success'] / df['n_instances']
 
@@ -164,16 +172,23 @@ def plot_inferror_pcolor(df, identifier, figname='paramsweep.png', logscale=Fals
     if logscale:
         ax.set_xscale('log')
         ax.set_yscale('log')
-    plt.xlabel(identifier[0])
-    plt.ylabel(identifier[1])
+    try:
+        if len(axlabels) == 2:
+            plt.xlabel(axlabels[0])
+            plt.ylabel(axlabels[1])
+        else:
+            raise TypeError
+    except TypeError:
+        plt.xlabel(identifier[0])
+        plt.ylabel(identifier[1])
     cbar = plt.colorbar(im, ax=ax)
-    cbar.ax.set_ylabel('Error rate')
+    cbar.ax.set_ylabel('1 - $S_\infty$')
     ax.set_title(title)
     plt.savefig(os.path.join(make_figure_folder(), figname))
 
 
 def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
-                   figname='paramsweep.png', logscale=False):
+                   figname='paramsweep.pdf', logscale=False, axlabels=None):
     assert len(identifier) == 1
     df['mean_cum_prederr'] = df['cum_prederr_sum'] / df['n_instances']
     df['std_cum_prederr'] = (df['cum_prederr_sqsum'] / df['n_instances'] -
@@ -197,10 +212,16 @@ def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
     ax.errorbar(xdata, ydata, yerr=yerr, fmt='.:', label=label)
     # ax.plot(xdata, ydata, '.:', label=label)
     # ax.fill_between(xdata, ydata-ystd, ydata+ystd, alpha=.3)
-    ax.axhline(4.68, label='500 samples', color='C1')
+    # ax.axhline(4.63, label='800 samples', color='C1')
     if logscale:
         ax.set_xscale('log')
-    ax.set_xlabel(identifier[0])
+    try:
+        if len(axlabels) == 1:
+            ax.set_xlabel(axlabels[0])
+        else:
+            ax.set_xlabel(axlabels[0])
+    except TypeError:
+        ax.set_xlabel(identifier[0])
     ax.set_ylabel('$<\mathrm{Err}>_\mathrm{data}$')
 
     if savefig:
@@ -209,7 +230,7 @@ def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
 
 
 def plot_inferror_1d(df, identifier, fig=None, ax=None, label=None,
-                     figname='paramsweep.png', logscale=False):
+                     figname='paramsweep.pdf', logscale=False, axlabels=None):
     assert len(identifier) == 1
     df['error_rate'] = 1 - df['inf_success'] / df['n_instances']
 
@@ -229,11 +250,17 @@ def plot_inferror_1d(df, identifier, fig=None, ax=None, label=None,
     ax.plot(xdata, ydata, '.:', label=label)
     if logscale:
         ax.set_xscale('log')
-    ax.set(xlabel=identifier[0], ylabel='Error rate')
+    try:
+        if len(axlabels) == 1:
+            ax.set_xlabel(axlabels[0])
+        else:
+            ax.set_xlabel(axlabels[0])
+    except TypeError:
+        ax.set_xlabel(identifier[0])
+    ax.set_ylabel('1 - $S_\infty$')
 
     if savefig:
-        fig.savefig(os.path.join(make_figure_folder(), figname + '.png'))
-
+        fig.savefig(os.path.join(make_figure_folder(), figname + '.pdf'))
 
 
 if len(sys.argv) != 2:
@@ -271,8 +298,16 @@ if 'tau_fac' in result.keys():
 
 # plot heatmap of success rate
 if len(id_params) == 1:
-    plot_cumerr_1d(result, id_params, figname=expt_name + '_cumerr')
-    plot_inferror_1d(result, id_params, figname=expt_name + '_inferr')
+    response = raw_input(
+                '>>> What labels should the axes have? (Enter to skip)\n')
+    if response == '':
+        axlabels = None
+    else:
+        axlabels = response.split(',')
+    plot_cumerr_1d(result, id_params, figname=expt_name + '_cumerr',
+                   axlabels=axlabels)
+    plot_inferror_1d(result, id_params, figname=expt_name + '_inferr',
+                     axlabels=axlabels)
 else:
     response = raw_input(">>> There are more than two identifiers. Plot 1d or 2d?\n")
     if response == '1d':
@@ -301,6 +336,13 @@ else:
             if len(plot_params) != n_plotparams:
                 print('>>> Wrong number of parameters.'
                       ' There are {} axes'.format(n_plotparams))
+
+            response = raw_input(
+                '>>> What labels should the axes have? (Enter to skip)\n')
+            if response == '':
+                axlabels = None
+            else:
+                axlabels = response.split(',')
 
     id_dict = {}
     slice_param = None
@@ -355,37 +397,50 @@ else:
 
     if slice_param is None:
         if n_plotparams == 1:
-            plot_cumerr_1d(subdf, plot_params, figname=expt_name + '_cumerr', logscale=logscale)
-            plot_inferror_1d(subdf, plot_params, figname=expt_name + '_inferr', logscale=logscale)
+            plot_cumerr_1d(
+                subdf, plot_params, figname=expt_name + '_cumerr',
+                logscale=logscale, axlabels=axlabels)
+            plot_inferror_1d(
+                subdf, plot_params, figname=expt_name + '_inferr',
+                logscale=logscale, axlabels=axlabels)
         if n_plotparams == 2:
-            plot_cumerr_pcolor(subdf, plot_params, figname=expt_name + '_cumerr', logscale=logscale)
-            plot_inferror_pcolor(subdf, plot_params, figname=expt_name + '_inferr', logscale=logscale)
+            plot_cumerr_pcolor(
+                subdf, plot_params, figname=expt_name + '_cumerr',
+                logscale=logscale, axlabels=axlabels)
+            plot_inferror_pcolor(
+                subdf, plot_params, figname=expt_name + '_inferr',
+                logscale=logscale, axlabels=axlabels)
     else:
         if n_plotparams == 1:
-            fig, ax = plt.subplots()
-            fig_is, ax_is = plt.subplots()
-            ax_is.set(ylim=[0, 1])
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
+            ax2.set(ylim=[0, 1.])
             # iterate over slices
             for i, v in enumerate(slice_vals):
                     slicedf = subdf.loc[subdf[slice_param] == v, :].copy()
                     slicedf.pop(slice_param)
                     label = slice_labels[i]
-                    plot_cumerr_1d(slicedf, plot_params, fig, ax, label=label, logscale=logscale)
-                    plot_inferror_1d(slicedf, plot_params, fig_is, ax_is, label=label, logscale=logscale)
-            ax.legend()
+                    plot_cumerr_1d(
+                        slicedf, plot_params, fig, ax1, label=label,
+                        logscale=logscale, axlabels=axlabels)
+                    plot_inferror_1d(
+                        slicedf, plot_params, fig, ax2, label=label,
+                        logscale=logscale, axlabels=axlabels)
+            ax2.legend()
             fig.savefig(os.path.join(make_figure_folder(), expt_name +
-                                     '_slice_{}_cumerr.png'.format(slice_param)))
-            ax_is.legend()
-            fig_is.savefig(os.path.join(make_figure_folder(), expt_name +
-                                        '_slice_{}_inferr.png'.format(slice_param)))
+                                     '_slice_{}.pdf'.format(slice_param)))
+            # # ax_is.legend()
+            # fig_is.savefig(os.path.join(make_figure_folder(), expt_name +
+            #                             '_slice_{}_inferr.pdf'.format(slice_param)))
         if n_plotparams == 2:
             for i, v in enumerate(slice_vals):
                     slicedf = subdf.loc[subdf[slice_param] == v, :].copy()
                     slicedf.pop(slice_param)
                     label = slice_labels[i]
-                    plot_cumerr_pcolor(slicedf, plot_params,
-                                       figname=expt_name + '_slice_{}{:02d}_cumerr'.format(slice_param, i),
-                                       logscale=logscale, title=label)
-                    plot_inferror_pcolor(slicedf, plot_params,
-                                         figname=expt_name + '_slice_{}{:02d}_inferr'.format(slice_param, i),
-                                         logscale=logscale, title=label)            
+                    plot_cumerr_pcolor(
+                        slicedf, plot_params,
+                        figname=expt_name + '_slice_{}{:02d}_cumerr'.format(slice_param, i),
+                        logscale=logscale, title=label, axlabels=axlabels)
+                    plot_inferror_pcolor(
+                        slicedf, plot_params,
+                        figname=expt_name + '_slice_{}{:02d}_inferr'.format(slice_param, i),
+                        logscale=logscale, title=label, axlabels=axlabels)

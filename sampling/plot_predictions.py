@@ -144,15 +144,15 @@ def plot_prediction_error(ax, pred_error, label=None, x_data=None):
         x_data = np.linspace(0, 1, n_frames)
 
     median = np.percentile(pred_error, 50, axis=0)
-    # mean = np.mean(pred_error, axis=0)
+    mean = np.mean(pred_error, axis=0)
     lower_quart = np.percentile(pred_error, 25, axis=0)
     upper_quart = np.percentile(pred_error, 75, axis=0)
     print('Integral = {:.1f}'.format(
           median[:48].sum()/48.))
 
     # add prediction error curve to plot
-    ax.plot(x_data, median, '.-', alpha=.7)
-    ax.fill_between(x_data, lower_quart, upper_quart, alpha=.3, label=label)
+    ax.plot(x_data[:-1], median[:-1], '.-', alpha=.7)
+    ax.fill_between(x_data[:-1], lower_quart[:-1], upper_quart[:-1], alpha=.3, label=label)
     # ax.plot(x_data, mean, '.-', alpha=.7, label='mean ' + label)
 
 
@@ -165,13 +165,17 @@ def plot_agent_performance(ax, agent_dict, label=None):
     ax.plot(speeds, succrate, label=label)
 
 
-def plot_prediction_error_dist(ax, pred_error, dist_pos=-1, label=None):
-    if label is not None:
-        label += '@col={}'.format(dist_pos % pred_error.shape[1])
+def plot_prediction_error_dist(ax, pred_error, dist_pos=None, label=None,
+                               title=False, color='C0'):
+    if dist_pos is None:
+        dist_pos = pred_error.shape[1] - 1
     pe_hist, bin_edges = np.histogram(pred_error[:, dist_pos], bins='auto')
+    if title:
+        # ax.set_title('{} of {} clamped'.format(dist_pos, pred_error.shape[1] - 1))
+        ax.set_title('$x_\mathrm{kink}$ = 0.7')
     ax.bar(bin_edges[:-1], pe_hist, width=bin_edges[1] - bin_edges[0],
-           alpha=.4, label=label)
-    ax.set(xlabel='Prediction error')
+           alpha=1., label=label, color=color)
+    # ax.set(xlabel='Prediction error')
 
 
 def list_bad_examples(pred_errors, img_shape):
@@ -213,8 +217,13 @@ def main(identifier_list, list_bad=False):
     # ax_pe.set_prop_cycle(cycler('color', color_cycle))
 
     # plot the pred.err. distributions at some predefined places
-    fig_pd, axarr_pd = plt.subplots(1, 4, sharey='row', figsize=(20, 5))
-    axarr_pd[0].set(ylabel='Abundance')
+    n_ids = len(identifier_list)
+    n_dist = 1
+    fig_pd, axarr_pd = plt.subplots(n_ids, n_dist, sharey='col',
+                                    sharex='col', figsize=(6*n_dist, 4*n_ids))
+    if n_ids == 1 or n_dist == 1:
+        axarr_pd = np.array(axarr_pd).reshape((n_ids, n_dist))
+    axarr_pd[-1, 0].set(ylabel='Number', xlabel='Prediction error')
     fig_pd.subplots_adjust(wspace=0)
 
     # fig_ap, ax_ap = plt.subplots()
@@ -249,11 +258,11 @@ def main(identifier_list, list_bad=False):
         test_data = test_set[0]
         data_idx, prediction, agent_result = get_performance_data(
             os.path.join(simfolder, expt_name), identifier_dict, test_data)
-        targets = test_data[data_idx].reshape((-1,)  + img_shape)[..., -1]
+        targets = test_data[data_idx].reshape((-1,) + img_shape)[..., -1]
 
         if kink_dict is not None:
             prekink_test_targets = kink_dict['nokink_lastcol'][-len(test_data):]
-            nsteps_pre = int(kink_dict['pos']*img_shape[1])
+            nsteps_pre = int(np.round(kink_dict['pos']*img_shape[1]))
             targets = np.concatenate(
                 (np.tile(np.expand_dims(prekink_test_targets[data_idx], 1), (1, nsteps_pre, 1)),
                  np.tile(np.expand_dims(targets, 1), (1, prediction.shape[1] - nsteps_pre, 1))),
@@ -263,9 +272,15 @@ def main(identifier_list, list_bad=False):
         pred_error = compute_prediction_error(prediction, targets, n_pos)
 
         plot_prediction_error(ax_pe, pred_error, label)
-        for i, dist_pos in enumerate(np.arange(.2, 1., .2)*pred_error.shape[1]):
-            plot_prediction_error_dist(axarr_pd[i], pred_error, int(dist_pos),
-                                       label)
+        for j, dist_pos in enumerate(np.linspace(.1, .35, n_dist) * img_shape[1]):
+        # for j, dist_pos in enumerate([47]):
+            if i == 0:
+                set_title = True
+            else:
+                set_title = False
+            plot_prediction_error_dist(axarr_pd[i, j], pred_error,
+                                       int(dist_pos), label, title=set_title,
+                                       color='C{}'.format(j))
         plot_agent_performance(ax_ap, agent_result, label)
 
         if list_bad:
@@ -273,8 +288,9 @@ def main(identifier_list, list_bad=False):
 
     ax_ap.plot(ax_ap.get_xlim(), [1, 1], 'k:')
     ax_ap.legend()
-    ax_pe.legend()
-    [axarr_pd[i].legend() for i in range(len(axarr_pd))]
+    # ax_pe.legend()
+    if axarr_pd.shape[0] > 1:
+        [axarr_pd[i, -1].legend() for i in range(len(axarr_pd))]
 
     fig_pe.savefig(make_figure_folder() + 'pred_error.pdf')  #, transparent=True)
     fig_pd.savefig(make_figure_folder() + 'pred_error_dist.pdf')  #, transparent=True)

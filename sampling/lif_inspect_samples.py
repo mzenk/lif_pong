@@ -9,10 +9,9 @@ from scipy.ndimage import convolve1d
 from lif_pong.utils import tile_raster_images
 from lif_pong.utils.data_mgmt import make_figure_folder, get_rbm_dict
 import lif_pong.training.rbm as rbm_pkg
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.gridspec as gridspec
 plt.rcParams['animation.ffmpeg_path'] = u'/home/hd/hd_hd/hd_kq433/ffmpeg-3.4.1-64bit-static/ffmpeg'
 
 
@@ -180,6 +179,55 @@ def plot_samples(samples, tile_shape, img_shape, samples_per_tile=1000,
     fig.savefig(os.path.join(make_figure_folder(), savename + '.png'))
 
 
+def plot_samples_clamp(samples, tile_shape, img_shape, samples_per_tile=1000,
+                       offset=0, titles=[], savename='test', clamp_duration=None,
+                       clamp_window=None):
+    n_pixels = np.prod(img_shape)
+    n_samples = samples_per_tile*tile_shape[1] + offset
+    # needs (n_imgs, n_pxls); samples is (n_instances, n_samples, n_pixels)
+    vis_samples = samples[..., :n_pixels]
+
+    if tile_shape[0] != samples.shape[0]:
+        if tile_shape[0] != samples.shape[1]:
+            print('Wrong samples dimensions!', file=sys.stderr)
+            sys.exit()
+        else:
+            vis_samples = np.swapaxes(vis_samples, 0, 1)
+    if vis_samples.shape[1] > n_samples:
+        print('Cropped some images (array too large)', file=sys.stderr)
+
+    snapshot_idxs = np.arange(offset, n_samples, samples_per_tile)
+    if clamp_duration is not None:
+        clamped_pos = snapshot_idxs // clamp_duration - .5
+    snapshots = vis_samples[:, snapshot_idxs].reshape(tile_shape + img_shape)
+
+    # fig, axarr = plt.subplots(*tile_shape, figsize=(tile_shape[1]*2, tile_shape[0]*1.5))
+    figsize = (tile_shape[1]*2, tile_shape[0]*1.5)
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(*tile_shape, wspace=0, hspace=0)
+    # , top=1.-0.5/figsize[1], bottom=0.5/figsize[1],
+    #                    left=0.5/figsize[0], right=1-0.5/figsize[0])
+    axarr = np.empty(tile_shape, dtype=object)
+    for i, snaps_expt in enumerate(snapshots):
+        for j, snap in enumerate(snaps_expt):
+            axarr[i, j] = plt.subplot(gs[i, j])
+            axarr[i, j].tick_params(
+                left='off', right='off', bottom='off', top='off',
+                labelleft='off', labelbottom='off', labelright='off', labeltop='off')
+            axarr[i, j].imshow(snap, interpolation='Nearest', cmap='gray_r')
+            if clamp_duration is not None:
+                axarr[i, j].axvline(clamped_pos[j], color='C1', lw=1)
+                if clamp_window is not None:
+                    axarr[i, j].axvline(clamped_pos[j] - clamp_window, color='C1', lw=1)
+        if len(titles) > 0:
+            print('ticks')
+            axarr[i, 0].tick_params(labelleft='on')
+            tick_locs = .5*(img_shape[0] + 1)
+            plt.yticks(tick_locs, titles[i], rotation='horizontal')
+    # fig.subplots_adjust(wspace=0, hspace=0)
+    fig.savefig(os.path.join(make_figure_folder(), savename + '.png'))
+
+
 def main(config_dict):
     sample_files = config_dict['sample_files']
     data_idx = config_dict['data_idx']
@@ -198,6 +246,14 @@ def main(config_dict):
         titles = config_dict['titles']
     else:
         titles = []
+    if 'clamp_duration' in config_dict.keys():
+        clamp_duration = config_dict['clamp_duration']
+    else:
+        clamp_duration = None
+    if 'clamp_window' in config_dict.keys():
+        clamp_window = config_dict['clamp_window']
+    else:
+        clamp_window = None
 
     frame_list = []
     n_samples = []
@@ -215,7 +271,7 @@ def main(config_dict):
         plot_animation(frame_list, img_shape, n_samples, titles=titles,
                        show_hidden=show_hidden, savename=savename)
     else:
-        tile_shape = config_dict['tile_shape']
+        tile_shape = tuple(config_dict['tile_shape'])
         try:
             offset = config_dict['offset']
         except KeyError:
@@ -226,7 +282,11 @@ def main(config_dict):
         assert tile_shape[0] == len(samples)
         plot_samples(samples, tile_shape, img_shape,
                      samples_per_tile=samples_per_tile, offset=offset,
-                     savename=savename)
+                     savename=savename, titles=titles)
+        # plot_samples(samples, tile_shape, img_shape,
+        #              samples_per_tile=samples_per_tile, offset=offset,
+        #              savename=savename, titles=titles,
+        #              clamp_duration=clamp_duration, clamp_window=clamp_window)
 
 
 if __name__ == '__main__':
