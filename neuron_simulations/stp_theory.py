@@ -150,11 +150,12 @@ if __name__ == '__main__':
     # plt.savefig('u_comparison.pdf')
 
     # scan parameter region (stationary value)
+    plt.rcParams['font.size'] = 20
     spike_interval = 1.
-    n_points = 50
+    n_points = 100
     start_tr = 1
-    stop_tr = 5.
-    start_u0 = -4.
+    stop_tr = 4.5
+    start_u0 = -3.8
     stop_u0 = 0
     tr_logrange = np.logspace(start_tr, stop_tr, n_points)
     u0_logrange = np.logspace(start_u0, stop_u0, n_points)
@@ -172,14 +173,18 @@ if __name__ == '__main__':
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
     im1 = ax1.pcolormesh(xedges, yedges, r_stat_grid, vmin=0, vmax=1)
+    cont1 = ax1.contour(tr_logrange, u0_logrange, r_stat_grid, np.arange(.1, .9, .3), colors='k')
+    plt.clabel(cont1, fontsize=10)
     im2 = ax2.pcolormesh(xedges, yedges, decay_time_grid)
+    cont2 = ax2.contour(tr_logrange, u0_logrange, decay_time_grid, np.arange(1000, 5000, 1000), colors='k')
+    plt.clabel(cont2, fontsize=10, fmt='%03d')
     ax1.set_xscale('log')
     ax1.set_yscale('log')
     ax2.set_xscale('log')
     ax2.set_yscale('log')
 
-    ax1.set(xlabel='tau_rec', ylabel='U', title='Stationary R')
-    ax2.set(xlabel='tau_rec', ylabel='U', title='Decay time constant')
+    ax1.set(xlabel=r'$\tau_{rec}$', ylabel='U', title=r'$R^*$')
+    ax2.set(xlabel=r'$\tau_{rec}$', ylabel='U', title=r'$\tau_R$')
     plt.colorbar(im1, ax=ax1)
     plt.colorbar(im2, ax=ax2)
     plt.savefig('param_logscan.png')

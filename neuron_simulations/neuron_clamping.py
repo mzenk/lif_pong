@@ -180,7 +180,7 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
 
 
 def get_calibration(leak_potentials, duration, neuron_params, noise_params,
-                    dt=.1):
+                    dt=.1, savename='calibration'):
     sim.setup(timestep=dt, spike_precision="on_grid", quit_on_end=False)
 
     # setup samplers
@@ -199,7 +199,7 @@ def get_calibration(leak_potentials, duration, neuron_params, noise_params,
     spiketrains = population.get_data().segments[0].spiketrains
     samples = \
         get_samples(spiketrains, dt, neuron_params['tau_refrac'], duration)
-    with open(os.path.join(make_data_folder(), 'calibration.pkl'), 'w') as f:
+    with open(os.path.join(make_data_folder(), savename + '.pkl'), 'w') as f:
         cPickle.dump({'samples': samples, 'E_l': leak_potentials,
                       'vmem': vmem.magnitude}, f)
 
@@ -236,22 +236,13 @@ def plot_w_vs_activation(filenames, show_fit=True):
 
 
 def plot_activation_fct(data_file, config_file):
-    plt.figure()
-    plt.xlabel('Synapse weight [muS]')
-    plt.ylabel('fraction in on state')
     with open(get_data_path('neuron_clamping') + data_file, 'r') as f:
         d = cPickle.load(f)
         samples = d['samples']
         v_rests = d['E_l']
     p_on = samples.mean(axis=0)
 
-    sampler_config = sbs.db.SamplerConfiguration.load(config_file)
-    sampler = sbs.samplers.LIFsampler(sampler_config, sim_name='pyNN.nest')
-    sbs_popt = (sampler.calibration.fit.v_p05, sampler.calibration.fit.alpha)
-    plt.plot(v_rests, p_on, '.')
-    plt.plot(v_rests, sigma_fct(v_rests, *sbs_popt), label='sbs')
-    # fit
-    fit_mask = np.logical_and(p_on > .05, p_on < .95)
+    fit_mask = np.logical_and(p_on > .03, p_on < .97)
     if not np.any(fit_mask):
         print('Range of data: [{}, {}]'.format(p_on.min(), p_on.max()))
         fit_mask = np.logical_not(fit_mask)
@@ -259,9 +250,26 @@ def plot_activation_fct(data_file, config_file):
     y_fit = p_on[fit_mask]
     p0 = [x_fit.mean(), 1./(x_fit.max() - x_fit.min())]
     popt, pcov = curve_fit(sigma_fct, x_fit, y_fit, p0=p0)
-    plt.plot(x_fit, sigma_fct(x_fit, *popt), label='fit')
+    print('Fit parameters: {}, {}'.format(*popt))
+    print('Maximum on-fraction: {}'.format(p_on.max()))
+
+    plt.figure()
+    plt.xlabel('$E_l$ [mV]')
+    plt.ylabel('$p(z = 1)$')
+
+    plt.plot(v_rests, p_on, 'x', label='Simulation')
+    # sampler_config = sbs.db.SamplerConfiguration.load(config_file)
+    # sampler = sbs.samplers.LIFsampler(sampler_config, sim_name='pyNN.nest')
+    # sbs_popt = (sampler.calibration.fit.v_p05, sampler.calibration.fit.alpha)
+    # plt.plot(v_rests, sigma_fct(v_rests, *sbs_popt), label='sbs')
+    plt.plot(v_rests, sigma_fct(v_rests, *popt),
+             label=r'$\alpha$ = ' + '{:.2f} mV,\n'.format(popt[1]) + r'$\bar u^0$ = ' + '{:.3f} mV'.format(popt[0]))
+    plt.legend()
+    plt.xticks(-50 + np.arange(-.3, .2, .1))
+    plt.tight_layout()
 
     plt.savefig(os.path.join(make_figure_folder(), 'act_fct.png'))
+    plt.savefig(os.path.join(make_figure_folder(), 'act_fct.pdf'))
 
 
 def plot_vmem_dist(data_file):
@@ -545,10 +553,11 @@ if __name__ == '__main__':
     #                   synweight=weights, tso_params=None, spike_interval=1./freq,
     #                   savename='freq_sweep{:02d}'.format(i), burn_in_time=100.)
 
-    # duration = 1e4
+    # duration = 1e5
     # n_neurons = 100
-    # leak_potentials = np.linspace(-50.1, -49.9, n_neurons)
-    # get_calibration(leak_potentials, duration, neuron_params, noise_params)
+    # leak_potentials = -50.08 + np.linspace(-.2, .2, n_neurons)
+    # get_calibration(leak_potentials, duration, neuron_params, noise_params,
+    #                 savename='wei_curr_calibdata')
 
     # # activity for depressing synapse
     # n_neurons = 500
@@ -570,27 +579,27 @@ if __name__ == '__main__':
     # plot_vg_traces(['renewing.pkl'], 2000.)
 
 
-    # check if act fct is equivalent to the one from sbs-calibration
-    w_fit = {}
-    with np.load('calibrations/wei_curr_clampcalib.npz') as d:
-        w_fit['p05'] = d['wp05']
-        w_fit['alpha'] = d['alpha']
-    sampler_config = sbs.db.SamplerConfiguration.load(config_file)
-    sampler = sbs.samplers.LIFsampler(sampler_config, sim_name='pyNN.nest')
-    sbs_fit = {}
-    sbs_fit['p05'] = sampler.calibration.fit.v_p05
-    sbs_fit['alpha'] = sampler.calibration.fit.alpha
+    # # check if act fct is equivalent to the one from sbs-calibration
+    # w_fit = {}
+    # with np.load('calibrations/wei_curr_clampcalib.npz') as d:
+    #     w_fit['p05'] = d['wp05']
+    #     w_fit['alpha'] = d['alpha']
+    # sampler_config = sbs.db.SamplerConfiguration.load(config_file)
+    # sampler = sbs.samplers.LIFsampler(sampler_config, sim_name='pyNN.nest')
+    # sbs_fit = {}
+    # sbs_fit['p05'] = sampler.calibration.fit.v_p05
+    # sbs_fit['alpha'] = sampler.calibration.fit.alpha
 
-    dt_spike = 1.
-    g_l = neuron_params['cm']/neuron_params['tau_m']
-    for k in w_fit.keys():
-        if k == 'alpha':
-            sbs2w = g_l/neuron_params['tau_syn_E']*dt_spike/(1 - np.exp(-dt_spike/neuron_params['tau_syn_E']))
-        else:
-            sbs2w = 0.
-        print('fit with weights: {}={}'.format(k, w_fit[k]))
-        # print('fit from calibration: {}={}'.format(k, sbs_fit[k]))
-        print('converted sbs fit: {}={}'.format(k, sbs_fit[k]*sbs2w))
+    # dt_spike = 1.
+    # g_l = neuron_params['cm']/neuron_params['tau_m']
+    # for k in w_fit.keys():
+    #     if k == 'alpha':
+    #         sbs2w = g_l/neuron_params['tau_syn_E']*dt_spike/(1 - np.exp(-dt_spike/neuron_params['tau_syn_E']))
+    #     else:
+    #         sbs2w = 0.
+    #     print('fit with weights: {}={}'.format(k, w_fit[k]))
+    #     # print('fit from calibration: {}={}'.format(k, sbs_fit[k]))
+    #     print('converted sbs fit: {}={}'.format(k, sbs_fit[k]*sbs2w))
 
     # # # t vs p_on given synaptic weight
     # filenames = ['wscan_wei{}.pkl'.format(i) for i in range(0, 10, 2)]
@@ -606,9 +615,9 @@ if __name__ == '__main__':
     # }
     # plot_time_evolution(filenames, clamp_tso_params, exp_kwargs)
 
-    # # activation fct w/o external input
-    # fn = 'calibration.pkl'
-    # plot_activation_fct(fn, config_file)
+    # activation fct w/o external input
+    fn = 'wei_curr_calibdata.pkl'
+    plot_activation_fct(fn, config_file)
     # plot_vmem_dist(fn)
 
     # # weight vs p_on

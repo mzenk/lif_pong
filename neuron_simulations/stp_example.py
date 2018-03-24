@@ -98,8 +98,8 @@ spike_source.record('spikes')
 sim.run(duration)
 
 # === Plot a figure ==========================================================
-figure_filename = 'stp_example.png'
-fig, axes = plt.subplots(2, 1, figsize=(10, 10))
+figure_filename = 'stp_example.pdf'
+fig, axes = plt.subplots(2, 1, figsize=(10, 10), sharex=True, sharey='row')
 for i, label, alpha in zip(range(2), ['renewing', 'depressing'], [.7, .5]):
     data = populations[label].get_data().segments[0]
     vmem = data.filter(name='v')[0]

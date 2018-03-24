@@ -3,20 +3,17 @@ import os
 import numpy as np
 from lif_pong.utils.data_mgmt import make_figure_folder
 import pyNN.nest as sim
-import matplotlib as mpl
-mpl.use('Agg')
 import matplotlib.pyplot as plt
-mpl.rcParams['font.size'] = 14
 
 # parameters from Mihai's thesis
 curr_params = {
         "cm"         : .1,
         "tau_m"      : 20.,
-        "v_thresh"   : -40.,
+        "v_thresh"   : -50.,
         "tau_syn_E"  : 10.,
-        "v_rest"     : -50.,
+        "v_rest"     : -60.,
         "tau_syn_I"  : 10.,
-        "v_reset"    : -53.,
+        "v_reset"    : -58.,
         "tau_refrac" : 10.,
         "i_offset"   : 0.,
 }
@@ -26,9 +23,9 @@ cond_params = {
         "tau_m"      : 20.,
         "v_thresh"   : 0.,
         "tau_syn_E"  : 10.,
-        "v_rest"     : -50.,
+        "v_rest"     : -60.,
         "tau_syn_I"  : 10.,
-        "v_reset"    : -53.,
+        "v_reset"    : -58.,
         "tau_refrac" : 10.,
         "i_offset"   : 0.,
         "e_rev_E"    : 0.,
@@ -68,15 +65,17 @@ def lif_iext_expt():
 
     # === Plotting ===========================================================
 
-    figure_filename = 'test.png'
+    figure_filename = 'test.pdf'
     fig, ax1 = plt.subplots(figsize=(10, 7))
 
     vmem = lif_pop.get_data().segments[0].filter(name='v')[0]
     spiketrain = lif_pop.get_data().segments[0].spiketrains[0]
     t = np.linspace(0, duration, len(vmem))
     ax1.plot(t, vmem, 'C0-')
-    ax1.set_ylabel('u [mV]', color='C0')
+    ax1.set_ylabel('$u$ [mV]', color='C0')
     ax1.tick_params('y', colors='C0')
+    ax1.set_ylim([-61, -49])
+    ax1.set(xlabel='time [ms]')
 
     i_data = np.repeat(i_ext.reshape(-1, 1), 2, axis=1).flatten()
     t_i = np.zeros_like(i_data)
@@ -84,10 +83,10 @@ def lif_iext_expt():
     t_i[-1] = duration
     ax2 = ax1.twinx()
     ax2.plot(t_i, i_data, 'C1-')
-    ax2.set(xlabel='t [ms]')
-    ax2.set_ylabel('I_\mathrm{ext} [\mu A]', color='C1')
+    ax2.set_ylabel('$I_\mathrm{ext}$ [$\mu$A]', color='C1')
+    # ax2.set(ylim=[-.005, .065])
     ax2.tick_params('y', colors='C1')
-    # plt.tight_layout()
+    plt.tight_layout()
     plt.savefig(os.path.join(make_figure_folder(), figure_filename))
 
     # === Clean up and quit ===================================================
@@ -111,11 +110,11 @@ def lif_isyn_expt():
     lif_pop = sim.Population(1, cuba_lif)
     lif_pop.initialize(v=curr_params['v_rest'])
 
-    # w_syn = .01
-    # connector = sim.AllToAllConnector()
-    # projection = sim.Projection(
-    #         current_source, lif_pop, connector, receptor_type='excitatory',
-    #         synapse_type=sim.StaticSynapse(weight=w_syn))
+    w_syn = .01
+    connector = sim.AllToAllConnector()
+    projection = sim.Projection(
+            current_source, lif_pop, connector, receptor_type='excitatory',
+            synapse_type=sim.StaticSynapse(weight=w_syn))
     weight = .01
     synapse_type = sim.StaticSynapse(weight=weight)
     proj_exc = sim.Projection(spike_source_exc, lif_pop, sim.OneToOneConnector(),
@@ -128,8 +127,8 @@ def lif_isyn_expt():
 
     # === Plotting ===========================================================
 
-    figure_filename = 'test.png'
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
+    figure_filename = 'test.pdf'
+    fig, (ax1, ax2) = plt.subplots(2, 2, figsize=(10, 10), sharex=True)
 
     vmem = lif_pop.get_data().segments[0].filter(name='v')[0]
     t = np.linspace(0, duration, len(vmem))
@@ -163,7 +162,7 @@ def lif_tso_expt():
     # synapse parameters
     weight = .01
     # nest has different weight units (x1000)
-    dep_params = {"U": 0.2, "tau_rec": 500.0, "tau_fac": 0.0,
+    dep_params = {"U": 0.5, "tau_rec": 500.0, "tau_fac": 0.0,
                   "weight": 1000 * weight}
     # # can normalize weights so that height of first PSP is identical
     # dep_params['weight'] /= dep_params['U']
@@ -180,7 +179,7 @@ def lif_tso_expt():
 
     spike_interval = 50.
     first_burst = .2*duration + np.arange(7)*spike_interval
-    second_burst = first_burst[-1] + 150. + np.arange(3)*20.
+    second_burst = first_burst[-1] + 150.    #+ np.arange(3)*20.
     spike_times = np.hstack((first_burst, second_burst))
     spike_source = sim.Population(1, sim.SpikeSourceArray(spike_times=spike_times))
 
@@ -202,19 +201,22 @@ def lif_tso_expt():
     sim.run(duration)
 
     # === Plot a figure =======================================================
-    figure_filename = 'stp_example.png'
-    fig, axes = plt.subplots(2, 2, figsize=(15, 10), sharey='col')
+    figure_filename = 'stp_example.pdf'
+    fig, axes = plt.subplots(2, 2, figsize=(18, 10), sharey='row', sharex=True)
     for i, label in zip(range(2), ['static', 'depressing']):
         data = populations[label].get_data().segments[0]
         vmem = data.filter(name='v')[0]
         gsyn = data.filter(name='gsyn_exc')[0]
         t = np.linspace(0, duration, len(vmem))
 
-        axes[i, 0].plot(t, gsyn, label=label, color='C1'.format(i))
-        axes[i, 0].set_ylabel('gsyn_exc')
+        axes[0, i].plot(t, gsyn, label=label, color='C1'.format(i))
+        axes[0, i].tick_params(labelleft='off')
 
-        axes[i, 1].plot(t, vmem, label=label, color='C0'.format(i))
-        axes[i, 1].set(xlabel='t [ms]', ylabel='Membrane potential [mV]')
+        axes[1, i].plot(t, vmem, label=label, color='C0'.format(i))
+        axes[1, i].tick_params(labelleft='off')
+    axes[1, 0].set(xlabel='time [ms]', ylabel='$u$ [a.u.]')
+    axes[1, 1].set(xlabel='time [ms]')
+    axes[0, 0].set_ylabel('$I_\mathrm{syn}$ [a.u.]')
 
     plt.tight_layout()
     plt.savefig(os.path.join(make_figure_folder(), figure_filename))
@@ -231,5 +233,5 @@ def exp_kernel(t, t0, tau):
 
 if __name__ == '__main__':
     # lif_isyn_expt()
-    lif_iext_expt()
-    # lif_tso_expt()
+    # lif_iext_expt()
+    lif_tso_expt()
