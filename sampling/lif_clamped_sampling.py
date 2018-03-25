@@ -353,6 +353,9 @@ def gather_network_spikes_clamped_sf(
     exc_weights, inh_weights = get_clamp_weights(
         clamp_dict, network.biases_theo[:nv], alpha_w, tau_syn)
 
+    # avoid sign change of weights
+    exc_weights = np.maximum(exc_weights, np.zeros_like(exc_weights))
+    inh_weights = np.minimum(inh_weights, np.zeros_like(inh_weights))
     # # could choose symmetric weights so that final w value is same for exc/inh
     # weights = np.maximum(np.abs(exc_weights), np.abs(inh_weights))
 
@@ -485,11 +488,14 @@ def clampfct_to_spiketrain(clamp_fct, n_neurons, duration, dt, spike_interval,
 # returns the weight a static synapse should have if the clamped neuron gets
 # no other input than the clamping spike train
 def get_clamp_weights(clamp_dict, vis_bias, alpha_w, tau_syn):
-    U = clamp_dict['tso_params']['U']
-    tau_rec = clamp_dict['tso_params']['tau_rec']
+    if clamp_dict['tso_params'] is not None:
+        U = clamp_dict['tso_params']['U']
+        tau_rec = clamp_dict['tso_params']['tau_rec']
+    else:
+        U = 1.
+        tau_rec = 0.
     dt_spike = clamp_dict['spike_interval']
 
-    # apply corrections to weight as in lif_clamped_sampling
     if 'weight' in clamp_dict.keys():
         weight = clamp_dict['weight']/U
         exc_weights = weight*np.ones_like(vis_bias)
