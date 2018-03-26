@@ -1,9 +1,24 @@
 from __future__ import division
 from __future__ import print_function
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+
+def compute_r(duration, dt, spike_times, U=1., tau_rec=0.):
+    rarr = [1]
+    times = [0]
+    t = 0
+    spike_counter = 0
+    while t < duration:
+        t += dt
+        rcurr = rarr[-1]
+        if spike_counter < len(spike_times) and \
+                t > spike_times[spike_counter]:
+            rcurr -= U*rcurr
+            spike_counter += 1
+        rarr.append(rcurr + (1 - rcurr)/tau_rec * dt)
+        times.append(t)
+    return np.array(times), np.array(rarr)
 
 
 def compute_ru_envelope(t_spike, U=1., tau_rec=0., tau_fac=0.):
@@ -101,30 +116,35 @@ def param_plot(attenuation_factor, clamp_duration, spike_interval=1.):
 
 
 if __name__ == '__main__':
-    # time_scaling =  1.
-    # tau_rec = 2500.
-    # tau_fac = 0.
-    # U = .002
-    # duration = 2000.
-    # spike_interval = 1.
-    # if time_scaling != 1:
-    #     tau_rec *= time_scaling
-    #     tau_fac *= time_scaling
-    #     spike_interval *= time_scaling
-    # spike_times = np.arange(0., duration, spike_interval)
+    time_scaling = 1.
+    tau_rec = 250.
+    tau_fac = 0.
+    U = .05
+    duration = 1000.
+    spike_interval = 50.
+    offset = 49.
+    if time_scaling != 1:
+        tau_rec *= time_scaling
+        tau_fac *= time_scaling
+        spike_interval *= time_scaling
+    spike_times = np.arange(offset, duration, spike_interval)
 
-    # # plot single example
-    # r, u = compute_ru_envelope(spike_times, U, tau_rec, tau_fac)
-    # w_env = r*u / (u[0]*r[0])
-    # plt.plot(spike_times, w_env, '.')
-    # # xtheo = 1 + np.arange(len(spike_times))
-    # # rtheo = r_theory(xtheo, spike_interval, U, tau_rec, tau_fac)
-    # # utheo = u_theory(xtheo, spike_interval, U, tau_fac)
-    # # plt.plot(spike_times, rtheo * utheo / (rtheo[0]*utheo[0]), ':')
+    # plot single example
+    r, u = compute_ru_envelope(spike_times, U, tau_rec, tau_fac)
+    tsim, rsim = compute_r(duration, 0.01, spike_times, U, tau_rec)
+    w_env = r*u / (u[0]*r[0])
+    plt.plot(tsim, rsim, '-')
+    plt.plot(spike_times, r, 'k:')
+    # xtheo = 1 + np.arange(len(spike_times))
+    # rtheo = r_theory(xtheo, spike_interval, U, tau_rec, tau_fac)
+    # utheo = u_theory(xtheo, spike_interval, U, tau_fac)
+    # plt.plot(spike_times, rtheo * utheo / (rtheo[0]*utheo[0]), ':')
     # plt.ylim(ymin=0)
-    # plt.xlabel('time [ms]')
+    plt.xlabel('time [a.u.]')
     # plt.ylabel('Weight envelope [w(first spike)]')
-    # plt.savefig('test.png')
+    plt.ylabel('R [1]')
+    plt.tight_layout()
+    plt.savefig('test.png')
 
     # # plot trace for several parameters
     # n_params = 5
@@ -149,45 +169,47 @@ if __name__ == '__main__':
     # ax.set_ylim(ymin=0)
     # plt.savefig('u_comparison.pdf')
 
-    # scan parameter region (stationary value)
-    plt.rcParams['font.size'] = 20
-    spike_interval = 1.
-    n_points = 100
-    start_tr = 1
-    stop_tr = 4.5
-    start_u0 = -3.8
-    stop_u0 = 0
-    tr_logrange = np.logspace(start_tr, stop_tr, n_points)
-    u0_logrange = np.logspace(start_u0, stop_u0, n_points)
-    tr_grid, u0_grid = np.meshgrid(tr_logrange, u0_logrange)
-    # pcolormesh takes grid edges
-    tmp_list = []
-    for vec in [tr_logrange, u0_logrange]:
-        tmp = np.hstack((vec, vec[-1]*np.power(vec[-1]/vec[0], 1/len(vec))))
-        shift_factor = np.power(tmp.max() / tmp.min(), -1./(2*len(tmp)))
-        tmp_list.append(shift_factor*tmp)
-    xedges, yedges = tmp_list
+    # # scan parameter region (stationary value)
+    # plt.rcParams['font.size'] = 20
+    # spike_interval = 1.
+    # n_points = 100
+    # start_tr = 1
+    # stop_tr = 4.8
+    # start_u0 = -3.9
+    # stop_u0 = 0
+    # tr_logrange = np.logspace(start_tr, stop_tr, n_points)
+    # u0_logrange = np.logspace(start_u0, stop_u0, n_points)
+    # tr_grid, u0_grid = np.meshgrid(tr_logrange, u0_logrange)
+    # # pcolormesh takes grid edges
+    # tmp_list = []
+    # for vec in [tr_logrange, u0_logrange]:
+    #     tmp = np.hstack((vec, vec[-1]*np.power(vec[-1]/vec[0], 1/len(vec))))
+    #     shift_factor = np.power(tmp.max() / tmp.min(), -1./(2*len(tmp)))
+    #     tmp_list.append(shift_factor*tmp)
+    # xedges, yedges = tmp_list
 
-    r_stat_grid = r_stat(u0_grid, tr_grid, dt_spike=spike_interval)
-    decay_time_grid = 1/decay_const(u0_grid, tr_grid, dt_spike=spike_interval)
+    # r_stat_grid = r_stat(u0_grid, tr_grid, dt_spike=spike_interval)
+    # decay_time_grid = 1/decay_const(u0_grid, tr_grid, dt_spike=spike_interval)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
-    im1 = ax1.pcolormesh(xedges, yedges, r_stat_grid, vmin=0, vmax=1)
-    cont1 = ax1.contour(tr_logrange, u0_logrange, r_stat_grid, np.arange(.1, .9, .3), colors='k')
-    plt.clabel(cont1, fontsize=10)
-    im2 = ax2.pcolormesh(xedges, yedges, decay_time_grid)
-    cont2 = ax2.contour(tr_logrange, u0_logrange, decay_time_grid, np.arange(1000, 5000, 1000), colors='k')
-    plt.clabel(cont2, fontsize=10, fmt='%03d')
-    ax1.set_xscale('log')
-    ax1.set_yscale('log')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
+    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
+    # ax1.set_xscale('log')
+    # ax1.set_yscale('log')
+    # ax2.set_xscale('log')
+    # ax2.set_yscale('log')
+    # im1 = ax1.pcolormesh(xedges, yedges, r_stat_grid, vmin=0, vmax=1)
+    # cont1 = ax1.contour(tr_logrange, u0_logrange, r_stat_grid, np.arange(.1, .8, .3), colors='k')
+    # plt.clabel(cont1, fontsize='smaller')
+    # im2 = ax2.pcolormesh(xedges, yedges, decay_time_grid)
+    # cont2 = ax2.contour(tr_logrange, u0_logrange, decay_time_grid, 
+    #                     [1000, 2000, 4000], colors='k')
+    # plt.clabel(cont2, fontsize='smaller', fmt='%03d')
 
-    ax1.set(xlabel=r'$\tau_{rec}$', ylabel='U', title=r'$R^*$')
-    ax2.set(xlabel=r'$\tau_{rec}$', ylabel='U', title=r'$\tau_R$')
-    plt.colorbar(im1, ax=ax1)
-    plt.colorbar(im2, ax=ax2)
-    plt.savefig('param_logscan.png')
+    # ax1.set(xlabel=r'$\tau_{rec}$', ylabel='U', title=r'$R^*$')
+    # ax2.set(xlabel=r'$\tau_{rec}$', ylabel='U', title=r'$\tau_R$')
+    # plt.colorbar(im1, ax=ax1)
+    # plt.colorbar(im2, ax=ax2)
+    # plt.tight_layout()
+    # plt.savefig('param_logscan.pdf')
 
     # # parameter choice
     # attenuation_factor = np.linspace(.01, .1, 5)
