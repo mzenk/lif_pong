@@ -111,7 +111,7 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
     clamp_dict = {
         'tso_params': tso_params,
         'spike_interval': spike_interval,
-        'bias_shift': bias_shift
+        'bias_shift': np.abs(bias_shift)
     }
     tau_syn = neuron_params['tau_syn_E']
     gl = neuron_params['cm']/neuron_params['tau_m']
@@ -161,7 +161,6 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
                                             synapse_type=bn_synapse)
     projections['ext_exc'].set(weight=exc_weights)
     projections['ext_inh'].set(weight=inh_weights)
-
     sim.run(duration)
 
     # === Save Data ===========================================================
@@ -409,9 +408,9 @@ def analyse_sweep(filenames, n_avg=20, filterlength=20):
     return (p_stat, p_stat_std)
 
 
-# def plot_time_evolution(data_file, tso_params=None, kwargs=None):
-    # kwargs comprise spike_interval, input spiketrain, fit param (wp05, alpha)
-def plot_time_evolution(data_file, clamp_dict, calib_file, bias=0):
+def plot_time_evolution(data_file, clamp_dict, calib_file, bias=0, labels=None):
+    if labels is None:
+        labels = ['file {}'.format(i) for i in range(len(data_file))]
     sampler_config = sbs.db.SamplerConfiguration.load(calib_file)
     tau_syn = sampler_config.neuron_parameters.tau_syn_E
     gl = sampler_config.neuron_parameters.cm / \
@@ -422,7 +421,7 @@ def plot_time_evolution(data_file, clamp_dict, calib_file, bias=0):
     alpha_w = gl*spike_interval/tau_syn*sampler_config.calibration.fit.alpha
 
     plt.figure()
-    plt.xlabel('t')
+    plt.xlabel('time [ms]')
     plt.ylabel(r'$p_{on}$')
     for i, fn in enumerate(data_file):
         with open(get_data_path('neuron_clamping') + fn, 'r') as f:
@@ -432,7 +431,7 @@ def plot_time_evolution(data_file, clamp_dict, calib_file, bias=0):
         # assuming file contains multiple runs of same exp't -> average
         p_on = samples.mean(axis=1)
         timeaxis = np.linspace(0, 10*len(samples), len(p_on))
-        plt.plot(timeaxis, p_on, 'C{}.'.format(i), label='Weight {}'.format(i), alpha=.8)
+        plt.plot(timeaxis, p_on, 'C{}.'.format(i), label=labels[i], alpha=.8)
 
         if tso_params is not None:
             r_theo = r_theo_interpolated(
@@ -442,12 +441,12 @@ def plot_time_evolution(data_file, clamp_dict, calib_file, bias=0):
         else:
             effweight = weights*np.ones_like(timeaxis)
 
-        
         effweight[timeaxis < clamp_offset] = 0
         p_theo = sigma_fct(bias + effweight/alpha_w)
         plt.plot(timeaxis, p_theo, 'k:'.format(i))
-
+    plt.legend()
     plt.savefig(os.path.join(make_figure_folder(), 'decay.png'))
+    plt.savefig(os.path.join(make_figure_folder(), 'decay.pdf'))
 
 
 def plot_vg_traces(data_files, duration):
@@ -525,8 +524,8 @@ if __name__ == '__main__':
     noise_params = wei_curr_noise
 
     clamp_tso_params = {
-        "U": .002,
-        "tau_rec": 8000.,
+        "U": .0006,
+        "tau_rec": 40000.,
         "tau_fac": 0.,
         "weight": 0.*1000.
     }
@@ -568,14 +567,13 @@ if __name__ == '__main__':
 
     # activity for depressing synapse
     n_neurons = 1000
-    clamp_offset = 400.
-    duration = 2000. + clamp_offset
+    clamp_offset = 200.
+    duration = 10000. + clamp_offset
     spike_interval = 1.
-    bias_shifts = np.linspace(1., 8., 5)
+    bias_shifts = [6]
     for i, bias_shift in enumerate(bias_shifts):
-            print(sigma_fct(bias_shift))
             clamping_expt(n_neurons, duration, neuron_params, noise_params,
-                          config_file, bias_shift=bias_shift, dt=.01,
+                          config_file, bias=-3., bias_shift=bias_shift, dt=.01,
                           tso_params=clamp_tso_params,
                           spike_interval=spike_interval,
                           savename='decay_test{}'.format(i),
@@ -587,14 +585,15 @@ if __name__ == '__main__':
     # plot_vg_traces(['renewing.pkl'], 2000.)
 
     # # t vs p_on given synaptic weight
-    filenames = ['decay_test{}.pkl'.format(i) for i in range(0, 5)]
+    filenames = ['decay_test{}.pkl'.format(i) for i in range(0, 1)]
 
     clamp_dict = {
-        'offset': 400.,
+        'offset': 200.,
         'spike_interval': 1.,
         'tso_params': clamp_tso_params
     }
-    plot_time_evolution(filenames, clamp_dict, config_file)
+    plot_time_evolution(filenames, clamp_dict, config_file,
+                        bias=-3.)
 
     # # activation fct w/o external input
     # fn = 'wei_curr_calibdata.pkl'
