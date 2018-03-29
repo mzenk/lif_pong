@@ -97,6 +97,15 @@ def plot_histograms(rbm, name='histo'):
     plt.tight_layout()
     plt.savefig(os.path.join(make_figure_folder(), name + '_biases.png'))
 
+def visualize_biases(rbm, img_shape, name='test'):
+    try:
+        biases = rbm.ibias
+    except AttributeError:
+        biases = rbm.vbias
+    plt.figure()
+    plt.imshow(biases.reshape(img_shape), interpolation='Nearest', cmap='gray_r')
+    plt.savefig(os.path.join(make_figure_folder(), name + '_visbiases.png'))
+
 
 # Load data -- Pong
 img_shape = (40, 48)
@@ -105,23 +114,24 @@ rbm_name = 'pong_lw5_40x48_crbm'
 # train_set, _, test_set = load_images(data_name)
 # assert np.prod(img_shape) == train_set[0].shape[1]
 testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
+plot_histograms(testrbm, 'gauss')
+visualize_biases(testrbm, img_shape)
 # rand_ind = np.random.choice(np.arange(testrbm.n_hidden), size=12, replace=False)
 # plot_filters(testrbm, rand_ind, img_shape, tile_shape=(3, 4), name='pong',
 #              title='Pong')
-fig, ax = plt.subplots(2, 1, figsize=(12, 7))
-plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Pong',
-                    ax=ax[0])
+# fig, ax = plt.subplots(2, 1, figsize=(12, 7))
+# plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Pong',
+#                     ax=ax[0])
 
-rbm_name = 'gauss_lw5_40x48_crbm'
-testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
-# rand_ind = np.random.choice(np.arange(testrbm.n_hidden), size=12, replace=False)
-# plot_filters(testrbm, rand_ind, img_shape, tile_shape=(3, 4), name='gauss',
-#          title='Hill')
-plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Hill',
-                    ax=ax[1])
-plt.tight_layout()
-fig.savefig(os.path.join(make_figure_folder(), 'lab_filters.png'))
-# plot_histograms(testrbm)
+# rbm_name = 'gauss_lw5_40x48_crbm'
+# testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
+# # rand_ind = np.random.choice(np.arange(testrbm.n_hidden), size=12, replace=False)
+# # plot_filters(testrbm, rand_ind, img_shape, tile_shape=(3, 4), name='gauss',
+# #          title='Hill')
+# plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Hill',
+#                     ax=ax[1])
+# plt.tight_layout()
+# fig.savefig(os.path.join(make_figure_folder(), 'lab_filters.png'))
 
 # # testing of L2
 # fname = 'gauss_uncover{}w{}s'.format(100, 100)
