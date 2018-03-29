@@ -134,8 +134,7 @@ def main(data_set, rbm, general_dict, sbs_dict, clamp_dict):
     for img in data_set[0][start:end].reshape((-1,) + img_shape):
         frames.append(
             get_frames_for_img(img, vis_bias, n_samples, sbs_dict, clamp_dict))
-    np.savez_compressed(os.path.join(make_data_folder(), savename),
-                        samples=np.array(frames))
+    np.savez_compressed(savename, samples=np.array(frames))
 
 
 def sigma(x):

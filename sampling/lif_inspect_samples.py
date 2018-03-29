@@ -23,7 +23,7 @@ def update_fig(i, frames, fig, img_artists, n_samples):
         im.set_data(frames[idx][i])
     # artists[-1].set_text(
     fig.suptitle('Image {2}: {0:4d}/{1} samples'.format(
-        i % n_samples, n_samples, (i // n_samples) % len(img_artists)), fontsize=14)
+        i % n_samples, n_samples, i // n_samples), fontsize=12)
     return img_artists
 
 
@@ -81,22 +81,6 @@ def load_samples(sample_file, data_idx, img_shape, n_labels, average=False,
                                  savename + '_hid_act.png'))
     else:
         frames = vis_samples.reshape(-1, *img_shape)
-        # # plot images for quick inspection
-        # nrows = min(n_imgs, len(frames))
-        # ncols = min(n_samples, 7)
-        # snapshots = vis_samples[::n_imgs//nrows, ::n_samples//ncols].reshape(-1, *img_shape)
-        # tiled_samples = tile_raster_images(snapshots,
-        #                                    img_shape=img_shape,
-        #                                    tile_shape=(nrows, ncols),
-        #                                    tile_spacing=(1, 1),
-        #                                    scale_rows_to_unit_interval=False,
-        #                                    output_pixel_vals=False)
-
-        # plt.figure(figsize=(14, 7))
-        # plt.imshow(tiled_samples, interpolation='Nearest', cmap='gray')
-        # plt.savefig(os.path.join(make_figure_folder(),
-        #                          savename + '_snapshots.png'),
-        #             bbox_inches='tight')
     return frames, n_samples
 
 
@@ -107,7 +91,7 @@ def plot_animation(frame_list, img_shape, n_samples, titles=[], show_hidden=Fals
         axarr = np.array([single_ax])
     else:
         tile_shape = (2, len(frame_list)//2 + len(frame_list) % 2)
-        fig, axarr = plt.subplots(*tile_shape, figsize=(tile_shape[1]*6, tile_shape[0]*4.5))
+        fig, axarr = plt.subplots(*tile_shape, figsize=(tile_shape[1]*4, tile_shape[0]*3))
         fig.subplots_adjust(wspace=0.1, hspace=0.3)
     if len(axarr.shape) == 1:
         axarr = np.expand_dims(axarr, 1)
@@ -125,6 +109,8 @@ def plot_animation(frame_list, img_shape, n_samples, titles=[], show_hidden=Fals
                     im.pop()
             else:
                 ax.set_title('samples {}'.format(i*len(axrow) + j))
+            ax.tick_params(left='off', right='off', bottom='off', top='off',
+                   labelleft='off', labelbottom='off')
     ani = animation.FuncAnimation(
         fig, update_fig, frames=frame_list[0].shape[0],
         interval=10., blit=True, repeat=False,
@@ -202,15 +188,18 @@ def plot_samples_clamp(samples, tile_shape, img_shape, samples_per_tile=1000,
     snapshots = vis_samples[:, snapshot_idxs].reshape(tile_shape + img_shape)
 
     # fig, axarr = plt.subplots(*tile_shape, figsize=(tile_shape[1]*2, tile_shape[0]*1.5))
-    figsize = (tile_shape[1]*2, tile_shape[0]*1.5)
-    fig = plt.figure(figsize=figsize)
-    gs = gridspec.GridSpec(*tile_shape, wspace=0, hspace=0)
-    # , top=1.-0.5/figsize[1], bottom=0.5/figsize[1],
-    #                    left=0.5/figsize[0], right=1-0.5/figsize[0])
-    axarr = np.empty(tile_shape, dtype=object)
+    figwidth = 5.7881
+    hspace = 0.1
+    pad = .05*figwidth
+    labelsize = .3
+    # figheight = figwidth + (tile_shape[0]*40/48 - tile_shape[1])/tile_shape[1]*(figwidth - 2*pad - labelsize) + hspace*(tile_shape[0] - 1) - labelsize
+    figsize = (figwidth, 40/48*figwidth*tile_shape[0]/tile_shape[1] + (tile_shape[0] - 1)*hspace)
+    fig, axarr = plt.subplots(*tile_shape, figsize=figsize, subplot_kw={'aspect': 40./48})
+    plt.subplots_adjust(hspace=hspace, wspace=0.)
+                        # , left=(pad + labelsize)/figwidth, right=1 - pad/figwidth,
+                        # bottom=pad/figheight, top=1 - pad/figheight)
     for i, snaps_expt in enumerate(snapshots):
         for j, snap in enumerate(snaps_expt):
-            axarr[i, j] = plt.subplot(gs[i, j])
             axarr[i, j].tick_params(
                 left='off', right='off', bottom='off', top='off',
                 labelleft='off', labelbottom='off', labelright='off', labeltop='off')
@@ -220,12 +209,10 @@ def plot_samples_clamp(samples, tile_shape, img_shape, samples_per_tile=1000,
                 if clamp_window is not None:
                     axarr[i, j].axvline(clamped_pos[j] - clamp_window, color='C1', lw=1)
         if len(titles) > 0:
-            print('ticks')
             axarr[i, 0].tick_params(labelleft='on')
-            tick_locs = .5*(img_shape[0] + 1)
-            plt.yticks(tick_locs, titles[i], rotation='horizontal')
-    # fig.subplots_adjust(wspace=0, hspace=0)
-    fig.savefig(os.path.join(make_figure_folder(), savename + '.png'))
+            axarr[i, 0].set_yticks([.5*(img_shape[0] + 1)])
+            axarr[i, 0].set_yticklabels([titles[i]], {'fontsize': 9})
+    fig.savefig(os.path.join(make_figure_folder(), savename + '.pdf'))
 
 
 def main(config_dict):
@@ -280,13 +267,13 @@ def main(config_dict):
 
         samples = np.array(frame_list, dtype=float).reshape(-1, n_samples, np.prod(img_shape))
         assert tile_shape[0] == len(samples)
-        plot_samples(samples, tile_shape, img_shape,
-                     samples_per_tile=samples_per_tile, offset=offset,
-                     savename=savename, titles=titles)
         # plot_samples(samples, tile_shape, img_shape,
         #              samples_per_tile=samples_per_tile, offset=offset,
-        #              savename=savename, titles=titles,
-        #              clamp_duration=clamp_duration, clamp_window=clamp_window)
+        #              savename=savename, titles=titles)
+        plot_samples_clamp(
+            samples, tile_shape, img_shape, samples_per_tile=samples_per_tile,
+            offset=offset, savename=savename, titles=titles,
+            clamp_duration=clamp_duration, clamp_window=clamp_window)
 
 
 if __name__ == '__main__':
