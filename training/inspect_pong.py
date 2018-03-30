@@ -13,7 +13,7 @@ mpl.rcParams['font.size'] = 12
 
 def plot_data(data_set, show_idx, img_shape, tile_shape=(4, 4), binary=False):
     if binary:
-        data = (data_set[0][idx] > .4)*1.
+        data = (data_set[0][idx] > .5)*1.
         name_mod = '_bin'
     else:
         data = data_set[0][idx]
