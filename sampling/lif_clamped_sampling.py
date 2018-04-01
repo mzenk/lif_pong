@@ -15,8 +15,8 @@ sbs.gather_data.set_subprocess_silent(True)
 
 
 def init_vmem(network):
-    v_reset =  network.samplers[0].neuron_parameters.v_reset
-    v_thresh =  network.samplers[0].neuron_parameters.v_thresh
+    v_reset = network.samplers[0].neuron_parameters.v_reset
+    v_thresh = network.samplers[0].neuron_parameters.v_thresh
     # np.random.seed(123456)
     # v_init = np.random.binomial(1, sigma(network.biases_theo))* \
     #     (v_thresh + .01*np.abs(v_thresh) - v_reset) + v_reset
@@ -98,7 +98,7 @@ def initialise_network(config_file, weights, biases, tso_params=None,
         bm.use_proper_tso = True
         # only adjust if not renewing
         log.warning('Check for renewing synapses assumes tau_syn == 10.')
-        if not (tso_params['U'] == 1. and 
+        if not (tso_params['U'] == 1. and
                 tso_params['tau_fac'] == 0 and tso_params['tau_rec'] == 10.):
             bm.tso_params = tso_params
             # weight scaling could be swept over

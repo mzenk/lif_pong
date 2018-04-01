@@ -8,9 +8,10 @@ from lif_pong.utils import average_pool, average_helper
 from lif_pong.utils.data_mgmt import make_figure_folder, load_images, make_data_folder
 import pong_agent
 from cycler import cycler
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+# plt.style.use('mthesis_style')
+# fig_pe.set_figheight(fig_pe.get_figwidth()/2.)
+# fig_pe.subplots_adjust(wspace=.3, right=.97, left=.1, top=.95, bottom=.125)
 
 simfolder = '/work/ws/nemo/hd_kq433-data_workspace-0/experiment/simulations'
 
@@ -151,8 +152,12 @@ def plot_prediction_error(ax, pred_error, label=None, x_data=None):
           median[:48].sum()/48.))
 
     # add prediction error curve to plot
-    ax.plot(x_data[:-1], median[:-1], '.-', alpha=.7)
-    ax.fill_between(x_data[:-1], lower_quart[:-1], upper_quart[:-1], alpha=.3, label=label)
+    if label != 'exception':
+        ax.plot(x_data[:-1], median[:-1], '.-', alpha=.7)
+        ax.fill_between(x_data[:-1], lower_quart[:-1], upper_quart[:-1], alpha=.3, label=label)
+    else:
+        ax.plot(x_data[:-1], median[:-1], '.-', alpha=.7)
+        ax.fill_between(x_data[:-1], median[:-1], median[:-1], alpha=.3, label=label)
     # ax.plot(x_data, mean, '.-', alpha=.7, label='mean ' + label)
 
 
@@ -169,12 +174,11 @@ def plot_prediction_error_dist(ax, pred_error, dist_pos=None, label=None,
                                title=False, color='C0'):
     if dist_pos is None:
         dist_pos = pred_error.shape[1] - 1
-    pe_hist, bin_edges = np.histogram(pred_error[:, dist_pos], bins='auto')
     if title:
         # ax.set_title('{} of {} clamped'.format(dist_pos, pred_error.shape[1] - 1))
         ax.set_title('$x_\mathrm{kink}$ = 0.7')
-    ax.bar(bin_edges[:-1], pe_hist, width=bin_edges[1] - bin_edges[0],
-           alpha=1., label=label, color=color)
+    ax.hist(pred_error[:, dist_pos], bins='auto', label=label, color=color,
+            histtype='stepfilled')
     # ax.set(xlabel='Prediction error')
 
 
@@ -210,7 +214,7 @@ def main(identifier_list, list_bad=False):
     # set up figures
     fig_pe, (ax_pe, ax_ap) = plt.subplots(1, 2, figsize=(16, 6))
     ax_pe.set_ylabel('Prediction error [pxls]')
-    ax_pe.set_ylim([-.5, 17])
+    ax_pe.set_ylim([-.5, 16.5])
     ax_pe.set_xlabel('Ball position / field length')
     # color_cycle = [plt.cm.rainbow(i)
     #                for i in np.linspace(0, 1, len(identifier_list))]
@@ -272,8 +276,8 @@ def main(identifier_list, list_bad=False):
         pred_error = compute_prediction_error(prediction, targets, n_pos)
 
         plot_prediction_error(ax_pe, pred_error, label)
-        for j, dist_pos in enumerate(np.linspace(.1, .35, n_dist) * img_shape[1]):
-        # for j, dist_pos in enumerate([47]):
+        # for j, dist_pos in enumerate(np.linspace(.1, .35, n_dist) * img_shape[1]):
+        for j, dist_pos in enumerate([47]):
             if i == 0:
                 set_title = True
             else:
@@ -291,7 +295,8 @@ def main(identifier_list, list_bad=False):
     # ax_pe.legend()
     if axarr_pd.shape[0] > 1:
         [axarr_pd[i, -1].legend() for i in range(len(axarr_pd))]
-
+    fig_pe.tight_layout()
+    fig_pd.tight_layout()
     fig_pe.savefig(make_figure_folder() + 'pred_error.pdf')  #, transparent=True)
     fig_pd.savefig(make_figure_folder() + 'pred_error_dist.pdf')  #, transparent=True)
     # fig_ap.savefig(make_figure_folder() + 'agent_perf.pdf')  #, transparent=True)

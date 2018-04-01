@@ -6,8 +6,6 @@ import sys
 import os
 import yaml
 from lif_pong.utils.data_mgmt import make_figure_folder
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
@@ -61,8 +59,8 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.pdf', logscale=False,
         if len(occurrence) > 0:
             assert len(occurrence) == 1
             C[i] = sorted_df['mean_cum_prederr'].iloc[occurrence[0]]
-            C_std[i] = sorted_df['std_cum_prederr'].iloc[occurrence[0]]
-
+            C_std[i] = sorted_df['std_cum_prederr'].iloc[occurrence[0]] / \
+                np.sqrt(sorted_df['n_instances'].iloc[occurrence[0]])
     min_idx = np.nanargmin(C)
     print('Minimum {0} +- {1} at ({4}, {5}) = ({2}, {3})'.format(
         C[min_idx], C_std[min_idx],
@@ -70,10 +68,13 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.pdf', logscale=False,
     C = C.reshape((X.shape[0] - 1, X.shape[1] - 1))
     C_std = C_std.reshape((X.shape[0] - 1, X.shape[1] - 1))
 
+    plt.style.use('mthesis_style')
     # save mean
     fig_mean, ax_mean = plt.subplots()
+    plt.subplots_adjust(left=.15, right=.85, bottom=.1)
+    ax_mean.ticklabel_format(style='sci', scilimits=(-3, 3), axis='both', useMathText=True)
     im = ax_mean.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
-                            cmap=plt.cm.viridis)
+                            cmap=plt.cm.viridis, linewidth=0, rasterized=True)
     # aspect = (C.shape[0] - 1)/(C.shape[1] - 1) \
     #     * (maxs[0] - mins[0])/(maxs[1] - mins[1])
     # ax_mean.set_aspect(float(aspect))
@@ -91,8 +92,12 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.pdf', logscale=False,
         plt.ylabel(identifier[1])
 
     cbar_m = plt.colorbar(im, ax=ax_mean)
-    cbar_m.ax.set_ylabel('Mean cum. prediction error')
+    cbar_m.ax.set_ylabel(r'$<\mathrm{Err}>_\mathrm{data}$')
+    # cbar_m.ax.axhline((5.90- C.min())/(C.max() - C.min()), color='w')   # Mixing
+    cbar_m.ax.axhline((8.2 - C.min())/(C.max() - C.min()), color='w')   # FM
     ax_mean.set_title(title)
+    plt.tight_layout()
+    fig_mean.savefig(os.path.join(make_figure_folder(), figname) + '.png')
     fig_mean.savefig(os.path.join(make_figure_folder(), figname) + '.pdf')
 
     # save std
@@ -106,7 +111,7 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.pdf', logscale=False,
     plt.xlabel(identifier[0])
     plt.ylabel(identifier[1])
     cbar_s = plt.colorbar(im, ax=ax_std)
-    cbar_s.ax.set_ylabel('Std. of cum. prediction error')
+    cbar_s.ax.set_ylabel(r'Std. of $<\mathrm{Err}>_\mathrm{data}$')
     ax_std.set_title('{} (std)'.format(title))
     fig_std.savefig(os.path.join(make_figure_folder(), figname + '_std.pdf'))
 
@@ -204,6 +209,13 @@ def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
             df['n_instances'].apply(np.sqrt)).as_matrix()
     print("Minimum {:.2f} at {} = {}".format(ydata.min(), identifier[0],
                                              xdata[np.argmin(ydata)]))
+
+    if xdata.dtype == object:
+        print('x-axis has dtype \'object\'. Printing values instead...')
+        for i, x in enumerate(xdata):
+            print('{}: Mean Cum. prederr = {} +- {}'.format(x, ydata[i], yerr[i]))
+        return
+
     if fig is None:
         fig, ax = plt.subplots()
         savefig = True
@@ -222,7 +234,7 @@ def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
             ax.set_xlabel(axlabels[0])
     except TypeError:
         ax.set_xlabel(identifier[0])
-    ax.set_ylabel('$<\mathrm{Err}>_\mathrm{data}$')
+    ax.set_ylabel(r'$<\mathrm{Err}>_\mathrm{data}$')
 
     if savefig:
         ax.legend()
@@ -241,6 +253,12 @@ def plot_inferror_1d(df, identifier, fig=None, ax=None, label=None,
     print("Minimum {} at {} = {}".format(ydata.min(), identifier[0],
                                          xdata[np.argmin(ydata)]))
 
+    if xdata.dtype == object:
+        print('x-axis has dtype \'object\'. Printing values instead...')
+        for i, x in enumerate(xdata):
+            print('{}: S(infinity) = {}'.format(x, ydata[i]))
+        return
+
     if fig is None:
         fig, ax = plt.subplots()
         ax.set(ylim=[0, 1])
@@ -258,7 +276,6 @@ def plot_inferror_1d(df, identifier, fig=None, ax=None, label=None,
     except TypeError:
         ax.set_xlabel(identifier[0])
     ax.set_ylabel('1 - $S_\infty$')
-
     if savefig:
         fig.savefig(os.path.join(make_figure_folder(), figname + '.pdf'))
 
@@ -373,8 +390,8 @@ else:
 
             # optional labelling
             response = raw_input(
-                '>>> Please provide labels for above values. (or type \"skip\")\n')
-            if response == 'skip':
+                '>>> Please provide labels for above values. (Enter to skip)\n')
+            if response == '':
                 slice_labels = slice_vals
             else:
                 slice_labels = response.split(',')
