@@ -9,9 +9,16 @@ from lif_pong.utils.data_mgmt import make_figure_folder, load_images, make_data_
 import pong_agent
 from cycler import cycler
 import matplotlib.pyplot as plt
+
+
 # plt.style.use('mthesis_style')
-# fig_pe.set_figheight(fig_pe.get_figwidth()/2.)
-# fig_pe.subplots_adjust(wspace=.3, right=.97, left=.1, top=.95, bottom=.125)
+# # manually tight layout -> no tight_layout?
+# fig_pe, (ax_pe, ax_ap) = plt.subplots(1, 2)
+# fig_pe.set_figheight(fig_pe.get_figwidth()/2.2)
+# fig_pe.subplots_adjust(wspace=.25, right=.98, left=.1, top=.98, bottom=.132)
+# ax_ap.set_xlim([-0.1, 1.7])
+# ax_pe.set_xlim([-.01, 1.01])
+# in plotprederr:, markersize=2.
 
 simfolder = '/work/ws/nemo/hd_kq433-data_workspace-0/experiment/simulations'
 
