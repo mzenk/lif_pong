@@ -29,7 +29,7 @@ def plot_data_samples(data, data_idx, img_shape, name='data',
     plt.gca().get_yaxis().set_visible(False)
     plt.tight_layout()
     plt.savefig(os.path.join(make_figure_folder(),
-                             name + '_samples' + name_mod + '.png'))
+                             name + '_samples' + name_mod + '.pdf'))
 
 
 def plot_pos_dist(data, img_shape, col):
@@ -43,29 +43,30 @@ def plot_pos_dist(data, img_shape, col):
     plot_startend(positions)
 
 
-def plot_startend(positions):
-    plt.figure()
+def plot_startend(positions, label=None):
     positions /= (positions.max() - positions.min())
-    plt.hist(positions, bins='auto')
+    plt.hist(positions, bins='auto', histtype='stepfilled', label=label)
     plt.xlabel('Position in units of field height')
-    plt.ylabel('Number')
-    plt.savefig(os.path.join(make_figure_folder(), 'pos_histo.png'))
+    plt.ylabel('Frequency')
 
 
-def plot_anglehisto(angles):
-    plt.figure()
-    plt.hist(angles, bins='auto')
-    plt.xlabel('Position')
-    plt.ylabel('Number')
-    plt.savefig(os.path.join(make_figure_folder(), 'angle_histo.png'))
+def plot_anglehisto(angles, label=None):
+    plt.hist(angles, bins='auto', histtype='stepfilled')
+    plt.xlabel('Angle [degrees]')
+    plt.ylabel('Frequency')
 
 
-def plot_mean_data(data, img_shape):
+def plot_mean_data(data, img_shape, title=None):
     # plot the mean of all data samples
-    plt.figure()
+    fig = plt.figure()
+    if title is not None:
+        plt.title(title)
+    fig.set_figheight(.66*fig.get_figheight())
+    fig.set_figwidth(.66*fig.get_figwidth())
     plt.imshow(data.mean(axis=0).reshape(img_shape),
                interpolation='Nearest', cmap='gray_r')
-    plt.savefig(os.path.join(make_figure_folder(), 'mean_img.png'))
+    plt.tight_layout()
+    plt.savefig(os.path.join(make_figure_folder(), 'mean_img.pdf'))
 
 
 if len(sys.argv) != 2:
@@ -89,6 +90,11 @@ ntrain = len(train_data)
 nvalid = len(valid_data)
 ntest = len(test_data)
 
+train_start_pos = init_pos[:ntrain]
+train_end_pos = end_pos[:ntrain]
+test_start_pos = init_pos[-ntest:]
+test_end_pos = end_pos[-ntest:]
+
 print('Number of samples in train/valid/test set: {}, {}, {}'.format(
     ntrain, nvalid, ntest))
 
@@ -96,6 +102,37 @@ print('Number of samples in train/valid/test set: {}, {}, {}'.format(
 np.random.seed(12345)
 idx = np.random.choice(np.arange(ntrain), size=min(25, ntrain), replace=False)
 # plot_data_samples(train_data, idx, img_shape, binary=False, name='test')
-# plot_startend(init_pos)
-# plot_anglehisto(init_angles)
-plot_mean_data(train_data, img_shape)
+
+# plot start position histogram
+fig = plt.figure()
+fig.set_figheight(.5*fig.get_figheight())
+fig.set_figwidth(.5*fig.get_figwidth())
+plt.title('Start positions (Kink)')
+plot_startend(train_start_pos, label='train')
+plot_startend(test_start_pos, label='test')
+plt.tight_layout()
+# plt.legend(loc=4)
+plt.savefig(os.path.join(make_figure_folder(), 'start_histo.pdf'))
+
+# plot end position histogram
+fig = plt.figure()
+fig.set_figheight(.5*fig.get_figheight())
+fig.set_figwidth(.5*fig.get_figwidth())
+plt.title('End positions (Kink)')
+plot_startend(train_end_pos, label='train')
+plot_startend(test_end_pos, label='test')
+plt.tight_layout()
+# plt.legend(loc=4)
+plt.savefig(os.path.join(make_figure_folder(), 'end_histo.pdf'))
+
+# plot initial angles
+fig = plt.figure()
+plt.title('Start angles (Pong)')
+fig.set_figheight(.66*fig.get_figheight())
+fig.set_figwidth(.66*fig.get_figwidth())
+plot_anglehisto(init_angles)
+plt.tight_layout()
+plt.savefig(os.path.join(make_figure_folder(), 'angle_histo.pdf'))
+
+# plot mean data image
+plot_mean_data(train_data, img_shape, title='Pong')
