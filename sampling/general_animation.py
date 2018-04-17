@@ -16,20 +16,20 @@ plt.rcParams['animation.ffmpeg_path'] = u'/home/hd/hd_hd/hd_kq433/ffmpeg-3.4.1-6
 
 
 class Pong_updater(object):
-    def __init__(self, image, points, img_shape=(36, 48), win_size=None,
+    def __init__(self, image, points, img_shape=(40, 48), win_size=None,
                  clamp_duration=1, paddle_len=0, max_step=0.):
         self.image = image
         self.points = points
         self.img_shape = img_shape
-        self.n_labels = 12  # remove hard-coded version later
+        self.n_labels = 10  # remove hard-coded version later
 
         # for overlay
         self.win_size = win_size
         # matplotlib seems to call the update function twice with the same parameters
         # before starting a simulation. The -3 compensates this bug.
         self.clamp_pos = -3
-        self.clamp_duration = int(clamp_duration)
         # no. of frames during which clamp is constant
+        self.clamp_duration = int(clamp_duration)
 
         # for agent
         if max_step == 0:
@@ -51,14 +51,23 @@ class Pong_updater(object):
             paddle_pxls[-paddle_len:, 1] = 1
         else:
             paddle_pxls[int(pos) - paddle_len//2:
-                        int(pos + np.round(paddle_len/2)), 1] = 1
+                        int(pos + np.round(paddle_len/2))] = 1
+
+            # C1 255,127,14
+            paddle_pxls[:, 0] *= 255/255
+            paddle_pxls[:, 1] *= 127/255
+            paddle_pxls[:, 2] *= 14/255
+
+            # # C2 44,160,44
+            # paddle_pxls[:, 0] *= 44/255
+            # paddle_pxls[:, 1] *= 160/255
+            # paddle_pxls[:, 2] *= 44/255
         return paddle_pxls
 
     def __call__(self, state):
             img_shape = self.img_shape
             t = state[0]
             vis_state = state[1][:np.prod(img_shape)]
-            labels = state[1][np.prod(img_shape):]
             pixels = vis_state.reshape(img_shape)
             if self.agent is not None:
                 prediction = pixels[:, -1]
@@ -75,7 +84,10 @@ class Pong_updater(object):
                 clamped_window = np.zeros(img_shape + (3,))
                 end = int(self.clamp_pos)
                 start = max(0, (end - self.win_size))
-                clamped_window[:, start:end, 2] = .2
+                clamped_window[:, start:end, 0] = 31/255
+                clamped_window[:, start:end, 1] = 119/255
+                clamped_window[:, start:end, 2] = 180/255
+                clamped_window *= .25
                 rgb_pixels = np.clip(rgb_pixels + clamped_window, 0., 1.)
                 if t % self.clamp_duration == 0:
                     self.clamp_pos += 1
@@ -89,34 +101,91 @@ class Pong_updater(object):
 
             self.image.set_data(rgb_pixels)
             self.points.set_data(pixels[:, -1], np.arange(img_shape[0]) - .5)
+
+            # # for testing layout etc. or plotting a single frame
+            # if t == 20*10:
+            #     target = 32.77
+            #     fig = plt.figure(figsize=(10, 7))
+            #     left, width = .05, .7
+            #     bottom, height = .1, .8
+            #     pad = 0.02
+            #     left_p = left + width + pad
+            #     width_p = .17
+            #     img_rect = [left, bottom, width, height]
+            #     pred_rect = [left_p, bottom, width_p, height]
+
+            #     ax_img = fig.add_axes(img_rect)
+            #     ax_pred = fig.add_axes(pred_rect)   # , adjustable='box', aspect=img_shape[0]/img_shape[1]
+            #     ax_img.xaxis.set_visible(False)
+            #     ax_img.yaxis.set_visible(False)
+
+            #     ax_pred.set_xlim([0., 1.1])
+            #     ax_pred.set_ylim([-.5, img_shape[0] - .5])
+            #     ax_pred.xaxis.set_ticks([0., 0.5, 1.])
+            #     ax_pred.tick_params(left='off', right='off', top='on',
+            #                         labelleft='off', labelright='off')
+            #     ax_pred.set_xlabel('P (last column)')
+
+            #     image = ax_img.imshow(np.zeros(img_shape), vmin=0., vmax=1.,
+            #                        interpolation='Nearest', cmap='gray', origin='lower')
+            #     points, = ax_pred.plot([], [], 'ko')
+
+            #     image.set_data(rgb_pixels)
+            #     points.set_data(pixels[:, -1], np.arange(img_shape[0]))
+            #     ax_pred.plot([0., 1.1], [target, target], '-', color='C2', linewidth=2)
+            #     fig.savefig('frame.pdf')
+            #     sys.exit()
+
+
             return self.image, self.points
 
 
 def make_animation(fig_name, img_shape, win_size, vis_samples, paddle_len=0,
                    clamp_interval=1, anim_interval=10., target=None):
     # set up figure
-    fig = plt.figure()
-    width = .7
-    ax1 = fig.add_axes([.05, .2, width, width*3/4])
-    ax1.xaxis.set_visible(False)
-    ax1.yaxis.set_visible(False)
-    ax2 = fig.add_axes([width - .02, .2, .2, width*3/4])
-    ax2.set_ylim([-.5, img_shape[0] - .5])
-    ax2.set_xlim([0, 1.1])
-    ax2.xaxis.set_ticks([0., 0.5, 1.])
-    ax2.tick_params(left='off', right='off',
-                    labelleft='off', labelright='off')
-    ax2.set_xlabel('P(last column)')
-    image = ax1.imshow(np.zeros(img_shape), vmin=0., vmax=1.,
-                       interpolation='Nearest', cmap='gray', origin='lower',
-                       animated=True)
-    # barh doesnt work because apparently BarContainer has no 'set_visible'
-    points, = ax2.plot([], [], 'bo')
+    # fig = plt.figure()
+    # width = .7
+    # ax1 = fig.add_axes([.05, .2, width, width*3/4])
+    # ax1.xaxis.set_visible(False)
+    # ax1.yaxis.set_visible(False)
+    # ax2 = fig.add_axes([width - .02, .2, .2, width*3/4])
+    # ax2.set_ylim([-.5, img_shape[0] - .5])
+    # ax2.set_xlim([0, 1.1])
+    # ax2.xaxis.set_ticks([0., 0.5, 1.])
+    # ax2.tick_params(left='off', right='off',
+    #                 labelleft='off', labelright='off')
+    # ax2.set_xlabel('P(last column)')
+
+    # define axes locations
+    fig = plt.figure(figsize=(10, 7))
+    left, width = .05, .7
+    bottom, height = .1, .8
+    pad = 0.02
+    left_p = left + width + pad
+    width_p = .17
+    img_rect = [left, bottom, width, height]
+    pred_rect = [left_p, bottom, width_p, height]
+
+    ax_img = fig.add_axes(img_rect)
+    ax_pred = fig.add_axes(pred_rect)   # , adjustable='box', aspect=img_shape[0]/img_shape[1]
+    ax_img.xaxis.set_visible(False)
+    ax_img.yaxis.set_visible(False)
+
+    ax_pred.set_xlim([0., 1.1])
+    ax_pred.set_ylim([-.5, img_shape[0] - .5])
+    ax_pred.xaxis.set_ticks([0., 0.5, 1.])
+    ax_pred.tick_params(left='off', right='off', top='on',
+                        labelleft='off', labelright='off')
+    ax_pred.set_xlabel('P (last column)')
+
+    image = ax_img.imshow(np.zeros(img_shape), vmin=0., vmax=1.,
+                       interpolation='Nearest', cmap='gray', origin='lower')
+    points, = ax_pred.plot([], [], 'ko')
     # ex. for adding dynamic text; must be inside bounding box to be updated
     # lab_text = ax.text(0.95, 0.01, '', va='bottom', ha='right',
     #                    transform=ax.transAxes, color='green')
     if target is not None:
-        ax2.plot([0, 1.1], [target, target], '-', color='C1', linewidth=2)
+        ax_pred.plot([0, 1.1], [target, target], '-', color='C2', linewidth=2)
 
     # Produce animation
     frames = zip(range(len(vis_samples)), vis_samples)
@@ -154,7 +223,7 @@ def main(config_dict):
     for i in range(len(vis_samples)):
         print('Making animation {} of {}'.format(i + 1, len(vis_samples)))
         make_animation(save_name + '_{}'.format(i), img_shape, win_size, vis_samples[i],
-                       paddle_len=3, clamp_interval=clamp_interval, target=targets[i])
+                       paddle_len=4, clamp_interval=clamp_interval, target=targets[i])
 
 
 
