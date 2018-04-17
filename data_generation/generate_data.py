@@ -83,9 +83,13 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
         init_states = draw_init_states(num_tot, field[0], field[1])
 
     data = []
-    impact_points = np.zeros(num_tot)
+    impact_points = []
     if kink_dict is not None:
         nokink_lastcols = []
+        if 'clip_angle' in kink_dict.keys():
+            clip_angle = kink_dict['clip_angle']
+        else:
+            clip_angle = False
 
     print('Generating trajectories...')
     for i, s in enumerate(init_states):
@@ -100,11 +104,13 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
                                        np.array([0, init_pos]), init_angle, v0,
                                        kink_dict=kink_dict)
 
-        traj.integrate()
+        clipped_angle = traj.integrate()
+        if clipped_angle and not clip_angle:
+            continue
         traj_pxls = traj.to_image(linewidth, dist_exponent)
         img_shape = traj_pxls.shape
         data.append(traj_pxls.flatten())
-        impact_points[i] = traj.trace[-1, 1]
+        impact_points.append(traj.trace[-1, 1])
 
         # with kink we need to run integration another time to get the target
         # before the kink
@@ -116,6 +122,7 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
             nokink_lastcols.append(nokink_pxls[:, -1])
 
     data = np.array(data)
+    impact_points = np.array(impact_points)
     # shuffle data so that successive samples do not have same start
     shuffled_idx = np.random.permutation(len(data))
     data = data[shuffled_idx]
@@ -154,6 +161,8 @@ def generate_data(num_train, num_valid, num_test, grid, fixed_start=False,
     labels /= np.expand_dims(z, 1)
 
     if save_name is not None:
+        num_train = min(num_train, len(data))
+        num_test = min(num_test, len(data))
         train_data = data[:num_train]
         train_labels = labels[:num_train]
         valid_data = data[num_train:-num_test]

@@ -115,6 +115,7 @@ class Trajectory:
         pos_list = []
         self.add_to_image(self.pos)
         reflection_pos = []
+        clipped = False
         while r.t < t1:
             r.integrate(r.t+dt)
             x = r.y[0]
@@ -133,16 +134,16 @@ class Trajectory:
             # inject random y-momentum; sigma can be zero
             if self.kink_dict is not None and x > self.kink_dict['pos'] \
                     and not noise_injected:
-                delta_vy = self.v0 * np.random.normal(
-                    (-1)**np.random.randint(2) * self.kink_dict['ampl'],
-                    self.kink_dict['sigma'])
-
+                delta_vy = self.v0 * ((-1)**np.random.randint(2) * self.kink_dict['ampl']
+                                      + self.kink_dict['sigma']*np.random.randn())
                 # clip any delta_vy that exceeds the allowed angle range
                 amin, amax = get_angle_range(x - .5*size[0], y - .5*size[1],
                                              *size)
+                if delta_vy < np.tan(amin)*vx - vy or \
+                        delta_vy > np.tan(amax)*vx - vy:
+                    clipped = True
                 delta_vy = np.clip(
                     delta_vy, np.tan(amin)*vx - vy, np.tan(amax)*vx - vy)
-
                 v_new = np.array([vx, vy + delta_vy])
                 # normalize again so that distance between trace points stays small
                 # this matters only if potential not constant
@@ -164,6 +165,7 @@ class Trajectory:
         self.trace = np.array(pos_list)
         # normalize pixels
         self.pixels /= np.max(self.pixels)
+        return clipped
 
     def draw_trajectory(self, ax, potential=False, color=None, framecolor=None):
         if self.trace.shape == (1,):
