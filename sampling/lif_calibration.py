@@ -18,7 +18,7 @@ sim_name = "pyNN.nest"
 
 
 def calibration(neuron_params, noise_params, calib_name='calibration',
-                cuba=False):
+                cuba=False, pre_calibration_parameters=None):
     """
         A sample calibration procedure.
     """
@@ -55,7 +55,7 @@ def calibration(neuron_params, noise_params, calib_name='calibration',
 
     # here we could give further kwargs for the pre-calibration phase when the
     # slope of the sigmoid is searched for
-    sampler.calibrate(calibration)
+    sampler.calibrate(calibration, **pre_calibration_parameters)
 
     # Afterwards, we need to save the calibration.
     sampler.write_config(calib_name)
@@ -127,12 +127,17 @@ def plot_calibration(config_file, mean_as_x=False, neuron_params=None,
 
 
 if __name__ == '__main__':
-    # calibrate first if necessary
-    calibration(wei_params, wei_noise, 'calibrations/wei_calib_400hz',
-                cuba=False)
+    # # manually restrict voltage range for narrow actfcts
+    # pre_calib = {
+    #         'V_rest_min': -50.01,
+    #         'V_rest_max': -49.99,
+    #         'dV': 0.001
+    # }
+    # calibration(wei_curr_params, wei_curr_noise, 'calibrations/wei_curr_calib_improved',
+    #             cuba=True, pre_calibration_parameters=pre_calib)
 
     # # check HCS
     # vmem_dist('calibrations/dodo_calib.json')
 
     # # re-plot activation function
-    # plot_calibration('calibrations/wei_calib_curr.json')
+    plot_calibration('calibrations/wei_curr_calib_improved.json')

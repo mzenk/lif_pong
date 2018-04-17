@@ -7,6 +7,7 @@ import os
 import yaml
 from lif_pong.utils.data_mgmt import make_figure_folder
 import matplotlib.pyplot as plt
+plt.style.use('mthesis_style')
 
 
 def plot_cumerr_pcolor(df, identifier, figname='paramsweep.pdf', logscale=False,
@@ -68,10 +69,13 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.pdf', logscale=False,
     C = C.reshape((X.shape[0] - 1, X.shape[1] - 1))
     C_std = C_std.reshape((X.shape[0] - 1, X.shape[1] - 1))
 
-    plt.style.use('mthesis_style')
     # save mean
     fig_mean, ax_mean = plt.subplots()
-    plt.subplots_adjust(left=.15, right=.85, bottom=.1)
+    fig_mean.set_figheight(.8*fig_mean.get_figheight())
+    fig_mean.set_figwidth(.8*fig_mean.get_figwidth())
+    # # rotated figure page
+    # fig_mean.set_figheight(.5*5.7885)
+    # fig_mean.set_figwidth(.5*8.1866)
     ax_mean.ticklabel_format(style='sci', scilimits=(-3, 3), axis='both', useMathText=True)
     im = ax_mean.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
                             cmap=plt.cm.viridis, linewidth=0, rasterized=True)
@@ -93,8 +97,11 @@ def plot_cumerr_pcolor(df, identifier, figname='paramsweep.pdf', logscale=False,
 
     cbar_m = plt.colorbar(im, ax=ax_mean)
     cbar_m.ax.set_ylabel(r'$<\mathrm{Err}>_\mathrm{data}$')
-    # cbar_m.ax.axhline((5.90- C.min())/(C.max() - C.min()), color='w')   # Mixing
-    cbar_m.ax.axhline((8.2 - C.min())/(C.max() - C.min()), color='w')   # FM
+    # cbar_m.ax.axhline((5.90- C.min())/(C.max() - C.min()), color='orange')   # Mixing
+    # cbar_m.ax.axhline((8.2 - C.min())/(C.max() - C.min()), color='w')   # FM
+    # cbar_m.ax.axhline((8.2 - 8.1)/(10. - 8.1), color='orange')   # FM
+    # cbar_m.ax.axhline((C.min() - 8.1)/(10. - 8.1), color='w')   # FM
+    # cbar_m.ax.axhline((C.max() - 8.1)/(10. - 8.1), color='w')   # FM
     ax_mean.set_title(title)
     plt.tight_layout()
     fig_mean.savefig(os.path.join(make_figure_folder(), figname) + '.png')
@@ -169,8 +176,11 @@ def plot_inferror_pcolor(df, identifier, figname='paramsweep.pdf', logscale=Fals
         C[min_idx], X_params_flat[min_idx], Y_params_flat[min_idx], *identifier))
     C = C.reshape((X.shape[0] - 1, X.shape[1] - 1))
     fig, ax = plt.subplots()
+    ax.ticklabel_format(style='sci', scilimits=(-3, 3), axis='both', useMathText=True)
+    fig.set_figheight(.5*5.7885)
+    fig.set_figwidth(.5*8.1866)
     im = ax.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
-                       cmap=plt.cm.viridis, vmin=0, vmax=1)
+                       cmap=plt.cm.viridis, rasterized=True)
     # aspect = (C.shape[0] - 1)/(C.shape[1] - 1) \
     #     * (maxs[0] - mins[0])/(maxs[1] - mins[1])
     # ax.set_aspect(float(aspect))
@@ -187,9 +197,16 @@ def plot_inferror_pcolor(df, identifier, figname='paramsweep.pdf', logscale=Fals
         plt.xlabel(identifier[0])
         plt.ylabel(identifier[1])
     cbar = plt.colorbar(im, ax=ax)
+    # cbar.ax.axhline(.057/.75, color='orange')   # FM
+    # cbar.ax.axhline(C.min()/.75, color='w')   # FM
+    # cbar.ax.axhline(.057/.25, color='orange')   # FM
+    # cbar.ax.axhline(C.min()/.25, color='w')   # FM
+    # cbar.ax.axhline(C.max()/.25, color='w')   # FM
     cbar.ax.set_ylabel('1 - $S_\infty$')
     ax.set_title(title)
-    plt.savefig(os.path.join(make_figure_folder(), figname))
+    plt.tight_layout()
+    fig.savefig(os.path.join(make_figure_folder(), figname) + '.png')
+    fig.savefig(os.path.join(make_figure_folder(), figname) + '.pdf')
 
 
 def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
@@ -218,13 +235,16 @@ def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
 
     if fig is None:
         fig, ax = plt.subplots()
+        fig.set_figwidth(fig.get_figwidth()*.66)
+        fig.set_figheight(fig.get_figheight()*.66)
         savefig = True
     else:
         savefig = False
     ax.errorbar(xdata, ydata, yerr=yerr, fmt='.:', label=label)
     # ax.plot(xdata, ydata, '.:', label=label)
     # ax.fill_between(xdata, ydata-ystd, ydata+ystd, alpha=.3)
-    # ax.axhline(4.63, label='800 samples', color='C1')
+    # ax.axhline(4.05, label='$n_s$ = 800', color='C1')
+    # ax.axhline(4.63, label='$n_s$ = 800', color='C1')
     if logscale:
         ax.set_xscale('log')
     try:
@@ -238,6 +258,7 @@ def plot_cumerr_1d(df, identifier, fig=None, ax=None, label=None,
 
     if savefig:
         ax.legend()
+        plt.tight_layout()
         fig.savefig(os.path.join(make_figure_folder(), figname + '.pdf'))
 
 
@@ -265,7 +286,7 @@ def plot_inferror_1d(df, identifier, fig=None, ax=None, label=None,
         savefig = True
     else:
         savefig = False
-    ax.plot(xdata, ydata, '.:', label=label)
+    ax.plot(xdata, ydata, 'o:', label=label)
     if logscale:
         ax.set_xscale('log')
     try:
@@ -429,8 +450,8 @@ else:
                 logscale=logscale, axlabels=axlabels)
     else:
         if n_plotparams == 1:
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
-            ax2.set(ylim=[0, 1.])
+            fig, (ax1, ax2) = plt.subplots(1, 2)
+            fig.set_figheight(fig.get_figwidth()/2.)
             # iterate over slices
             for i, v in enumerate(slice_vals):
                     slicedf = subdf.loc[subdf[slice_param] == v, :].copy()
@@ -443,11 +464,9 @@ else:
                         slicedf, plot_params, fig, ax2, label=label,
                         logscale=logscale, axlabels=axlabels)
             ax2.legend()
+            fig.tight_layout()
             fig.savefig(os.path.join(make_figure_folder(), expt_name +
                                      '_slice_{}.pdf'.format(slice_param)))
-            # # ax_is.legend()
-            # fig_is.savefig(os.path.join(make_figure_folder(), expt_name +
-            #                             '_slice_{}_inferr.pdf'.format(slice_param)))
         if n_plotparams == 2:
             for i, v in enumerate(slice_vals):
                     slicedf = subdf.loc[subdf[slice_param] == v, :].copy()

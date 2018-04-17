@@ -25,7 +25,7 @@ def get_clamp_offsets(duration, clamp_fct, winsize=None, thresh=.5):
                                 np.setdiff1d(curr_idx, last_idx))
         exc_offsets[np.logical_and(newly_clamped, flat_img > thresh)] = t
         inh_offsets[np.logical_and(newly_clamped, flat_img < thresh)] = t
-        
+
         last_idx = curr_idx.copy()
         t = t_next
     return exc_offsets, inh_offsets
@@ -88,6 +88,9 @@ def get_frames_for_img(img, vis_bias, n_samples, sbs_dict, clamp_dict):
 
     exc_weights, inh_weights = \
         get_clamp_weights(clamp_dict, vis_bias, alpha_w, tau_syn)
+
+    exc_weights = np.maximum(exc_weights, np.zeros_like(exc_weights))
+    inh_weights = np.minimum(inh_weights, np.zeros_like(inh_weights))
 
     clamp_interval = sampling_interval*n_samples
     clamp_fct = Clamp_window(clamp_interval, img, win_size=winsize)

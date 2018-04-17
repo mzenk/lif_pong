@@ -110,7 +110,8 @@ def compute_performance(predictions, targets, data_idx, max_speedup=2.,
         target_pos = target_pos.T
     # exclude fully clamped prediction because it is always correct
     if leave_uncovered > 0:
-        predicted_pos = predicted_pos[:-leave_uncovered]
+        predicted_pos[-leave_uncovered:] = predicted_pos[-leave_uncovered - 1]
+
     # sensible max_step range: one paddle length per one ball x-step => v=1.
     # ball velocity measured in pixels per time between two clamping frames
     v_ball = 1.

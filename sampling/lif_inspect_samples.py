@@ -11,7 +11,6 @@ from lif_pong.utils.data_mgmt import make_figure_folder, get_rbm_dict
 import lif_pong.training.rbm as rbm_pkg
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import matplotlib.gridspec as gridspec
 plt.rcParams['animation.ffmpeg_path'] = u'/home/hd/hd_hd/hd_kq433/ffmpeg-3.4.1-64bit-static/ffmpeg'
 
 
@@ -191,23 +190,36 @@ def plot_samples_clamp(samples, tile_shape, img_shape, samples_per_tile=1000,
     figwidth = 5.7881
     hspace = 0.1
     pad = .05*figwidth
-    labelsize = .3
-    # figheight = figwidth + (tile_shape[0]*40/48 - tile_shape[1])/tile_shape[1]*(figwidth - 2*pad - labelsize) + hspace*(tile_shape[0] - 1) - labelsize
-    figsize = (figwidth, 40/48*figwidth*tile_shape[0]/tile_shape[1] + (tile_shape[0] - 1)*hspace)
+    labelsize = .1
+    figheight = figwidth + (tile_shape[0]*40/48 - tile_shape[1])/tile_shape[1]*(figwidth - 2*pad - labelsize) + \
+        hspace*(tile_shape[0] - 1) - labelsize
+    figsize = (figwidth, figheight)
     fig, axarr = plt.subplots(*tile_shape, figsize=figsize, subplot_kw={'aspect': 40./48})
-    plt.subplots_adjust(hspace=hspace, wspace=0.)
-                        # , left=(pad + labelsize)/figwidth, right=1 - pad/figwidth,
-                        # bottom=pad/figheight, top=1 - pad/figheight)
+    if tile_shape != axarr.shape:
+        axarr = axarr.reshape(tile_shape)
+    plt.subplots_adjust(hspace=hspace, wspace=0.05,   #  left=.1, right=.92, bottom=.05, top=.95)
+                        left=(pad + labelsize)/figwidth, right=1 - pad/figwidth,
+                        bottom=pad/figheight, top=1 - pad/figheight)
     for i, snaps_expt in enumerate(snapshots):
         for j, snap in enumerate(snaps_expt):
             axarr[i, j].tick_params(
                 left='off', right='off', bottom='off', top='off',
                 labelleft='off', labelbottom='off', labelright='off', labeltop='off')
-            axarr[i, j].imshow(snap, interpolation='Nearest', cmap='gray_r')
+            axarr[i, j].imshow(snap, interpolation='Nearest', cmap='gray_r', vmin=0, vmax=1)
             if clamp_duration is not None:
                 axarr[i, j].axvline(clamped_pos[j], color='C1', lw=1)
                 if clamp_window is not None:
-                    axarr[i, j].axvline(clamped_pos[j] - clamp_window, color='C1', lw=1)
+                    try:
+                        if len(clamp_window) == len(axarr):
+                            window_rear = max(clamped_pos.min(),
+                                              clamped_pos[j] - clamp_window[i])
+                        else:
+                            window_rear = 0
+                            print('Invalid clamp window input.')
+                    except AttributeError:
+                        window_rear = max(clamped_pos.min(),
+                                              clamped_pos[j] - clamp_window)
+                    axarr[i, j].axvline(window_rear, color='C1', lw=1)
         if len(titles) > 0:
             axarr[i, 0].tick_params(labelleft='on')
             axarr[i, 0].set_yticks([.5*(img_shape[0] + 1)])
@@ -266,10 +278,9 @@ def main(config_dict):
         samples_per_tile = config_dict['samples_per_tile']
 
         samples = np.array(frame_list, dtype=float).reshape(-1, n_samples, np.prod(img_shape))
-        assert tile_shape[0] == len(samples)
-        # plot_samples(samples, tile_shape, img_shape,
-        #              samples_per_tile=samples_per_tile, offset=offset,
-        #              savename=savename, titles=titles)
+        if tile_shape[0] < len(samples):
+            samples = samples[:tile_shape[0]]
+            print('Too many images; left out last images.')
         plot_samples_clamp(
             samples, tile_shape, img_shape, samples_per_tile=samples_per_tile,
             offset=offset, savename=savename, titles=titles,
