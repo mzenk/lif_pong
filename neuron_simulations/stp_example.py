@@ -2,7 +2,7 @@
 import numpy as np
 from pyNN.utility import get_simulator, init_logging, normalized_filename
 import pyNN.nest as sim
-from neuron_parameters import dodo_params
+from neuron_parameters import wei_curr_params
 from lif_pong.utils.data_mgmt import make_figure_folder
 from stp_theory import compute_ru_envelope, r_theo_interpolated
 import matplotlib as mpl
@@ -18,10 +18,10 @@ def normalize_weight(syn_params):
 sim.setup(**{"spike_precision": "on_grid", 'quit_on_end': False})
 
 # === Build and instrument the network =======================================
-neuron_params = dodo_params
+neuron_params = wei_curr_params
 cuba = False
-duration = 4900.
-spike_interval = 1.
+duration = 200.
+spike_interval = 10.
 
 # model used in sbs
 # sim.nest.CopyModel("tsodyks2_synapse_lbl", "avoid_pynn_trying_to_be_smart_lbl")
@@ -30,7 +30,7 @@ sim.nest.CopyModel("tsodyks2_synapse", "avoid_pynn_trying_to_be_smart")
 # synapse parameters
 weight = .01
 # nest has different weight units (x1000)
-dep_params = {"U": 0.001, "tau_rec": 6000.0, "tau_fac": 0.0,
+dep_params = {"U": 0.22, "tau_rec": 50.0, "tau_fac": 0.0,
               "weight": 1000 * weight}
 normalize_weight(dep_params)
 fac_params = {"U": 0.1, "tau_rec": 10.0, "tau_fac": 300.0,
@@ -100,7 +100,8 @@ sim.run(duration)
 # === Plot a figure ==========================================================
 figure_filename = 'stp_example.pdf'
 fig, axes = plt.subplots(2, 1, figsize=(10, 10), sharex=True, sharey='row')
-for i, label, alpha in zip(range(2), ['renewing', 'depressing'], [.7, .5]):
+fig, ax = plt.subplots()
+for i, label, alpha in zip(range(2), ['renewing', 'depressing'], [.7, .7]):
     data = populations[label].get_data().segments[0]
     vmem = data.filter(name='v')[0]
     gsyn = data.filter(name='gsyn_exc')[0]
@@ -136,6 +137,11 @@ for i, label, alpha in zip(range(2), ['renewing', 'depressing'], [.7, .5]):
     axes[1].set_xlabel('t [ms]')
     axes[1].set_ylabel('Membrane potential [mV]')
     axes[1].legend(loc='upper right')
+    # ax.plot(t, vmem, alpha=alpha, label=label, color='C{}'.format(i))
+    # ax.set_xlabel('t [ms]')
+    # ax.set_yticks([])
+    # ax.set_ylabel('Membrane potential [a.u.]')
+    # ax.legend(loc='upper right')
 
 plt.tight_layout()
 plt.savefig(make_figure_folder() + figure_filename)

@@ -15,6 +15,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 import sbs
 from sbs.cutils import generate_states
+plt.style.use('mthesis_style')
 
 
 def setup_samplers(n_neurons, neuron_params, noise_params):
@@ -121,7 +122,6 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
 
     exc_weights = np.maximum(exc_weights, np.zeros_like(exc_weights))
     inh_weights = np.minimum(inh_weights, np.zeros_like(inh_weights))
-
     if tso_params is None:
         # do not correct for accumulation with static synapses
         # (otherwise identical to renewing after burn-in)
@@ -197,7 +197,7 @@ def clamping_expt(n_neurons, duration, neuron_params, noise_params, calib_file,
 
 
 def get_calibration(leak_potentials, duration, neuron_params, noise_params,
-                    dt=.1, savename='calibration'):
+                    dt=.01, savename='calibration', store_vmem=False):
     sim.setup(timestep=dt, spike_precision="on_grid", quit_on_end=False)
 
     # setup samplers
@@ -207,18 +207,24 @@ def get_calibration(leak_potentials, duration, neuron_params, noise_params,
     projections['exc'] = exc_proj
     projections['inh'] = inh_proj
     population.set(v_rest=leak_potentials)
-    population.record(['v', 'spikes'])
+    if store_vmem:
+        population.record(['v', 'spikes'])
+    else:
+        population.record(['spikes'])
 
     sim.run(duration)
 
     # === Save Data ===========================================================
-    vmem = population.get_data().segments[0].filter(name='v')[0].T
+    if store_vmem:
+        vmem = population.get_data().segments[0].filter(name='v')[0].T
+    else:
+        vmem = None
     spiketrains = population.get_data().segments[0].spiketrains
     samples = \
         get_samples(spiketrains, dt, neuron_params['tau_refrac'], duration)
     with open(os.path.join(make_data_folder(), savename + '.pkl'), 'w') as f:
         cPickle.dump({'samples': samples, 'E_l': leak_potentials,
-                      'vmem': vmem.magnitude}, f)
+                      'vmem': vmem}, f)
 
 
 def plot_w_vs_activation(filenames, show_fit=True):
@@ -270,16 +276,18 @@ def plot_activation_fct(data_file, config_file):
     print('Fit parameters: {}, {}'.format(*popt))
     print('Maximum on-fraction: {}'.format(p_on.max()))
 
-    plt.figure()
+    fig = plt.figure()
+    fig.set_figheight(.66*fig.get_figheight())
+    fig.set_figwidth(.66*fig.get_figwidth())
     plt.xlabel('$E_l$ [mV]')
     plt.ylabel('$p(z = 1)$')
 
-    plt.plot(v_rests, p_on, 'x', label='Simulation')
+    plt.plot(v_rests, p_on, 'x', markersize=5, label='Simulation')
     # sampler_config = sbs.db.SamplerConfiguration.load(config_file)
     # sampler = sbs.samplers.LIFsampler(sampler_config, sim_name='pyNN.nest')
     # sbs_popt = (sampler.calibration.fit.v_p05, sampler.calibration.fit.alpha)
     # plt.plot(v_rests, sigma_fct(v_rests, *sbs_popt), label='sbs')
-    plt.plot(v_rests, sigma_fct(v_rests, *popt),
+    plt.plot(v_rests, sigma_fct(v_rests, *popt), lw=2,
              label=r'$\alpha$ = ' + '{:.1E} mV,\n'.format(popt[1]) + r'$\bar u^0$ = ' + '{:.1E} mV'.format(popt[0]))
     plt.legend()
     # plt.xticks(-50 + np.arange(-.3, .2, .1))
@@ -420,7 +428,9 @@ def plot_time_evolution(data_file, clamp_dict, calib_file, bias=0, labels=None):
     spike_interval = clamp_dict['spike_interval']
     alpha_w = gl*spike_interval/tau_syn*sampler_config.calibration.fit.alpha
 
-    plt.figure()
+    fig = plt.figure()
+    fig.set_figheight(.66*fig.get_figheight())
+    fig.set_figwidth(.66*fig.get_figwidth())
     plt.xlabel('time [ms]')
     plt.ylabel(r'$p_{on}$')
     for i, fn in enumerate(data_file):
@@ -443,8 +453,13 @@ def plot_time_evolution(data_file, clamp_dict, calib_file, bias=0, labels=None):
 
         effweight[timeaxis < clamp_offset] = 0
         p_theo = sigma_fct(bias + effweight/alpha_w)
-        plt.plot(timeaxis, p_theo, 'k:'.format(i))
+        if i == 1:
+            theo_label = 'Theory'
+        else:
+            theo_label = None
+        plt.plot(timeaxis, p_theo, 'k:'.format(i), lw=2, label=theo_label)
     plt.legend()
+    plt.tight_layout()
     plt.savefig(os.path.join(make_figure_folder(), 'decay.png'))
     plt.savefig(os.path.join(make_figure_folder(), 'decay.pdf'))
 
@@ -517,7 +532,6 @@ def gaussian(x, mu=0., sigma=1.):
 
 
 if __name__ == '__main__':
-    mpl.rcParams['font.size'] = 14
     # Parameters
     config_file = '../sampling/calibrations/wei_curr_calib_improved.json'
     neuron_params = wei_curr_params
@@ -525,7 +539,7 @@ if __name__ == '__main__':
 
     clamp_tso_params = {
         "U": .0006,
-        "tau_rec": 40000.,
+        "tau_rec": 30000.,
         "tau_fac": 0.,
         "weight": 0.*1000.
     }
@@ -559,33 +573,33 @@ if __name__ == '__main__':
     #                   synweight=weights, tso_params=None, spike_interval=1./freq,
     #                   savename='freq_sweep{:02d}'.format(i), burn_in_time=100.)
 
-    # duration = 1e5
+    # duration = 1e6
     # n_neurons = 100
-    # leak_potentials = -50 + np.linspace(-.005, .005, n_neurons)
+    # leak_potentials = -50 + np.linspace(-.004, .004, n_neurons)
     # get_calibration(leak_potentials, duration, neuron_params, noise_params,
     #                 savename='wei_curr_calibdata')
 
-    # activity for depressing synapse
-    n_neurons = 1000
-    clamp_offset = 200.
-    duration = 10000. + clamp_offset
-    spike_interval = 1.
-    bias_shifts = [6]
-    for i, bias_shift in enumerate(bias_shifts):
-            clamping_expt(n_neurons, duration, neuron_params, noise_params,
-                          config_file, bias=-3., bias_shift=bias_shift, dt=.01,
-                          tso_params=clamp_tso_params,
-                          spike_interval=spike_interval,
-                          savename='decay_test{}'.format(i),
-                          clamp_offset=clamp_offset)
+    # # activity for depressing synapse
+    # n_neurons = 200
+    # clamp_offset = 200.
+    # duration = 10000. + clamp_offset
+    # spike_interval = 1.
+    # bias_shifts = [5, 10, 20]
+    # for i, bias_shift in enumerate(bias_shifts):
+    #         clamping_expt(n_neurons, duration, neuron_params, noise_params,
+    #                       config_file, bias=-2., bias_shift=bias_shift, dt=.01,
+    #                       tso_params=clamp_tso_params,
+    #                       spike_interval=spike_interval,
+    #                       savename='decay_test{}'.format(i),
+    #                       clamp_offset=clamp_offset)
 
     # === Plot a figure =============================
 
     # # plot voltage and conductance traces
     # plot_vg_traces(['renewing.pkl'], 2000.)
 
-    # # t vs p_on given synaptic weight
-    filenames = ['decay_test{}.pkl'.format(i) for i in range(0, 1)]
+    # t vs p_on given synaptic weight
+    filenames = ['decay_test{}.pkl'.format(i) for i in range(0, 3)]
 
     clamp_dict = {
         'offset': 200.,
@@ -593,9 +607,9 @@ if __name__ == '__main__':
         'tso_params': clamp_tso_params
     }
     plot_time_evolution(filenames, clamp_dict, config_file,
-                        bias=-3.)
+                        bias=-2)
 
-    # # activation fct w/o external input
+    # activation fct w/o external input
     # fn = 'wei_curr_calibdata.pkl'
     # plot_activation_fct(fn, config_file)
     # plot_vmem_dist(fn)
