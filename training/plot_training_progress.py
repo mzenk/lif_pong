@@ -24,17 +24,18 @@ def get_progress(logfile):
         nepoch.insert(0, 0)
     return np.array(nepoch), np.array(train_classrate), np.array(valid_classrate)
 
-
+plt.rcParams['font.size'] = 16
 fig, ax = plt.subplots()
-paths = ['pong_train.log', 'gauss_train.log']
+basefolder = os.path.expanduser('~/workspace/experiment/simulations')
+paths = ['TrainThickPongFine/15_0.0001_0.05/train.log', 'TrainLW5GaussFine02/10_0.001_0.05/train.log']
 labels = ['Pong', 'Hill']
 for i, path in enumerate(paths):
-    nepoch, train_cr, valid_cr = get_progress(path)
-    ax.plot(nepoch[1:], 1 - train_cr[1:], 'o', label=labels[i])
+    nepoch, train_cr, valid_cr = get_progress(os.path.join(basefolder,path))
+    ax.plot(nepoch[1:], train_cr[1:], 'o', label=labels[i])
     # ax.plot(nepoch, 1 - valid_cr, '.', label=labels[i])
 
-ax.legend()
-ax.set_ylim(bottom=0.)
+ax.legend(loc=4)
+ax.set_ylim(top=1.)
 ax.set_xlabel('No. epochs')
-ax.set_ylabel('Classification error rate')
+ax.set_ylabel('Classification rate')
 fig.savefig('test.pdf')

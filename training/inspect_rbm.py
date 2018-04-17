@@ -49,6 +49,7 @@ def plot_labvis_filters(rbm, label_idxs, img_shape, name='lab_filters',
     if fig is not None:
         plt.tight_layout()
         plt.savefig(os.path.join(make_figure_folder(), name + '_filters.png'))
+        plt.savefig(os.path.join(make_figure_folder(), name + '_filters.pdf'))
 
 
 def plot_filters(rbm, hidden_idxs, img_shape, tile_shape=(4, 4),
@@ -71,45 +72,47 @@ def plot_filters(rbm, hidden_idxs, img_shape, tile_shape=(4, 4),
     plt.tight_layout()
     plt.savefig(os.path.join(make_figure_folder(), name + '_filters.png'),
                 bbox_inches='tight')
+    plt.savefig(os.path.join(make_figure_folder(), name + '_filters.pdf'),
+                bbox_inches='tight')
 
 
 def plot_histograms(rbm, name='histo'):
     plt.style.use('mthesis_style')
     # weight histogram
-    figwidth = 5.7881
-    figheight = figwidth/1.618
-    plt.figure(figsize=(figwidth, figheight))
+    fig = plt.figure()
+    fig.set_figheight(fig.get_figwidth()/1.8)
     plt.subplot(121)
-    plt.hist(rbm.w[:rbm.n_inputs].flatten(), bins='auto')
+    plt.hist(rbm.w[:rbm.n_inputs].flatten(), bins='auto', histtype='stepfilled')
     print('Max: {}, Min: {}'.format(rbm.w[:rbm.n_inputs].max(), rbm.w[:rbm.n_inputs].min()))
     plt.title('Visible to hidden')
     plt.xlabel('Weight')
-    plt.ylabel('Number')
+    plt.ylabel('Frequency')
     plt.subplot(122)
-    plt.hist(rbm.w[rbm.n_inputs:].flatten(), bins='auto')
+    plt.hist(rbm.w[rbm.n_inputs:].flatten(), bins='auto', histtype='stepfilled')
     plt.title('Label to hidden')
     plt.xlabel('Weight')
-    plt.ylabel('Number')
-    plt.subplots_adjust(wspace=0.4, right=.9)
+    # plt.ylabel('Frequency')
+    plt.subplots_adjust(wspace=0.3, right=.9, bottom=.12)
     plt.savefig(os.path.join(make_figure_folder(), name + '_weights.png'))
+    plt.savefig(os.path.join(make_figure_folder(), name + '_weights.pdf'))
 
     # bias histogram
-    figwidth = 5.7881
-    figheight = figwidth/1.618
-    plt.figure(figsize=(figwidth, figheight))
+    fig = plt.figure()
+    fig.set_figheight(fig.get_figwidth()/1.8)
     plt.subplot(121)
-    plt.hist(rbm.ibias, bins='auto')
+    plt.hist(rbm.ibias, bins='auto', histtype='stepfilled')
     # plt.hist(rbm.lbias, bins='auto', alpha=.9)
     plt.title('Visible neurons')
     plt.xlabel('Bias')
-    plt.ylabel('Number')
+    plt.ylabel('Frequency')
     plt.subplot(122)
-    plt.hist(rbm.hbias, bins='auto')
+    plt.hist(rbm.hbias, bins='auto', histtype='stepfilled')
     plt.title('Hidden neurons')
     plt.xlabel('Bias')
-    plt.ylabel('Number')
-    plt.subplots_adjust(wspace=0.3, right=.9)
+    # plt.ylabel('Frequency')
+    plt.subplots_adjust(wspace=0.3, right=.9, bottom=.12)
     plt.savefig(os.path.join(make_figure_folder(), name + '_biases.png'))
+    plt.savefig(os.path.join(make_figure_folder(), name + '_biases.pdf'))
 
 
 def visualize_biases(rbm, img_shape, name='test'):
@@ -118,28 +121,32 @@ def visualize_biases(rbm, img_shape, name='test'):
         biases = rbm.ibias
     except AttributeError:
         biases = rbm.vbias
-    plt.figure()
-    plt.title('Visible biases')
+    fig = plt.figure()
+    fig.set_figheight(.66*fig.get_figheight())
+    fig.set_figwidth(.66*fig.get_figwidth())
+    plt.title('Visible biases (Flat)')
     plt.imshow(biases.reshape(img_shape), interpolation='Nearest', cmap='gray_r')
     plt.colorbar()
+    plt.tight_layout()
     plt.savefig(os.path.join(make_figure_folder(), name + '_visbiases.png'))
+    plt.savefig(os.path.join(make_figure_folder(), name + '_visbiases.pdf'))
 
 
 # Load data -- Pong
 img_shape = (40, 48)
-rbm_name = 'gauss_lw5_40x48_crbm'
+rbm_name = 'pong_lw5_40x48_crbm'
 # data_name = 'gauss_var_start{}x{}'.format(*img_shape)
 # train_set, _, test_set = load_images(data_name)
 # assert np.prod(img_shape) == train_set[0].shape[1]
 testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
-# plot_histograms(testrbm, 'gauss')
-visualize_biases(testrbm, img_shape)
-# rand_ind = np.random.choice(np.arange(testrbm.n_hidden), size=12, replace=False)
-# plot_filters(testrbm, rand_ind, img_shape, tile_shape=(3, 4), name='pong',
-#              title='Pong')
-# fig, ax = plt.subplots(2, 1, figsize=(12, 7))
-# plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Pong',
-#                     ax=ax[0])
+# plot_histograms(testrbm, 'pong')
+# visualize_biases(testrbm, img_shape)
+rand_ind = np.random.choice(np.arange(testrbm.n_hidden), size=12, replace=False)
+plot_filters(testrbm, rand_ind, img_shape, tile_shape=(3, 4), name='pong',
+             title='Flat')
+fig, ax = plt.subplots(2, 1, figsize=(12, 7))
+plot_labvis_filters(testrbm, np.arange(2, 8, 2), img_shape, title='Flat',
+                    ax=ax[0])
 
 # rbm_name = 'gauss_lw5_40x48_crbm'
 # testrbm = rbm_pkg.load(get_rbm_dict(rbm_name))
