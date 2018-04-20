@@ -9,21 +9,40 @@ from scipy.ndimage import convolve1d
 from lif_pong.utils import tile_raster_images
 from lif_pong.utils.data_mgmt import make_figure_folder, get_rbm_dict
 import lif_pong.training.rbm as rbm_pkg
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 plt.rcParams['animation.ffmpeg_path'] = u'/home/hd/hd_hd/hd_kq433/ffmpeg-3.4.1-64bit-static/ffmpeg'
 
 
 # video
-def update_fig(i, frames, fig, img_artists, n_samples):
+def update_fig(i, frames, fig, img_artists, n_samples, polys,
+               clamp_window=None, clamp_duration=None):
     if len(img_artists) > 1:
         assert len(frames) == len(img_artists)
+    img_shape = frames[0][0].shape
     for idx, im in enumerate(img_artists):
         im.set_data(frames[idx][i])
+        if clamp_window is not None:
+            try:
+                if len(clamp_window) == len(img_artists):
+                    clamp_end = (i % n_samples) // clamp_duration - .5
+                    clamp_start = max(0, clamp_end - clamp_window[idx]) - .5
+                    verts = np.array([[clamp_start, -.5], [clamp_start, img_shape[0] + .5],
+                                      [clamp_end, img_shape[0] + .5], [clamp_end, -.5]])
+                else:
+                    raise RuntimeError
+            except TypeError:
+                clamp_end = (i % n_samples) // clamp_duration - .5
+                clamp_start = max(0, clamp_end - clamp_window) - .5
+                verts = np.array([[clamp_start, -.5], [clamp_start, img_shape[0] + .5],
+                                  [clamp_end, img_shape[0] + .5], [clamp_end, -.5]])
+            polys[idx].set_xy(verts)
+
     # artists[-1].set_text(
     fig.suptitle('Image {2}: {0:4d}/{1} samples'.format(
-        i % n_samples, n_samples, i // n_samples), fontsize=12)
-    return img_artists
+        (i % n_samples) + 1, n_samples, i // n_samples), fontsize=12)
+    return img_artists + polys
 
 
 def load_samples(sample_file, data_idx, img_shape, n_labels, average=False,
@@ -84,36 +103,52 @@ def load_samples(sample_file, data_idx, img_shape, n_labels, average=False,
 
 
 def plot_animation(frame_list, img_shape, n_samples, titles=[], show_hidden=False,
-                   savename='test'):
+                   savename='test', clamp_window=None, clamp_duration=None):
     if len(frame_list) == 1:
         fig, single_ax = plt.subplots()
         axarr = np.array([single_ax])
     else:
+        # vertical orientation
         tile_shape = (2, len(frame_list)//2 + len(frame_list) % 2)
         fig, axarr = plt.subplots(*tile_shape, figsize=(tile_shape[1]*4, tile_shape[0]*3))
         fig.subplots_adjust(wspace=0.1, hspace=0.3)
+        # horizontal orientation
+        # tile_shape = (len(frame_list)//2 + len(frame_list) % 2, 2)
+        # fig, axarr = plt.subplots(*tile_shape, figsize=(tile_shape[1]*4, tile_shape[0]*3.5))
+        # fig.subplots_adjust(wspace=0.1, hspace=0.3)
     if len(axarr.shape) == 1:
         axarr = np.expand_dims(axarr, 1)
+    if clamp_window is not None:
+        assert clamp_duration is not None
 
     im = []
+    polys = []
     for i, axrow in enumerate(axarr):
         for j, ax in enumerate(axrow):
             im.append(ax.imshow(np.zeros(img_shape), vmin=0, vmax=1.,
-                      interpolation='Nearest', cmap='gray', animated=True))
+                      interpolation='Nearest', cmap='gray_r', animated=True))
+            clamppatch = matplotlib.patches.Polygon(
+                np.array([[0, 0],[0, 0], [0, 0], [0, 0]]), closed=True,
+                fill=True, facecolor='C0', edgecolor=None, alpha=.3,
+                animated=True)
+            ax.add_patch(clamppatch)
+            polys.append(clamppatch)
             if len(titles) > 0:
                 try:
                     title = titles[i*len(axrow) + j]
-                    ax.set_title(title)
+                    ax.set_title(title, fontsize=12)
                 except IndexError:
                     im.pop()
             else:
-                ax.set_title('samples {}'.format(i*len(axrow) + j))
+                ax.set_title('samples {}'.format(i*len(axrow) + j),
+                             fontdict={'fontsize': 12})
             ax.tick_params(left='off', right='off', bottom='off', top='off',
                    labelleft='off', labelbottom='off')
+
     ani = animation.FuncAnimation(
         fig, update_fig, frames=frame_list[0].shape[0],
         interval=10., blit=True, repeat=False,
-        fargs=(frame_list, fig, im, n_samples))
+        fargs=(frame_list, fig, im, n_samples, polys, clamp_window, clamp_duration))
 
     if show_hidden:
         ani.save(os.path.join(make_figure_folder(),
@@ -268,7 +303,8 @@ def main(config_dict):
 
     if make_video:
         plot_animation(frame_list, img_shape, n_samples, titles=titles,
-                       show_hidden=show_hidden, savename=savename)
+                       show_hidden=show_hidden, savename=savename,
+                       clamp_window=clamp_window, clamp_duration=clamp_duration)
     else:
         tile_shape = tuple(config_dict['tile_shape'])
         try:

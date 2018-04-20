@@ -17,7 +17,7 @@ plt.rcParams['animation.ffmpeg_path'] = u'/home/hd/hd_hd/hd_kq433/ffmpeg-3.4.1-6
 
 class Pong_updater(object):
     def __init__(self, image, points, img_shape=(40, 48), win_size=None,
-                 clamp_duration=1, paddle_len=0, max_step=0.):
+                 clamp_duration=1, paddle_len=0, max_step=0., inverted_rgb=False):
         self.image = image
         self.points = points
         self.img_shape = img_shape
@@ -30,7 +30,7 @@ class Pong_updater(object):
         self.clamp_pos = -3
         # no. of frames during which clamp is constant
         self.clamp_duration = int(clamp_duration)
-
+        self.inverted = inverted_rgb
         # for agent
         if max_step == 0:
             max_step = 1./clamp_duration
@@ -87,7 +87,10 @@ class Pong_updater(object):
                 clamped_window[:, start:end, 0] = 31/255
                 clamped_window[:, start:end, 1] = 119/255
                 clamped_window[:, start:end, 2] = 180/255
+                if self.inverted:
+                    clamped_window[clamped_window != 0] = 1 - clamped_window[clamped_window != 0]
                 clamped_window *= .25
+
                 rgb_pixels = np.clip(rgb_pixels + clamped_window, 0., 1.)
                 if t % self.clamp_duration == 0:
                     self.clamp_pos += 1
@@ -96,8 +99,13 @@ class Pong_updater(object):
             # add paddle
             if self.agent is not None:
                 paddle_pxls = self.update_paddle(prediction)
+                if self.inverted:
+                    paddle_pxls[paddle_pxls != 0] = 1 - paddle_pxls[paddle_pxls != 0]
                 rgb_pixels = np.hstack((rgb_pixels,
                                         np.expand_dims(paddle_pxls, 1)))
+
+            if self.inverted:
+                rgb_pixels = 1 - rgb_pixels
 
             self.image.set_data(rgb_pixels)
             self.points.set_data(pixels[:, -1], np.arange(img_shape[0]) - .5)
@@ -129,19 +137,19 @@ class Pong_updater(object):
             #     image = ax_img.imshow(np.zeros(img_shape), vmin=0., vmax=1.,
             #                        interpolation='Nearest', cmap='gray', origin='lower')
             #     points, = ax_pred.plot([], [], 'ko')
-
+            #     print(rgb_pixels.min())
             #     image.set_data(rgb_pixels)
             #     points.set_data(pixels[:, -1], np.arange(img_shape[0]))
             #     ax_pred.plot([0., 1.1], [target, target], '-', color='C2', linewidth=2)
             #     fig.savefig('frame.pdf')
             #     sys.exit()
 
-
             return self.image, self.points
 
 
 def make_animation(fig_name, img_shape, win_size, vis_samples, paddle_len=0,
-                   clamp_interval=1, anim_interval=10., target=None):
+                   clamp_interval=1, anim_interval=10., target=None,
+                   inverted_rgb=False):
     # set up figure
     # fig = plt.figure()
     # width = .7
@@ -179,7 +187,7 @@ def make_animation(fig_name, img_shape, win_size, vis_samples, paddle_len=0,
     ax_pred.set_xlabel('P (last column)')
 
     image = ax_img.imshow(np.zeros(img_shape), vmin=0., vmax=1.,
-                       interpolation='Nearest', cmap='gray', origin='lower')
+                       interpolation='Nearest', cmap='gray_r', origin='lower')
     points, = ax_pred.plot([], [], 'ko')
     # ex. for adding dynamic text; must be inside bounding box to be updated
     # lab_text = ax.text(0.95, 0.01, '', va='bottom', ha='right',
@@ -191,7 +199,7 @@ def make_animation(fig_name, img_shape, win_size, vis_samples, paddle_len=0,
     frames = zip(range(len(vis_samples)), vis_samples)
     upd = Pong_updater(image, points, img_shape=img_shape,
                        win_size=win_size, paddle_len=paddle_len,
-                       clamp_duration=clamp_interval)
+                       clamp_duration=clamp_interval, inverted_rgb=inverted_rgb)
     ani = animation.FuncAnimation(fig, upd, frames=frames, blit=True,
                                   interval=anim_interval, repeat_delay=2000)
     ani.save(fig_name + '.mp4', writer='ffmpeg')
@@ -211,9 +219,13 @@ def main(config_dict):
         targets = average_helper(img_shape[0], targets[start_idx:start_idx + n_imgs])
     else:
         targets = [None]*n_imgs
+    if 'inverted_rgb' in config_dict.keys():
+        inverted_rgb = config_dict['inverted_rgb']
+    else:
+        inverted_rgb = False
     save_name = os.path.join(make_figure_folder(), config_dict['save_name'])
 
-    with np.load(data_path) as d:
+    with np.load(os.path.expanduser(data_path)) as d:
         samples = d['samples'][:n_imgs]
         vis_samples = samples[..., :np.prod(img_shape) + img_shape[0]//3].astype(float)
     # maybe average like in lif_inspect_samples
@@ -223,7 +235,8 @@ def main(config_dict):
     for i in range(len(vis_samples)):
         print('Making animation {} of {}'.format(i + 1, len(vis_samples)))
         make_animation(save_name + '_{}'.format(i), img_shape, win_size, vis_samples[i],
-                       paddle_len=4, clamp_interval=clamp_interval, target=targets[i])
+                       paddle_len=4, clamp_interval=clamp_interval, target=targets[i],
+                       inverted_rgb=inverted_rgb)
 
 
 
