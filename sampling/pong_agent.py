@@ -142,7 +142,7 @@ def compute_performance(predictions, targets, data_idx, max_speedup=2.,
 
 
 def compute_baseline_performance(img_shape, test_set, data_idx, max_speedup=2.,
-                                 paddle_width=3, leave_uncovered=1):
+                                 paddle_width=4, leave_uncovered=1):
     n_pos = img_shape[0]
 
     # compute baseline prediction
@@ -161,6 +161,32 @@ def compute_baseline_performance(img_shape, test_set, data_idx, max_speedup=2.,
                                max_speedup=max_speedup, 
                                paddle_width=paddle_width,
                                leave_uncovered=leave_uncovered)
+
+
+def compute_ideal_performance(img_shape, test_set, data_idx, max_speedup=2.,
+                              paddle_width=4, leave_uncovered=1):
+
+    n_pos = img_shape[0]
+    imgs = test_set[0].reshape((-1,) + img_shape)[data_idx]
+    targets = imgs[..., -1]
+    target_pos = average_helper(n_pos, targets) - .5*img_shape[0]
+
+    v_ball = 1.
+    speed_range = np.linspace(0, v_ball * max_speedup, 100)
+    successes = []
+    for speed in speed_range:
+        ymax = speed*img_shape[1]/v_ball
+        successes.append(np.sum(np.abs(target_pos) <= ymax + .5*paddle_width))
+
+    result = {
+        'successes': np.array(successes),
+        'successes_std': None,
+        'distances': None,
+        'traces': None,
+        'speeds': speed_range/v_ball,
+        'n_instances': len(data_idx)
+    }
+    return result
 
 
 if __name__ == '__main__':

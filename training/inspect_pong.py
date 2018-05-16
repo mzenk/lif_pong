@@ -32,11 +32,13 @@ def plot_data(data_set, show_idx, img_shape, tile_shape=(4, 4), binary=False):
     plt.tight_layout()
     plt.savefig(os.path.join(make_figure_folder(),
                              data_name + '_samples' + name_mod + '.png'))
+    plt.savefig(os.path.join(make_figure_folder(),
+                             data_name + '_samples' + name_mod + '.pdf'))
 
 
 # Load data -- Pong
 img_shape = (40, 48)
-data_name = 'gauss_lw5_40x48'
+data_name = 'knick_lw5_pos0.5_ampl0.5_40x48'
 train_set, valid_set, test_set = load_images(data_name)
 # # Load data -- MNIST
 # import gzip

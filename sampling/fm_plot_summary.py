@@ -180,7 +180,7 @@ def plot_inferror_pcolor(df, identifier, figname='paramsweep.pdf', logscale=Fals
     fig.set_figheight(.5*5.7885)
     fig.set_figwidth(.5*8.1866)
     im = ax.pcolormesh(X, Y, np.ma.masked_where(np.isnan(C), C),
-                       cmap=plt.cm.viridis, rasterized=True)
+                       cmap=plt.cm.viridis, rasterized=True, vmin=0., vmax=.3)
     # aspect = (C.shape[0] - 1)/(C.shape[1] - 1) \
     #     * (maxs[0] - mins[0])/(maxs[1] - mins[1])
     # ax.set_aspect(float(aspect))
@@ -196,8 +196,8 @@ def plot_inferror_pcolor(df, identifier, figname='paramsweep.pdf', logscale=Fals
     except TypeError:
         plt.xlabel(identifier[0])
         plt.ylabel(identifier[1])
-    cbar = plt.colorbar(im, ax=ax)
-    # cbar.ax.axhline(.057/.75, color='orange')   # FM
+    cbar = plt.colorbar(im, ax=ax, extend='max')
+    cbar.ax.axhline(.057/.75, color='orange')   # FM
     # cbar.ax.axhline(C.min()/.75, color='w')   # FM
     # cbar.ax.axhline(.057/.25, color='orange')   # FM
     # cbar.ax.axhline(C.min()/.25, color='w')   # FM

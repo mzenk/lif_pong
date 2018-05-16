@@ -152,12 +152,13 @@ def plot_prediction_error(ax, pred_error, label=None, x_data=None):
           median[:48].sum()/48.))
 
     # add prediction error curve to plot
-    if label != 'exception':
-        ax.plot(x_data[:-1], median[:-1], '.-', alpha=.7)
-        ax.fill_between(x_data[:-1], lower_quart[:-1], upper_quart[:-1], alpha=.3, label=label)
-    else:
+    if label == 'Static clamping':
         ax.plot(x_data[:-1], median[:-1], '.-', alpha=.7)
         ax.fill_between(x_data[:-1], median[:-1], median[:-1], alpha=.3, label=label)
+    else:
+        ax.plot(x_data[:-1], median[:-1], '.-', alpha=.7)
+        ax.fill_between(x_data[:-1], lower_quart[:-1], upper_quart[:-1], alpha=.3, label=label)
+
     # ax.plot(x_data, mean, '.-', alpha=.7, label='mean ' + label)
 
 
@@ -167,7 +168,10 @@ def plot_agent_performance(ax, agent_dict, label=None):
     # std of binary rv is not very helpfu
     speeds = agent_dict['speeds']
     print('Maximum success rate: {:.3f}'.format(np.max(succrate)))
-    ax.plot(speeds, succrate, label=label)
+    if label == 'baseline':
+        ax.plot(speeds, succrate, 'k:')
+    else:
+        ax.plot(speeds, succrate, label=label)
 
 
 def plot_prediction_error_dist(ax, pred_error, dist_pos=None, label=None,
@@ -216,7 +220,7 @@ def main(identifier_list, list_bad=False):
     ax_ap.set_xlim([-0.1, 1.8])
     ax_pe.set_xlim([-.01, 1.01])
 
-     # fig_ap, ax_ap = plt.subplots()
+    # fig_ap, ax_ap = plt.subplots()
     ax_pe.set_ylabel('Prediction error [pxls]')
     ax_pe.set_xlabel('Ball position / field length')
     ax_ap.set_xlabel('Agent speed / ball speed ($r$)')
@@ -314,7 +318,13 @@ def main(identifier_list, list_bad=False):
         if list_bad:
             list_bad_examples(pred_error, img_shape)
 
-    ax_ap.plot(ax_ap.get_xlim(), [1, 1], 'k:')
+    # # Add line for ideal agent
+    # agent_dict = pong_agent.compute_ideal_performance(img_shape, test_set, data_idx)
+    # succrate = agent_dict['successes'] / agent_dict['n_instances']
+    # speeds = agent_dict['speeds']
+    # ax_ap.plot(speeds, succrate, 'k:', label='Omniscient agent')
+    ax_ap.plot([-0.1, 2.], [1,1], 'k:')
+
     ax_ap.legend()
     fig_pd.tight_layout()
     # ax_pe.legend()
